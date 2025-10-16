@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Tamrakar Complex | Smart Device Exchange Hub{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="container">
+    <div class="hero-content">
+      <h1>Upgrade smarter with Tamrakar Complex</h1>
+      <p>
+        Discover real-time trade-in valuations, accurate market pricing, and a
+        deep search experience built for Nepal's vibrant smartphone market.
+      </p>
+      <div class="hero-actions">
+        <a class="btn primary" href="{{ url_for('exchange') }}">Exchange Valuation</a>
+        <a class="btn secondary" href="{{ url_for('deep_search') }}">Deep Search</a>
+      </div>
+    </div>
+    <div class="hero-insights">
+      <h2>Trending flagship insights</h2>
+      <ul class="highlight-list">
+        {% for phone in hero_highlights %}
+        <li>
+          <h3>{{ phone.name }}</h3>
+          <p><strong>Official price:</strong> NPR {{ "{:,}".format(phone.official_price) }}</p>
+          <p><strong>Exchange base:</strong> NPR {{ "{:,}".format(phone.base_price) }}</p>
+          <p><strong>Key specs:</strong> {{ phone.display }} · {{ phone.chipset }} · {{ phone.camera }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="feature-grid container">
+  <article>
+    <h2>Exchange valuations tailored for Nepal</h2>
+    <p>
+      Our valuation engine combines condition, storage tiers, accessories, and
+      warranty coverage to produce a reliable offer that aligns with local
+      demand.
+    </p>
+  </article>
+  <article>
+    <h2>Actionable market pricing</h2>
+    <p>
+      We collate pricing intelligence inspired by Tamrakar Complex storefronts
+      and major online retailers to give you a trusted reference before you buy
+      or sell.
+    </p>
+  </article>
+  <article>
+    <h2>Deep search, instant decisions</h2>
+    <p>
+      Filter by brand, budget ceiling, or specific device names to quickly
+      shortlist the phones that match your needs.
+    </p>
+  </article>
+</section>
+
+<section class="cta">
+  <div class="container">
+    <h2>Ready to refresh your smartphone?</h2>
+    <p>Start with a valuation, browse price charts, and finalize with confidence.</p>
+    <a class="btn primary" href="{{ url_for('exchange') }}">Start valuation</a>
+  </div>
+</section>
+{% endblock %}

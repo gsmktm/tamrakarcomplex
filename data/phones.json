@@ -1,0 +1,154 @@
+[
+  {
+    "id": "iphone-14-pro",
+    "name": "Apple iPhone 14 Pro",
+    "brand": "Apple",
+    "storage": ["128GB", "256GB", "512GB"],
+    "base_price": 190000,
+    "condition_adjustments": {
+      "Mint": 1.0,
+      "Good": 0.88,
+      "Fair": 0.75,
+      "Needs Repair": 0.5
+    },
+    "year": 2022,
+    "battery_health": 100,
+    "display": "6.1\" Super Retina XDR",
+    "chipset": "A16 Bionic",
+    "camera": "48MP Triple Camera",
+    "official_price": 195990
+  },
+  {
+    "id": "samsung-s23-ultra",
+    "name": "Samsung Galaxy S23 Ultra",
+    "brand": "Samsung",
+    "storage": ["256GB", "512GB"],
+    "base_price": 184000,
+    "condition_adjustments": {
+      "Mint": 1.0,
+      "Good": 0.87,
+      "Fair": 0.72,
+      "Needs Repair": 0.45
+    },
+    "year": 2023,
+    "battery_health": 100,
+    "display": "6.8\" Dynamic AMOLED 2X",
+    "chipset": "Snapdragon 8 Gen 2",
+    "camera": "200MP Quad Camera",
+    "official_price": 191999
+  },
+  {
+    "id": "xiaomi-13-pro",
+    "name": "Xiaomi 13 Pro",
+    "brand": "Xiaomi",
+    "storage": ["256GB"],
+    "base_price": 150000,
+    "condition_adjustments": {
+      "Mint": 1.0,
+      "Good": 0.85,
+      "Fair": 0.7,
+      "Needs Repair": 0.4
+    },
+    "year": 2023,
+    "battery_health": 100,
+    "display": "6.73\" AMOLED",
+    "chipset": "Snapdragon 8 Gen 2",
+    "camera": "50MP Triple Camera",
+    "official_price": 154999
+  },
+  {
+    "id": "oneplus-11",
+    "name": "OnePlus 11",
+    "brand": "OnePlus",
+    "storage": ["128GB", "256GB"],
+    "base_price": 118000,
+    "condition_adjustments": {
+      "Mint": 1.0,
+      "Good": 0.84,
+      "Fair": 0.7,
+      "Needs Repair": 0.45
+    },
+    "year": 2023,
+    "battery_health": 100,
+    "display": "6.7\" Fluid AMOLED",
+    "chipset": "Snapdragon 8 Gen 2",
+    "camera": "50MP Triple Camera",
+    "official_price": 123999
+  },
+  {
+    "id": "poco-x5-pro",
+    "name": "Poco X5 Pro",
+    "brand": "Poco",
+    "storage": ["128GB", "256GB"],
+    "base_price": 42000,
+    "condition_adjustments": {
+      "Mint": 1.0,
+      "Good": 0.82,
+      "Fair": 0.68,
+      "Needs Repair": 0.4
+    },
+    "year": 2023,
+    "battery_health": 100,
+    "display": "6.67\" AMOLED",
+    "chipset": "Snapdragon 778G",
+    "camera": "108MP Triple Camera",
+    "official_price": 44999
+  },
+  {
+    "id": "vivo-v27",
+    "name": "Vivo V27",
+    "brand": "Vivo",
+    "storage": ["128GB", "256GB"],
+    "base_price": 56000,
+    "condition_adjustments": {
+      "Mint": 1.0,
+      "Good": 0.83,
+      "Fair": 0.7,
+      "Needs Repair": 0.42
+    },
+    "year": 2023,
+    "battery_health": 100,
+    "display": "6.78\" AMOLED",
+    "chipset": "Dimensity 7200",
+    "camera": "50MP Triple Camera",
+    "official_price": 58999
+  },
+  {
+    "id": "oppo-reno8-t",
+    "name": "Oppo Reno8 T",
+    "brand": "Oppo",
+    "storage": ["256GB"],
+    "base_price": 48000,
+    "condition_adjustments": {
+      "Mint": 1.0,
+      "Good": 0.8,
+      "Fair": 0.66,
+      "Needs Repair": 0.38
+    },
+    "year": 2023,
+    "battery_health": 100,
+    "display": "6.43\" AMOLED",
+    "chipset": "Helio G99",
+    "camera": "100MP Triple Camera",
+    "official_price": 50999
+  },
+  {
+    "id": "realme-10-pro-plus",
+    "name": "Realme 10 Pro+",
+    "brand": "Realme",
+    "storage": ["128GB", "256GB"],
+    "base_price": 52000,
+    "condition_adjustments": {
+      "Mint": 1.0,
+      "Good": 0.82,
+      "Fair": 0.68,
+      "Needs Repair": 0.4
+    },
+    "year": 2023,
+    "battery_health": 100,
+    "display": "6.7\" AMOLED",
+    "chipset": "Dimensity 1080",
+    "camera": "108MP Triple Camera",
+    "official_price": 54999
+  }
+]

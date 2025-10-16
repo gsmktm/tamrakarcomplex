@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Price Insights | Tamrakar Complex{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div class="container">
+    <h1>Market Price Dashboard</h1>
+    <p>Compare official prices with Tamrakar Complex base exchange offers.</p>
+  </div>
+</section>
+
+<section class="container">
+  <div class="card">
+    <table class="price-table">
+      <thead>
+        <tr>
+          <th>Brand</th>
+          <th>Model</th>
+          <th>Official Price (NPR)</th>
+          <th>Exchange Base (NPR)</th>
+          <th>Highlights</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for phone in phones %}
+        <tr>
+          <td>{{ phone.brand }}</td>
+          <td>{{ phone.name }}</td>
+          <td>{{ "{:,}".format(phone.official_price) }}</td>
+          <td>{{ "{:,}".format(phone.base_price) }}</td>
+          <td>{{ phone.display }} · {{ phone.camera }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

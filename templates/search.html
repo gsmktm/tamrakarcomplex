@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Deep Search | Tamrakar Complex{% endblock %}
+{% block extra_head %}
+<script defer src="{{ url_for('static', filename='js/search.js') }}"></script>
+{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div class="container">
+    <h1>Deep Search</h1>
+    <p>Explore phones by brand, budget, and feature focus in seconds.</p>
+  </div>
+</section>
+
+<section class="container">
+  <div class="card search-card">
+    <form id="search-form">
+      <label for="query">Search term</label>
+      <input type="text" id="query" name="query" placeholder="e.g. iPhone, Galaxy, Dimensity" required />
+
+      <label for="brand">Brand</label>
+      <select id="brand" name="brand">
+        <option value="">All brands</option>
+        {% for brand in brands %}
+        <option value="{{ brand }}">{{ brand }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="max_price">Max price (NPR)</label>
+      <input type="number" id="max_price" name="max_price" placeholder="Set a budget cap" min="0" />
+
+      <button class="btn primary" type="submit">Search</button>
+    </form>
+
+    <div id="results">
+      <p class="hint">Enter a query to see matching devices, with price and spec summaries.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}

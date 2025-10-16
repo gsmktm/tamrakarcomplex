@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Exchange Valuation | Tamrakar Complex{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div class="container">
+    <h1>Exchange Valuation</h1>
+    <p>Get a transparent trade-in estimate tailored to Kathmandu's market.</p>
+  </div>
+</section>
+
+<section class="container two-column">
+  <form method="post" class="card">
+    <h2>Device details</h2>
+    <label for="phone_id">Choose device</label>
+    <select name="phone_id" id="phone_id" required>
+      <option value="">Select a phone</option>
+      {% for phone in phones %}
+      <option value="{{ phone.id }}" {% if selected_phone and selected_phone.id == phone.id %}selected{% endif %}>
+        {{ phone.brand }} — {{ phone.name }}
+      </option>
+      {% endfor %}
+    </select>
+
+    <label for="storage">Storage</label>
+    <select name="storage" id="storage" required>
+      <option value="">Select storage</option>
+      {% if selected_phone %}
+        {% for storage in selected_phone.storage %}
+        <option value="{{ storage }}" {% if valuation and valuation.storage == storage %}selected{% endif %}>{{ storage }}</option>
+        {% endfor %}
+      {% else %}
+        <option value="128GB">128GB</option>
+        <option value="256GB">256GB</option>
+        <option value="512GB">512GB</option>
+      {% endif %}
+    </select>
+
+    <label for="condition">Condition</label>
+    <select name="condition" id="condition" required>
+      <option value="Mint" {% if valuation and valuation.condition == 'Mint' %}selected{% endif %}>Mint (no noticeable wear)</option>
+      <option value="Good" {% if valuation and valuation.condition == 'Good' %}selected{% endif %}>Good (light wear)</option>
+      <option value="Fair" {% if valuation and valuation.condition == 'Fair' %}selected{% endif %}>Fair (visible wear)</option>
+      <option value="Needs Repair" {% if valuation and valuation.condition == 'Needs Repair' %}selected{% endif %}>Needs Repair</option>
+    </select>
+
+    <label for="age">Device age</label>
+    <input type="number" min="0" max="6" name="age" id="age" value="{{ valuation.age if valuation else 0 }}" />
+
+    <fieldset class="checkbox-group">
+      <legend>Accessories included</legend>
+      <label><input type="checkbox" name="accessories" value="charger" {% if valuation and 'charger' in valuation.accessories %}checked{% endif %}/> Charger</label>
+      <label><input type="checkbox" name="accessories" value="earbuds" {% if valuation and 'earbuds' in valuation.accessories %}checked{% endif %}/> Earbuds</label>
+      <label><input type="checkbox" name="accessories" value="box" {% if valuation and 'box' in valuation.accessories %}checked{% endif %}/> Original box</label>
+    </fieldset>
+
+    <fieldset class="radio-group">
+      <legend>Warranty</legend>
+      <label><input type="radio" name="warranty" value="active" {% if valuation and valuation.warranty == 'active' %}checked{% endif %}/> Active</label>
+      <label><input type="radio" name="warranty" value="expired" {% if valuation and valuation.warranty == 'expired' %}checked{% endif %}/> Expired</label>
+    </fieldset>
+
+    <button class="btn primary" type="submit">Calculate valuation</button>
+  </form>
+
+  <aside class="card valuation">
+    <h2>Your valuation</h2>
+    {% if valuation %}
+    <p class="valuation-price">Estimated offer: NPR {{ "{:,}".format(valuation.estimated_price) }}</p>
+    <p>
+      Based on a <strong>{{ valuation.condition }}</strong> device with <strong>{{ valuation.storage }}</strong>
+      storage and {{ valuation.accessories|length }} accessories.
+    </p>
+    <p>Warranty: {{ 'Active coverage' if valuation.warranty == 'active' else 'Expired' }}.</p>
+    <p>Age adjustment applied for {{ valuation.age }} year(s) of ownership.</p>
+    <p class="hint">Visit our Tamrakar Complex outlet to finalise inspection and payment.</p>
+    {% else %}
+    <p>Select a device and share its details to generate your personalised exchange offer.</p>
+    {% endif %}
+  </aside>
+</section>
+{% endblock %}
