@@ -1,0 +1,25 @@
+:root {
+  --primary: #8b5cf6;
+  --secondary: #22c55e;
+  --radius: 12px;
+  --container-max-width: 1200px;
+}
+
+body.dynamic-theme .text-primary { color: var(--primary) !important; }
+body.dynamic-theme .bg-primary { background-color: var(--primary) !important; }
+body.dynamic-theme .border-primary { border-color: var(--primary) !important; }
+body.dynamic-theme .text-secondary { color: var(--secondary) !important; }
+body.dynamic-theme .bg-secondary { background-color: var(--secondary) !important; }
+
+/* Rounded elements */
+body.dynamic-theme .rounded,
+body.dynamic-theme .rounded-md,
+body.dynamic-theme .rounded-lg,
+body.dynamic-theme .rounded-xl,
+body.dynamic-theme .rounded-2xl {
+  border-radius: var(--radius) !important;
+}
+
+.container {
+  max-width: var(--container-max-width);
+}

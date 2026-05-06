@@ -1,0 +1,51 @@
+import { ReactNode } from "react";
+import { Navigate, useLocation, Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { Loader2, ShieldAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+export function RequireStoreAdmin({ children }: { children: ReactNode }) {
+  const { role, loading, user } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  // Superadmins and staff admins can also access store admin areas for support
+  const isStoreAdmin = role === "storeadmin" || role === "suadmin" || role === "staffadmin";
+
+  if (!isStoreAdmin) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md space-y-6">
+          <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center">
+            <ShieldAlert className="w-8 h-8 text-destructive" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold tracking-tight">Store Admin Access Required</h2>
+            <p className="text-muted-foreground">This area is for store owners and managers. Your current role ({role}) does not have permission to view this page.</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button asChild variant="default" size="lg">
+              <Link to="/storeadmin">Go to Store Dashboard</Link>
+            </Button>
+            <Button asChild variant="ghost">
+              <Link to="/">Back to Home</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}

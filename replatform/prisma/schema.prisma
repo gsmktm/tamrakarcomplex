@@ -1,0 +1,748 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlatformRole {
+  SUPER_ADMIN
+  STAFF_ADMIN
+  STORE_ADMIN
+  STORE_STAFF
+  CUSTOMER
+}
+
+enum SubscriptionStatus {
+  active
+  expired
+  pending_payment
+  suspended
+  cancelled
+  trial
+}
+
+enum ReferralStatus {
+  pending
+  approved
+  rejected
+  paid
+  expired
+}
+
+enum RequestStatus {
+  pending
+  under_review
+  inspection_needed
+  offer_sent
+  accepted
+  rejected
+  completed
+  cancelled
+}
+
+enum RepairStatus {
+  request_received
+  inspection_pending
+  under_repair
+  waiting_for_parts
+  ready_for_pickup
+  completed
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+model User {
+  id                String                @id @default(cuid())
+  email             String                @unique
+  passwordHash      String
+  fullName          String?
+  phone             String?
+  referralCode      String                @unique
+  referredById      String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  roles             UserRole[]
+  staffPermissions  StaffPermission[]
+  storePermissions  StorePermission[]
+  ownedStores       Store[]               @relation("StoreOwner")
+  storeStaffLinks   StoreStaff[]
+  orders            Order[]
+  referralLinks     ReferralLink[]
+  referralClicks    ReferralClick[]
+  referralRewards   ReferralTransaction[] @relation("ReferralReferrer")
+  pointWallet       PointWallet?
+  reviews           Review[]
+  auditLogs         AuditLog[]
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        PlatformRole @unique
+  permissions Permission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id        String @id @default(cuid())
+  roleId    String
+  moduleKey String
+  actionKey String
+  role      Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, moduleKey, actionKey])
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+}
+
+model StaffPermission {
+  id        String  @id @default(cuid())
+  userId    String
+  moduleKey String
+  canView   Boolean @default(false)
+  canCreate Boolean @default(false)
+  canEdit   Boolean @default(false)
+  canDelete Boolean @default(false)
+  canApprove Boolean @default(false)
+  canExport Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleKey])
+}
+
+model StorePermission {
+  id        String  @id @default(cuid())
+  userId    String
+  storeId   String
+  moduleKey String
+  canView   Boolean @default(false)
+  canCreate Boolean @default(false)
+  canEdit   Boolean @default(false)
+  canDelete Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId, moduleKey])
+}
+
+model Store {
+  id                String               @id @default(cuid())
+  ownerId           String
+  packageId         String?
+  name              String
+  slug              String               @unique
+  description       String?
+  logoUrl           String?
+  coverUrl          String?
+  shopNumber        String?
+  floor             String?
+  insideTamrakar    Boolean              @default(true)
+  location          String?
+  phone             String?
+  whatsapp          String?
+  viber             String?
+  messenger         String?
+  mapUrl            String?
+  rating            Float                @default(0)
+  verified          Boolean              @default(false)
+  status            String               @default("pending")
+  packageSlug       String               @default("free")
+  subscriptionStatus SubscriptionStatus   @default(expired)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  owner             User                 @relation("StoreOwner", fields: [ownerId], references: [id])
+  package           StorePackage?        @relation(fields: [packageId], references: [id])
+  categories        StoreCategory[]
+  tags              StoreTag[]
+  staff             StoreStaff[]
+  permissions       StorePermission[]
+  subscriptions     StoreSubscription[]
+  products          Product[]
+  marketplace       MarketplaceListing[]
+  valuationRequests ValuationRequest[]
+  repairRequests    RepairRequest[]
+  exchangeRequests  ExchangeRequest[]
+  sellRequests      SellDeviceRequest[]
+  leads             StoreLead[]
+  analyticsEvents   StoreAnalyticsEvent[]
+  reviews           Review[]
+}
+
+model StoreCategory {
+  id      String  @id @default(cuid())
+  name    String
+  slug    String  @unique
+  stores  Store[]
+}
+
+model StoreTag {
+  id      String  @id @default(cuid())
+  name    String
+  slug    String  @unique
+  stores  Store[]
+}
+
+model StoreStaff {
+  id        String   @id @default(cuid())
+  storeId   String
+  userId    String
+  title     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, userId])
+}
+
+model StorePackage {
+  id                       String              @id @default(cuid())
+  name                     String
+  slug                     String              @unique
+  monthlyPrice             Int
+  productLimit             Int
+  marketplaceListingLimit  Int
+  storeStaffLimit          Int
+  valuationAccess          Boolean             @default(false)
+  repairAccess             Boolean             @default(false)
+  exchangeAccess           Boolean             @default(false)
+  sellDeviceAccess         Boolean             @default(false)
+  referralAccess           Boolean             @default(false)
+  featuredPlacement        Boolean             @default(false)
+  seoControl               Boolean             @default(false)
+  analyticsLevel           String              @default("none")
+  supportLevel             String              @default("community")
+  verifiedBadge            Boolean             @default(false)
+  homepageBoost            Boolean             @default(false)
+  rank                     Int                 @default(0)
+  active                   Boolean             @default(true)
+  stores                   Store[]
+  subscriptions            StoreSubscription[]
+}
+
+model StoreSubscription {
+  id              String             @id @default(cuid())
+  storeId          String
+  packageId        String
+  status           SubscriptionStatus @default(pending_payment)
+  startDate        DateTime?
+  expiryDate       DateTime?
+  renewalDate      DateTime?
+  graceEndsAt      DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  store            Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  package          StorePackage       @relation(fields: [packageId], references: [id])
+  payments         StorePayment[]
+  invoices         Invoice[]
+}
+
+model StorePayment {
+  id             String        @id @default(cuid())
+  subscriptionId String
+  amount         Int
+  method         String
+  status         PaymentStatus @default(pending)
+  gatewayRef     String?
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  subscription   StoreSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model Invoice {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  invoiceNo      String   @unique
+  amount         Int
+  status         String   @default("unpaid")
+  issuedAt       DateTime @default(now())
+  dueAt          DateTime?
+  subscription   StoreSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model Brand {
+  id        String        @id @default(cuid())
+  name      String
+  slug      String        @unique
+  logoUrl   String?
+  status    String        @default("active")
+  series    PhoneSeries[]
+  models    PhoneModel[]
+  products  Product[]
+}
+
+model PhoneSeries {
+  id      String       @id @default(cuid())
+  brandId String
+  name    String
+  slug    String       @unique
+  status  String       @default("active")
+  brand   Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  models  PhoneModel[]
+}
+
+model PhoneModel {
+  id             String        @id @default(cuid())
+  brandId        String
+  seriesId       String?
+  name           String
+  slug           String        @unique
+  modelNumber    String?
+  releaseYear    Int?
+  image          String?
+  status         String        @default("active")
+  searchKeywords String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  
+  brand          Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  series         PhoneSeries?  @relation(fields: [seriesId], references: [id])
+  
+  variants       PhoneVariant[]
+  specs          PhoneSpec?
+  inventory      InventoryItem[]
+  usedListings   UsedPhoneListing[]
+  exchangeValues ExchangeValue[]
+  unlocking      UnlockingService[]
+  repair         RepairService[]
+  accessories    AccessoryCompatibility[]
+  searchAliases  SearchAlias[]
+  autoPages      AutoPage[]
+  products       Product[]
+}
+
+model PhoneVariant {
+  id            String        @id @default(cuid())
+  modelId       String
+  ram           String?
+  storage       String?
+  color         String?
+  region        String?
+  conditionType String        @default("new")
+  status        String        @default("active")
+  
+  model         PhoneModel    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  inventory     InventoryItem[]
+  usedListings  UsedPhoneListing[]
+  exchangeValues ExchangeValue[]
+  products      Product[]
+}
+
+model PhoneSpec {
+  id             String     @id @default(cuid())
+  modelId        String     @unique
+  display        String?
+  processor      String?
+  camera         String?
+  battery        String?
+  charging       String?
+  os             String?
+  network        String?
+  body           String?
+  pros           String[]   @default([])
+  cons           String[]   @default([])
+  verdict        String?
+  highlights     Json?      // [{title: "Design", content: "..."}, {title: "Display", content: "..."}]
+  fullSpecsJson  Json?
+  
+  model          PhoneModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+model InventoryItem {
+  id            String       @id @default(cuid())
+  modelId       String
+  variantId     String
+  storeId       String
+  price         Int
+  stockQuantity Int          @default(0)
+  condition     String       @default("new")
+  warranty      String?
+  status        String       @default("active")
+  
+  model         PhoneModel   @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  variant       PhoneVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  store         Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+}
+
+model UsedPhoneListing {
+  id            String       @id @default(cuid())
+  modelId       String
+  variantId     String
+  sellerId      String
+  storeId       String?
+  condition     String
+  expectedPrice Int
+  approvedPrice Int?
+  status        String       @default("pending")
+  createdAt     DateTime     @default(now())
+  
+  model         PhoneModel   @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  variant       PhoneVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  store         Store?       @relation(fields: [storeId], references: [id])
+}
+
+model Product {
+  id            String          @id @default(cuid())
+  storeId       String?
+  categoryId    String?
+  brandId       String?
+  modelId       String?
+  variantId     String?
+  title         String
+  slug          String          @unique
+  description   String?
+  price         Int
+  margin        Int?
+  condition     String          @default("new")
+  stockStatus   String          @default("in_stock")
+  warranty      String?
+  seoTitle      String?
+  seoDescription String?
+  published     Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  store         Store?          @relation(fields: [storeId], references: [id])
+  category      ProductCategory? @relation(fields: [categoryId], references: [id])
+  brand         Brand?          @relation(fields: [brandId], references: [id])
+  model         PhoneModel?     @relation(fields: [modelId], references: [id])
+  variant       PhoneVariant?   @relation(fields: [variantId], references: [id])
+  images        ProductImage[]
+  stock         ProductStock?
+  orderItems    OrderItem[]
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  alt       String?
+  sortOrder Int     @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductStock {
+  id        String  @id @default(cuid())
+  productId String  @unique
+  quantity  Int     @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductCategory {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  products Product[]
+}
+
+model ExchangeValue {
+  id             String       @id @default(cuid())
+  modelId        String
+  variantId      String
+  minValue       Int
+  maxValue       Int
+  conditionGrade String
+  adminNote      String?
+  status         String       @default("active")
+  
+  model          PhoneModel   @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  variant        PhoneVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+}
+
+model UnlockingService {
+  id           String     @id @default(cuid())
+  modelId      String
+  serviceType  String
+  price        Int
+  timeRequired String?
+  status       String     @default("active")
+  
+  model        PhoneModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+model RepairService {
+  id           String     @id @default(cuid())
+  modelId      String
+  repairType   String
+  partName     String?
+  price        Int?
+  timeRequired String?
+  status       String     @default("active")
+  storeId      String? // Optional: can be global or store-specific
+  
+  model        PhoneModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+model Accessory {
+  id            String                   @id @default(cuid())
+  name          String
+  category      String
+  brand         String?
+  price         Int
+  stockQuantity Int                      @default(0)
+  status        String                   @default("active")
+  compatibility AccessoryCompatibility[]
+}
+
+model AccessoryCompatibility {
+  id                String     @id @default(cuid())
+  accessoryId       String
+  modelId           String
+  compatibilityType String?
+  
+  accessory         Accessory  @relation(fields: [accessoryId], references: [id], onDelete: Cascade)
+  model             PhoneModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+model SearchAlias {
+  id             String     @id @default(cuid())
+  modelId        String
+  aliasText      String
+  normalizedText String
+  
+  model          PhoneModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+model AutoPage {
+  id              String     @id @default(cuid())
+  modelId         String
+  pageType        String
+  slug            String     @unique
+  title           String
+  metaDescription String?
+  content         String?
+  status          String     @default("active")
+  
+  model           PhoneModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+model RepairRequest {
+  id        String       @id @default(cuid())
+  storeId   String?
+  userId    String?
+  payload   Json
+  status    RepairStatus @default(request_received)
+  createdAt DateTime     @default(now())
+  store     Store?       @relation(fields: [storeId], references: [id])
+}
+
+model ExchangeRequest {
+  id        String        @id @default(cuid())
+  storeId   String?
+  userId    String?
+  oldDevice Json
+  targetProductId String?
+  estimate  Int?
+  finalOffer Int?
+  status    RequestStatus @default(pending)
+  createdAt DateTime      @default(now())
+  store     Store?        @relation(fields: [storeId], references: [id])
+}
+
+model SellDeviceRequest {
+  id        String        @id @default(cuid())
+  storeId   String?
+  userId    String?
+  device    Json
+  estimate  Int?
+  finalOffer Int?
+  status    RequestStatus @default(pending)
+  createdAt DateTime      @default(now())
+  store     Store?        @relation(fields: [storeId], references: [id])
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  userId    String
+  total     Int
+  status    String      @default("created")
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id])
+  items     OrderItem[]
+  payments  Payment[]
+  referrals ReferralTransaction[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  unitPrice Int
+  total     Int
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  orderId   String
+  amount    Int
+  method    String
+  status    PaymentStatus @default(pending)
+  gatewayRef String?
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model ReferralRule {
+  id              String  @id @default(cuid())
+  enabled         Boolean @default(true)
+  pointValue      Int     @default(1)
+  defaultPercent  Float   @default(3)
+  minOrderValue   Int     @default(0)
+  maxReward       Int     @default(1000)
+  attributionDays Int     @default(30)
+  approvalMode    String  @default("manual_after_completion")
+}
+
+model ReferralLink {
+  id         String   @id @default(cuid())
+  userId     String
+  targetType String
+  targetId   String
+  code       String   @unique
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks     ReferralClick[]
+}
+
+model ReferralClick {
+  id          String   @id @default(cuid())
+  linkId      String
+  userId      String?
+  visitorId   String
+  clickedAt   DateTime @default(now())
+  expiresAt   DateTime
+  link        ReferralLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id])
+}
+
+model ReferralTransaction {
+  id             String         @id @default(cuid())
+  referrerId     String
+  orderId        String?
+  targetType     String
+  targetId       String
+  margin         Int
+  rewardPoints   Int
+  status         ReferralStatus @default(pending)
+  needsMarginReview Boolean     @default(false)
+  createdAt      DateTime       @default(now())
+  approvedAt     DateTime?
+  referrer       User           @relation("ReferralReferrer", fields: [referrerId], references: [id])
+  order          Order?         @relation(fields: [orderId], references: [id])
+}
+
+model PointWallet {
+  id             String @id @default(cuid())
+  userId         String @unique
+  pendingPoints  Int    @default(0)
+  approvedPoints Int    @default(0)
+  usedPoints     Int    @default(0)
+  expiredPoints  Int    @default(0)
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   PointTransaction[]
+}
+
+model PointTransaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  type        String
+  points      Int
+  status      String
+  referenceId String?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  wallet      PointWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+}
+
+model SeoPage {
+  id          String @id @default(cuid())
+  path        String @unique
+  title       String
+  description String
+  keywords    String[]
+  ogImage     String?
+  schemaJson  Json?
+}
+
+model Banner {
+  id        String  @id @default(cuid())
+  title     String
+  imageUrl  String
+  targetUrl String?
+  active    Boolean @default(true)
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  storeId   String?
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  store     Store?   @relation(fields: [storeId], references: [id])
+}
+
+model StoreLead {
+  id        String   @id @default(cuid())
+  storeId   String
+  type      String
+  payload   Json
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+}
+
+model StoreAnalyticsEvent {
+  id        String   @id @default(cuid())
+  storeId   String
+  type      String
+  payload   Json?
+  createdAt DateTime @default(now())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String?
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  id        String @id @default(cuid())
+  key       String @unique
+  value     Json
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+}

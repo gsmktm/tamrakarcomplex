@@ -1,0 +1,31 @@
+project_id = "tvgmnjuexdgtgtqhrjok"
+
+[functions.newsletter-subscribe]
+verify_jwt = false
+
+[functions.import-gadgetbyte-products]
+verify_jwt = true
+
+[functions.bootstrap-admin]
+verify_jwt = true
+
+[functions.import-gadgetbyte-articles]
+verify_jwt = true
+
+[functions.valuation-estimator]
+verify_jwt = false
+
+[functions.sitemap]
+verify_jwt = false
+
+[functions.auto-search-og]
+verify_jwt = false
+
+[functions.create-order-secure]
+verify_jwt = true
+
+[functions.create-payment-session]
+verify_jwt = true
+
+[functions.verify-payment]
+verify_jwt = true
