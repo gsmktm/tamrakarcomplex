@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
+import { AlertCircle, Loader2, Trash2, Search, CheckCircle, Clock, Smartphone, Key, Cpu, RefreshCw, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Loader2, Trash2, Search, CheckCircle, Clock, Smartphone, Key, Cpu, RefreshCw, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -41,47 +42,53 @@ const UnlockingManager = () => {
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
 
-  const { data: requests, isLoading } = useQuery({
+  const { data: requests, isLoading, error: requestsError } = useQuery({
     queryKey: ["admin_unlock_requests", user?.id, role],
     queryFn: async () => {
-      let query = supabase.from("unlock_requests").select("*, stores(name)");
-      
-      if (isStoreAdmin && !isSuperAdmin && user?.id) {
-        // Get store IDs from store_admins or owner_id
-        const { data: memberships } = await supabase
-          .from("store_admins")
-          .select("store_id")
-          .eq("user_id", user.id)
-          .eq("status", "active");
+      try {
+        let query = supabase.from("unlock_requests").select("*, stores(name)");
         
-        const { data: ownedStores } = await supabase
-          .from("stores")
-          .select("id")
-          .eq("owner_id", user.id);
-        
-        const myStoreIds = Array.from(new Set([
-          ...(memberships || []).map(m => m.store_id),
-          ...(ownedStores || []).map(s => s.id)
-        ]));
-        
-        query = query.in("assigned_store_id", myStoreIds);
-      }
-
-      const { data, error } = await query.order("created_at", { ascending: false });
-      if (error) {
-        if (isSchemaMissingError(error)) {
-          // Fallback to base table if relationship fails
-          const { data: baseData, error: baseError } = await supabase
-            .from("unlock_requests")
-            .select("*")
-            .order("created_at", { ascending: false });
-          if (baseError) return [];
-          return baseData ?? [];
+        if (isStoreAdmin && !isSuperAdmin && user?.id) {
+          // Get store IDs from store_admins or owner_id
+          const { data: memberships } = await supabase
+            .from("store_admins")
+            .select("store_id")
+            .eq("user_id", user.id)
+            .eq("status", "active");
+          
+          const { data: ownedStores } = await supabase
+            .from("stores")
+            .select("id")
+            .eq("owner_id", user.id);
+          
+          const myStoreIds = Array.from(new Set([
+            ...(memberships || []).map(m => m.store_id),
+            ...(ownedStores || []).map(s => s.id)
+          ]));
+          
+          query = query.in("assigned_store_id", myStoreIds);
         }
-        throw error;
+
+        const { data, error } = await query.order("created_at", { ascending: false });
+        if (error) {
+          if (isSchemaMissingError(error)) {
+            // Fallback to base table if relationship fails
+            const { data: baseData, error: baseError } = await supabase
+              .from("unlock_requests")
+              .select("*")
+              .order("created_at", { ascending: false });
+            if (baseError) return [];
+            return baseData ?? [];
+          }
+          throw error;
+        }
+        return data ?? [];
+      } catch (err) {
+        handleSupabaseError(err, "UnlockingManager: Failed to fetch requests");
+        return [];
       }
-      return data ?? [];
     },
+    retry: 1,
     enabled: !!user?.id
   });
 

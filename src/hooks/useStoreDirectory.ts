@@ -1,17 +1,9 @@
 // Store Directory Hook
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { storeDirectoryService, type StoreDirectoryItem } from "@/services/storeDirectoryService";
+import { storeDirectoryService, type StoreDirectoryFilters, type StoreDirectoryItem } from "@/services/storeDirectoryService";
 
-export function useStoreDirectory(filters?: {
-  package_slug?: string;
-  complex_zone?: string;
-  is_verified?: boolean;
-  is_featured?: boolean;
-  search?: string;
-  limit?: number;
-  offset?: number;
-}) {
+export function useStoreDirectory(filters?: StoreDirectoryFilters) {
   return useQuery({
     queryKey: ["store-directory", filters],
     queryFn: () => storeDirectoryService.getStoresForDirectory(filters),

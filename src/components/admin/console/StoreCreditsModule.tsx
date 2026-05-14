@@ -61,7 +61,7 @@ export function StoreCreditsModule() {
   const [storeId, setStoreId] = useState<string>("global");
   const [mode, setMode] = useState<"credit" | "debit">("credit");
 
-  const isAdmin = role === "suadmin" || role === "admin";
+  const isAdmin = role === "suadmin" || role === "staffadmin";
 
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery<AdminUserRecord[]>({
     queryKey: ["console-store-credits-users"],
@@ -435,4 +435,3 @@ export function StoreCreditsModule() {
     </div>
   );
 }
-

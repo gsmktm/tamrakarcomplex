@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Store } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
 import type { LeadQuoteRow } from "@/types/app";
 
@@ -29,6 +29,7 @@ interface SellRequest {
   created_at: string;
   user_id: string;
   type: string;
+  store_id?: string | null;
   device: {
     brand: string;
     model: string;
@@ -43,6 +44,9 @@ interface SellRequest {
   user?: {
     email: string;
   };
+  stores?: {
+    store_name: string;
+  } | null;
 }
 
 function isJsonRecord(value: Json | undefined | null): value is Record<string, Json> {
@@ -57,13 +61,14 @@ function readStringArray(value: Json | undefined): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-function mapLeadQuoteRow(row: LeadQuoteRow): SellRequest {
+function mapLeadQuoteRow(row: any): SellRequest {
   const device = isJsonRecord(row.device) ? row.device : {};
   return {
     id: row.id,
     created_at: row.created_at || new Date().toISOString(),
     user_id: row.user_id,
     type: row.type,
+    store_id: row.store_id,
     device: {
       brand: readString(device.brand) || "-",
       model: readString(device.model) || "-",
@@ -75,21 +80,27 @@ function mapLeadQuoteRow(row: LeadQuoteRow): SellRequest {
     defects: readStringArray(row.defects || undefined),
     quoted_value: row.quoted_value || 0,
     status: (row.status as SellRequest["status"]) || "new",
+    stores: row.stores
   };
 }
 
-export const SellRequestsTable = () => {
+export const SellRequestsTable = ({ storeId }: { storeId?: string }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: requests, isLoading } = useQuery({
-    queryKey: ["admin-sell-requests"],
+    queryKey: ["admin-sell-requests", storeId],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from("leads_quotes")
-          .select("*")
-          .order("created_at", { ascending: false });
+          .select("*, stores(store_name)");
+        
+        if (storeId) {
+          query = query.eq("store_id", storeId);
+        }
+
+        const { data, error } = await query.order("created_at", { ascending: false });
         
         if (error) throw error;
         return (data ?? []).map(mapLeadQuoteRow);
@@ -167,6 +178,7 @@ export const SellRequestsTable = () => {
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Device</TableHead>
+              <TableHead>Store/Target</TableHead>
               <TableHead>Condition</TableHead>
               <TableHead>Quote</TableHead>
               <TableHead>Status</TableHead>
@@ -184,6 +196,16 @@ export const SellRequestsTable = () => {
                   <div className="text-xs text-muted-foreground">
                     {[req.device.storage, req.device.ram].filter(Boolean).join("/")}
                   </div>
+                </TableCell>
+                <TableCell>
+                  {req.stores ? (
+                    <div className="flex items-center gap-1.5 text-primary">
+                      <Store className="h-3 w-3" />
+                      <span className="text-xs font-bold">{req.stores.store_name}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground italic">Marketplace</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="capitalize">{req.condition.replace("_", " ")}</Badge>

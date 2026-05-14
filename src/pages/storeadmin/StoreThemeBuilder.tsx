@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, getErrorMessage } from "@/lib/utils";
 import { resolveEffectiveStorePackage } from "@/lib/storeEntitlements";
+import { getPublicStorePath } from "@/lib/storeRoutes";
 import {
   OPENING_DAYS,
   STORE_THEME_OPTIONS,
@@ -34,6 +35,7 @@ type BuilderStore = {
   owner_id: string | null;
   name: string;
   slug: string | null;
+  seo_slug?: string | null;
   location: string | null;
   address: string | null;
   phone: string | null;
@@ -259,7 +261,7 @@ export default function StoreThemeBuilder() {
         <div className="flex flex-wrap gap-2">
           <Badge className="capitalize" variant="outline">{packageSlug}</Badge>
           <Button variant="outline" asChild>
-            <Link to={`/stores/${activeStore.slug || activeStore.id}`} target="_blank">
+            <Link to={getPublicStorePath(activeStore)} target="_blank">
               <ExternalLink className="mr-2 h-4 w-4" />
               View Page
             </Link>

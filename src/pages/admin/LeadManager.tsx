@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
-  Loader2, Search, Eye, User, Phone, Mail, MessageSquare, CheckCircle, XCircle, Clock
+  Loader2, Search, Eye, User, Phone, Mail, MessageSquare, CheckCircle, XCircle, Clock, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 
 interface Lead {
   id: string;
@@ -37,8 +38,11 @@ interface Lead {
 }
 
 export default function LeadManager() {
-  const { role } = useAuth();
+  const { user, role } = useAuth();
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const isSuperAdmin = role === "suadmin";
+  const isStoreAdmin = role === "storeadmin";
+
   const [showLeadDialog, setShowLeadDialog] = useState(false);
   const [filters, setFilters] = useState({
     status: 'all',
@@ -47,29 +51,56 @@ export default function LeadManager() {
 
   const queryClient = useQueryClient();
 
-  const { data: leads, isLoading } = useQuery({
-    queryKey: ["sell-phone-leads", filters],
+  const { data: leads, isLoading, error: leadsError } = useQuery({
+    queryKey: ["sell-phone-leads", filters, user?.id, role],
     queryFn: async () => {
-      let query = supabase
-        .from("sell_phone_leads")
-        .select(`
-          *,
-          assigned_store:stores(name)
-        `)
-        .order("created_at", { ascending: false });
+      try {
+        let query = supabase
+          .from("sell_phone_leads")
+          .select(`
+            *,
+            assigned_store:stores(name)
+          `)
+          .order("created_at", { ascending: false });
 
-      if (filters.status && filters.status !== 'all') {
-        query = query.eq("status", filters.status);
-      }
-      if (filters.search) {
-        query = query.ilike("customer_name", `%${filters.search}%`)
-          .or(`customer_phone.ilike.%${filters.search}%,customer_email.ilike.%${filters.search}%`);
-      }
+        if (isStoreAdmin && !isSuperAdmin && user?.id) {
+          // Get store IDs from store_admins or owner_id
+          const { data: memberships } = await supabase
+            .from("store_admins")
+            .select("store_id")
+            .eq("user_id", user.id)
+            .eq("status", "active");
+          
+          const { data: ownedStores } = await supabase
+            .from("stores")
+            .select("id")
+            .or(`owner_id.eq.${user.id},owner_user_id.eq.${user.id}`);
+          
+          const myStoreIds = Array.from(new Set([
+            ...(memberships || []).map(m => m.store_id),
+            ...(ownedStores || []).map(s => s.id)
+          ]));
+          
+          query = query.in("assigned_store_id", myStoreIds);
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Lead[];
+        if (filters.status && filters.status !== 'all') {
+          query = query.eq("status", filters.status);
+        }
+        if (filters.search) {
+          query = query.ilike("customer_name", `%${filters.search}%`)
+            .or(`customer_phone.ilike.%${filters.search}%,customer_email.ilike.%${filters.search}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data as Lead[];
+      } catch (err) {
+        handleSupabaseError(err, "LeadManager: Failed to fetch leads");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const { data: stores } = useQuery({
@@ -294,14 +325,43 @@ export default function LeadManager() {
                         <Button
                           size="sm"
                           variant="outline"
+                          title="Book Inspection"
                           onClick={() => updateLeadMutation.mutate({
                             id: lead.id,
                             updates: { status: 'inspection_booked' }
                           })}
                         >
+                          <Clock className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {lead.status === 'inspection_booked' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          title="Mark Completed"
+                          onClick={() => updateLeadMutation.mutate({
+                            id: lead.id,
+                            updates: { status: 'completed' }
+                          })}
+                        >
                           <CheckCircle className="h-4 w-4" />
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-500 hover:text-red-600"
+                        onClick={() => {
+                          if (confirm("Cancel this lead?")) {
+                            updateLeadMutation.mutate({
+                              id: lead.id,
+                              updates: { status: 'cancelled' }
+                            });
+                          }
+                        }}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

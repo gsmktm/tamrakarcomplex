@@ -19,7 +19,7 @@ export default function StoreSettings() {
       const { data, error } = await supabase
         .from("stores")
         .select("*")
-        .eq("owner_id", user?.id)
+        .or(`owner_id.eq.${user?.id},owner_user_id.eq.${user?.id}`)
         .single();
 
       if (error) throw error;
@@ -33,7 +33,7 @@ export default function StoreSettings() {
       const { error } = await supabase
         .from("stores")
         .update(updates)
-        .eq("owner_id", user?.id);
+        .or(`owner_id.eq.${user?.id},owner_user_id.eq.${user?.id}`);
 
       if (error) throw error;
     },

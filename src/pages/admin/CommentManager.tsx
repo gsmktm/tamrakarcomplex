@@ -20,16 +20,22 @@ export default function CommentManager() {
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
 
-  const { data: comments, isLoading } = useQuery({
+  const { data: comments, isLoading, error: commentsError } = useQuery({
     queryKey: ["comments", "admin"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("comments")
-        .select("id, content, created_at, user_id, article:articles(title, slug)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as CommentRow[];
+      try {
+        const { data, error } = await supabase
+          .from("comments")
+          .select("id, content, created_at, user_id, article:articles(title, slug)")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        return (data ?? []) as CommentRow[];
+      } catch (err) {
+        handleSupabaseError(err, "CommentManager: Failed to fetch comments");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const deleteMutation = useMutation({

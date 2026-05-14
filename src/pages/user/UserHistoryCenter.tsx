@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,7 +14,8 @@ import {
   Loader2,
   ArrowRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Smartphone
 } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
@@ -61,7 +63,8 @@ export default function UserHistoryCenter({ defaultTab }: { defaultTab?: string 
     const tab = defaultTab.toLowerCase();
     if (tab === "orders") return item.activity_type === "order";
     if (tab === "repairs") return item.activity_type === "repair";
-    if (tab === "exchanges") return item.activity_type === "exchange" || item.activity_type === "unlock";
+    if (tab === "unlocks") return item.activity_type === "unlock";
+    if (tab === "exchanges") return item.activity_type === "exchange" || item.activity_type === "lead";
     if (tab === "listings") return item.activity_type === "listing";
     return true;
   });
@@ -114,6 +117,7 @@ export default function UserHistoryCenter({ defaultTab }: { defaultTab?: string 
                           {item.activity_type === 'repair' && <div className="bg-orange-500/10 p-2.5 rounded-xl"><Wrench className="h-6 w-6 text-orange-500" /></div>}
                           {item.activity_type === 'unlock' && <div className="bg-green-500/10 p-2.5 rounded-xl"><Unlock className="h-6 w-6 text-green-500" /></div>}
                           {item.activity_type === 'exchange' && <div className="bg-purple-500/10 p-2.5 rounded-xl"><RefreshCw className="h-6 w-6 text-purple-500" /></div>}
+                          {item.activity_type === 'lead' && <div className="bg-amber-500/10 p-2.5 rounded-xl"><Smartphone className="h-6 w-6 text-amber-500" /></div>}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">

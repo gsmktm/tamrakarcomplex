@@ -28,17 +28,24 @@ export function ReferralRewardsPanel() {
   const { data: referralData, isLoading } = useQuery({
     queryKey: ["my-referrals", user?.id],
     queryFn: async () => {
-      const [profileRes, referralsRes] = await Promise.all([
+      const [profileRes, historyRes] = await Promise.all([
         supabase.from("profiles").select("referral_code, referral_points").eq("id", user!.id).single(),
-        supabase.from("referral_invites").select("*").eq("inviter_id", user!.id).order("created_at", { ascending: false }),
+        supabase.from("referral_history").select("*, referred_user:profiles(full_name, email)").eq("referrer_id", user!.id).order("created_at", { ascending: false }),
       ]);
 
       if (profileRes.error) throw profileRes.error;
-      if (referralsRes.error) throw referralsRes.error;
+      if (historyRes.error) throw historyRes.error;
 
       return {
         profile: profileRes.data,
-        referrals: referralsRes.data || [],
+        referrals: (historyRes.data || []).map(r => ({
+          id: r.id,
+          invitee_email: (r.referred_user as any)?.email || "New User",
+          invitee_name: (r.referred_user as any)?.full_name || "New User",
+          created_at: r.created_at,
+          status: "completed",
+          reward_points: r.points_earned
+        })),
       };
     },
     enabled: !!user?.id,
@@ -156,7 +163,7 @@ export function ReferralRewardsPanel() {
           ) : (
             <div className="space-y-4">
               {referrals.map((referral) => (
-                <div key={safeId(referral.id)} className="flex items-center justify-between p-4 border rounded-lg">
+                <div key={referral.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-3">
                     {referral.status === "completed" && <CheckCircle className="h-5 w-5 text-green-500" />}
                     {referral.status === "pending" && <Clock className="h-5 w-5 text-blue-500" />}

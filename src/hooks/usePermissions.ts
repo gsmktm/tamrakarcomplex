@@ -11,18 +11,21 @@ export function usePermissions() {
     enabled: !!user?.id && role === "staffadmin",
   });
 
+  const checkPermission = (module: string, action: StaffPermissionAction = "view") => {
+    if (role === "suadmin") return true;
+    if (role !== "staffadmin") return false;
+    if (!permissions) return false;
+    
+    const modulePerms = permissions[module as StaffPermissionModule];
+    if (!modulePerms) return false;
+    
+    return modulePerms[action] === true;
+  };
+
   return {
     permissions,
     isLoading,
-    canAccessModule: (module: string, action: StaffPermissionAction = "view") => {
-      if (role === "suadmin") return true;
-      if (role !== "staffadmin") return false;
-      if (!permissions) return false;
-      
-      const modulePerms = permissions[module as StaffPermissionModule];
-      if (!modulePerms) return false;
-      
-      return modulePerms[action] === true;
-    },
+    canAccessModule: checkPermission,
+    hasPermission: checkPermission,
   };
 }

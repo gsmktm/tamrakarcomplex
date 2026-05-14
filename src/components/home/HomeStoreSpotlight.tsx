@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStorePreview } from "@/hooks/useStorePreview";
 import { useAuth } from "@/hooks/useAuth";
+import { getPublicStorePath } from "@/lib/storeRoutes";
 
 export const HomeStoreSpotlight = () => {
   const navigate = useNavigate();
@@ -77,7 +78,7 @@ export const HomeStoreSpotlight = () => {
                     <div className="flex gap-2">
                       <Button 
                         className="flex-1 rounded-xl h-11 font-bold text-xs"
-                        onClick={() => navigate(`/stores/${store.id}`)}
+                        onClick={() => navigate(getPublicStorePath(store))}
                       >
                         View Store
                       </Button>

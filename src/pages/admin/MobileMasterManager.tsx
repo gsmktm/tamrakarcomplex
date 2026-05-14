@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -22,11 +23,13 @@ import {
   CheckCircle2,
   Settings2,
   Database,
-  ExternalLink
+  ExternalLink,
+  PlusCircle
 } from "lucide-react";
 import { mobileMasterService, Brand, PhoneSeries, PhoneModel, PhoneVariant } from "@/services/mobileMasterService";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 export default function MobileMasterManager() {
   const [activeTab, setActiveTab] = useState("brands");
@@ -76,6 +79,54 @@ export default function MobileMasterManager() {
       queryClient.invalidateQueries({ queryKey: ["master_models"] });
       toast.success("Model created");
     }
+  });
+
+  const deleteBrand = useMutation({
+    mutationFn: (id: string) => mobileMasterService.deleteBrand(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["master_brands"] });
+      toast.success("Brand deleted");
+      if (selectedBrandId === id) setSelectedBrandId(null);
+    },
+    onError: (error: any) => toast.error("Failed to delete brand: " + error.message)
+  });
+
+  const updateBrand = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => mobileMasterService.updateBrand(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["master_brands"] });
+      toast.success("Brand updated");
+    },
+    onError: (error: any) => toast.error("Failed to update brand: " + error.message)
+  });
+
+  const deleteSeries = useMutation({
+    mutationFn: (id: string) => mobileMasterService.deleteSeries(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["master_series"] });
+      toast.success("Series deleted");
+      if (selectedSeriesId === id) setSelectedSeriesId(null);
+    },
+    onError: (error: any) => toast.error("Failed to delete series: " + error.message)
+  });
+
+  const deleteModel = useMutation({
+    mutationFn: (id: string) => mobileMasterService.deleteModel(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["master_models"] });
+      toast.success("Model deleted");
+      if (selectedModelId === id) setSelectedModelId(null);
+    },
+    onError: (error: any) => toast.error("Failed to delete model: " + error.message)
+  });
+
+  const updateModel = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => mobileMasterService.updateModel(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["master_models"] });
+      toast.success("Model updated");
+    },
+    onError: (error: any) => toast.error("Failed to update model: " + error.message)
   });
 
   return (
@@ -163,7 +214,7 @@ export default function MobileMasterManager() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {brands?.map(brand => (
-                  <Card key={brand.id} className="cursor-pointer hover:border-primary transition-colors" onClick={() => setSelectedBrandId(brand.id)}>
+                  <Card key={brand.id} className="group cursor-pointer hover:border-primary transition-colors" onClick={() => setSelectedBrandId(brand.id)}>
                     <CardContent className="p-4 flex items-center gap-4">
                       <div className="h-12 w-12 bg-muted rounded-md flex items-center justify-center font-bold text-lg">
                         {brand.logo ? <img src={brand.logo} alt={brand.name} className="h-full w-full object-contain" /> : brand.name[0]}
@@ -172,7 +223,18 @@ export default function MobileMasterManager() {
                         <h3 className="font-medium">{brand.name}</h3>
                         <p className="text-xs text-muted-foreground">{brand.slug}</p>
                       </div>
-                      {selectedBrandId === brand.id && <CheckCircle2 className="ml-auto h-5 w-5 text-primary" />}
+                      <div className="ml-auto flex items-center gap-1">
+                        {selectedBrandId === brand.id && <CheckCircle2 className="h-5 w-5 text-primary mr-2" />}
+                        <EditBrandDialog brand={brand} onUpdate={(id, data) => updateBrand.mutate({ id, data })} />
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("Delete brand? This will fail if models exist.")) {
+                            deleteBrand.mutate(brand.id);
+                          }
+                        }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -188,7 +250,7 @@ export default function MobileMasterManager() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {series?.map(s => (
-                  <Card key={s.id} className="cursor-pointer hover:border-primary transition-colors" onClick={() => setSelectedSeriesId(s.id)}>
+                  <Card key={s.id} className="group cursor-pointer hover:border-primary transition-colors" onClick={() => setSelectedSeriesId(s.id)}>
                     <CardContent className="p-4 flex items-center gap-4">
                       <div className="h-10 w-10 bg-muted rounded-md flex items-center justify-center">
                         <Layers className="h-5 w-5" />
@@ -197,7 +259,17 @@ export default function MobileMasterManager() {
                         <h3 className="font-medium">{s.name}</h3>
                         <p className="text-xs text-muted-foreground">{s.slug}</p>
                       </div>
-                      {selectedSeriesId === s.id && <CheckCircle2 className="ml-auto h-5 w-5 text-primary" />}
+                      <div className="ml-auto flex items-center gap-1">
+                        {selectedSeriesId === s.id && <CheckCircle2 className="ml-auto h-5 w-5 text-primary mr-2" />}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("Delete series?")) {
+                            deleteSeries.mutate(s.id);
+                          }
+                        }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -250,16 +322,23 @@ export default function MobileMasterManager() {
                           {model.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="ghost" size="sm" onClick={() => {
-                          setSelectedModelId(model.id);
-                          setActiveTab("connections");
-                        }}>
-                          <Settings2 className="h-4 w-4 mr-1" /> Connect
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                            setSelectedModelId(model.id);
+                            setActiveTab("connections");
+                          }}>
+                            <Settings2 className="h-4 w-4" />
+                          </Button>
+                          <EditModelDialog model={model} brands={brands || []} series={series || []} onUpdate={(id, data) => updateModel.mutate({ id, data })} />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => {
+                            if (confirm("Delete model?")) {
+                              deleteModel.mutate(model.id);
+                            }
+                          }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -267,9 +346,52 @@ export default function MobileMasterManager() {
               </Table>
             </TabsContent>
 
-            <TabsContent value="connections" className="space-y-6 mt-4">
-              {selectedModelId && (
-                <ModelConnections modelId={selectedModelId} modelName={models?.find(m => m.id === selectedModelId)?.name || "Selected Model"} />
+            <TabsContent value="connections" className="space-y-6 mt-4 animate-in fade-in slide-in-from-right-4">
+              {!selectedModelId ? (
+                <div className="p-20 text-center border-2 border-dashed rounded-[2rem] bg-muted/20">
+                  <Smartphone className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+                  <h3 className="text-lg font-bold">No Model Selected</h3>
+                  <p className="text-muted-foreground mb-6">Select a model from the Models tab to manage its connections.</p>
+                  <Button onClick={() => setActiveTab("models")}>Go to Models</Button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between border-b pb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                        <Smartphone className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold">
+                          {models?.find(m => m.id === selectedModelId)?.name || "Model Settings"}
+                        </h2>
+                        <p className="text-sm text-muted-foreground">Manage specifications, variants, and stock links.</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setSelectedModelId(null)}>Change Model</Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <ConnectionCard 
+                      title="Specifications" 
+                      description="Manage technical specs, pros/cons, and overview."
+                      icon={<Settings2 className="h-5 w-5" />}
+                      action={<SpecEditor modelId={selectedModelId!} />}
+                    />
+                    <ConnectionCard 
+                      title="Variants" 
+                      description="Add RAM, Storage, and Color combinations."
+                      icon={<Layers className="h-5 w-5" />}
+                      action={<VariantEditor modelId={selectedModelId!} />}
+                    />
+                    <ConnectionCard 
+                      title="Stock Management" 
+                      description="Update new phone stock and pricing."
+                      icon={<Smartphone className="h-5 w-5" />}
+                      href={`/suadmin/products?modelId=${selectedModelId}`}
+                    />
+                  </div>
+                </>
               )}
             </TabsContent>
           </Tabs>
@@ -310,6 +432,38 @@ function AddBrandDialog({ onAdd }: { onAdd: (data: any) => void }) {
   );
 }
 
+function EditBrandDialog({ brand, onUpdate }: { brand: any, onUpdate: (id: string, data: any) => void }) {
+  const [name, setName] = useState(brand.name);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle>Edit Brand</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Brand Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Apple, Samsung" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => {
+            onUpdate(brand.id, { name, slug: slugify(name) });
+            setOpen(false);
+          }}>Save Changes</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AddSeriesDialog({ brandId, onAdd }: { brandId: string, onAdd: (data: any) => void }) {
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
@@ -335,6 +489,84 @@ function AddSeriesDialog({ brandId, onAdd }: { brandId: string, onAdd: (data: an
             setOpen(false);
             setName("");
           }}>Create Series</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditModelDialog({ model, brands, series, onUpdate }: { model: any, brands: any[], series: any[], onUpdate: (id: string, data: any) => void }) {
+  const [formData, setFormData] = useState({
+    name: model.name,
+    brand_id: model.brand_id,
+    series_id: model.series_id || "none",
+    model_number: model.model_number || "",
+    release_year: model.release_year || new Date().getFullYear(),
+  });
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Model</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Brand</Label>
+              <Select value={formData.brand_id} onValueChange={(v) => setFormData({...formData, brand_id: v})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Series (Optional)</Label>
+              <Select value={formData.series_id} onValueChange={(v) => setFormData({...formData, series_id: v})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Direct)</SelectItem>
+                  {series.filter(s => s.brand_id === formData.brand_id).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Model Name</Label>
+            <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="e.g. iPhone 17 Pro Max" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Model Number</Label>
+              <Input value={formData.model_number} onChange={(e) => setFormData({...formData, model_number: e.target.value})} placeholder="e.g. A3106" />
+            </div>
+            <div className="space-y-2">
+              <Label>Release Year</Label>
+              <Input type="number" value={formData.release_year} onChange={(e) => setFormData({...formData, release_year: parseInt(e.target.value)})} />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => {
+            const { series_id, ...rest } = formData;
+            onUpdate(model.id, { 
+              ...rest, 
+              series_id: series_id === "none" ? null : series_id,
+              slug: slugify(formData.name) 
+            });
+            setOpen(false);
+          }}>Update Model</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -435,10 +667,16 @@ function ModelConnections({ modelId, modelName }: { modelId: string, modelName: 
           action={<SpecEditor modelId={modelId} />}
         />
         <ConnectionCard 
+          title="Variants" 
+          description="Add RAM, Storage, and Color combinations."
+          icon={<Layers className="h-5 w-5" />}
+          action={<VariantEditor modelId={modelId} />}
+        />
+        <ConnectionCard 
           title="Stock Management" 
           description="Update new phone stock and pricing."
           icon={<Smartphone className="h-5 w-5" />}
-          href={`/admin/stock?modelId=${modelId}`}
+          href={`/suadmin/products?modelId=${modelId}`}
         />
         <ConnectionCard 
           title="Exchange Valuation" 
@@ -475,26 +713,143 @@ function ModelConnections({ modelId, modelName }: { modelId: string, modelName: 
   );
 }
 
-function ConnectionCard({ title, description, icon, href, action }: { title: string, description: string, icon: any, href?: string, action?: React.ReactNode }) {
+function ConnectionCard({ title, description, icon, action, href }: any) {
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg text-primary">
-            {icon}
-          </div>
-          <CardTitle className="text-lg">{title}</CardTitle>
+    <Card className="flex flex-col h-full border-slate-200 hover:border-primary/30 transition-colors">
+      <CardHeader className="pb-3">
+        <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary mb-3">
+          {icon}
         </div>
+        <CardTitle className="text-lg">{title}</CardTitle>
+        <CardDescription className="text-xs">{description}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <CardDescription>{description}</CardDescription>
+      <CardContent className="mt-auto pt-0">
         {action ? action : (
-          <Button variant="outline" className="w-full" asChild>
-            <a href={href}>Configure Module</a>
+          <Button variant="outline" className="w-full gap-2" asChild>
+            <Link to={href}>
+              Open Manager <ExternalLink className="h-3 w-3" />
+            </Link>
           </Button>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function VariantEditor({ modelId }: { modelId: string }) {
+  const [open, setOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    ram: "",
+    storage: "",
+    color: "",
+    condition_type: "new",
+  });
+  const queryClient = useQueryClient();
+
+  const { data: variants, isLoading } = useQuery({
+    queryKey: ["model_variants", modelId],
+    queryFn: () => mobileMasterService.getVariants(modelId),
+    enabled: open,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => mobileMasterService.createVariant(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["model_variants", modelId] });
+      toast.success("Variant added");
+      setFormData({ ram: "", storage: "", color: "", condition_type: "new" });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => mobileMasterService.deleteVariant(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["model_variants", modelId] });
+      toast.success("Variant deleted");
+    }
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="w-full">Manage Variants</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Manage Model Variants</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6 py-4">
+          {/* Add New Variant */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-muted/30 rounded-xl border border-dashed">
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-bold text-muted-foreground">RAM</Label>
+              <Input value={formData.ram} onChange={e => setFormData({...formData, ram: e.target.value})} placeholder="8GB" className="h-9 text-sm" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Storage</Label>
+              <Input value={formData.storage} onChange={e => setFormData({...formData, storage: e.target.value})} placeholder="256GB" className="h-9 text-sm" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Color</Label>
+              <Input value={formData.color} onChange={e => setFormData({...formData, color: e.target.value})} placeholder="Black" className="h-9 text-sm" />
+            </div>
+            <div className="flex items-end">
+              <Button 
+                onClick={() => createMutation.mutate({ ...formData, model_id: modelId, status: 'active' })} 
+                disabled={createMutation.isPending || !formData.storage}
+                className="w-full h-9"
+              >
+                {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} Add
+              </Button>
+            </div>
+          </div>
+
+          {/* Current Variants */}
+          <div className="space-y-2">
+            <Label className="text-xs font-bold">Existing Variants</Label>
+            <div className="border rounded-xl overflow-hidden">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="h-9 text-xs">RAM</TableHead>
+                    <TableHead className="h-9 text-xs">Storage</TableHead>
+                    <TableHead className="h-9 text-xs">Color</TableHead>
+                    <TableHead className="h-9 text-xs text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-8"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></TableCell></TableRow>
+                  ) : variants?.length === 0 ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground text-sm italic">No variants added yet.</TableCell></TableRow>
+                  ) : variants?.map((v: any) => (
+                    <TableRow key={v.id}>
+                      <TableCell className="py-2 text-sm font-medium">{v.ram || '-'}</TableCell>
+                      <TableCell className="py-2 text-sm">{v.storage || '-'}</TableCell>
+                      <TableCell className="py-2 text-sm">{v.color || '-'}</TableCell>
+                      <TableCell className="py-2 text-right">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => {
+                          if (confirm("Delete variant?")) {
+                            deleteMutation.mutate(v.id);
+                          }
+                        }}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

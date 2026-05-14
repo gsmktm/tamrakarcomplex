@@ -13,9 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { formatEdgeFunctionError } from "@/lib/utils";
+import { formatEdgeFunctionError, cn } from "@/lib/utils";
 import { assertEdgeFunctionAvailable } from "@/lib/edgeFunctions";
-import { Loader2, Plus, Pencil, Trash2, Search, Download, ExternalLink, Smartphone, ArrowUpDown, Filter, MoreHorizontal, CheckCircle2, XCircle, Star, Package, Store, RefreshCw } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Search, Download, ExternalLink, Smartphone, ArrowUpDown, Filter, MoreHorizontal, CheckCircle2, XCircle, Star, Package, Store, RefreshCw, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { gsmArenaService, GsmArenaProduct } from "@/services/gsmArenaService";
@@ -25,6 +25,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { isAdminRole } from "@/lib/roles";
 import { fetchStoreTierOverrides, resolveTierForStore } from "@/lib/storeTier";
 import { getStoreEntitlements } from "@/lib/storePackages";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 
 interface ProductFormValues {
   name: string;
@@ -160,40 +161,46 @@ const ProductManager = () => {
     enabled: isStoreAdmin && !!user?.id,
   });
 
-  const { data: products, isLoading } = useQuery<DBProduct[]>({
+  const { data: products, isLoading, error: productsError } = useQuery<DBProduct[]>({
     queryKey: ["products", role, user?.id],
     queryFn: async () => {
-      let query = supabase.from("products").select(`
-        *,
-        stores (id, name)
-      `);
-      
-      if (isStoreAdmin && user?.id && !isPlatformAdmin) {
-        // Get store IDs from store_admins or owner_id
-        const { data: memberships } = await supabase
-          .from("store_admins")
-          .select("store_id")
-          .eq("user_id", user.id)
-          .eq("status", "active");
+      try {
+        let query = supabase.from("products").select(`
+          *,
+          stores (id, name)
+        `);
         
-        const { data: ownedStores } = await supabase
-          .from("stores")
-          .select("id")
-          .eq("owner_id", user.id);
-        
-        const allStoreIds = Array.from(new Set([
-          ...(memberships || []).map(m => m.store_id),
-          ...(ownedStores || []).map(s => s.id)
-        ]));
-        
-        query = query.in("store_id", allStoreIds);
-      }
+        if (isStoreAdmin && user?.id && !isPlatformAdmin) {
+          // Get store IDs from store_admins or owner_id
+          const { data: memberships } = await supabase
+            .from("store_admins")
+            .select("store_id")
+            .eq("user_id", user.id)
+            .eq("status", "active");
+          
+          const { data: ownedStores } = await supabase
+            .from("stores")
+            .select("id")
+            .eq("owner_id", user.id);
+          
+          const allStoreIds = Array.from(new Set([
+            ...(memberships || []).map(m => m.store_id),
+            ...(ownedStores || []).map(s => s.id)
+          ]));
+          
+          query = query.in("store_id", allStoreIds);
+        }
 
-      const { data, error } = await query.order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return (data || []) as unknown as DBProduct[];
+        const { data, error } = await query.order("created_at", { ascending: false });
+        
+        if (error) throw error;
+        return (data || []) as unknown as DBProduct[];
+      } catch (err) {
+        handleSupabaseError(err, "ProductManager: Failed to fetch products list");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const createMutation = useMutation({
@@ -416,6 +423,22 @@ const ProductManager = () => {
         toast.error("Failed to remove some duplicates");
     }
   };
+
+  const { data: storesData } = useQuery({
+    queryKey: ["stores-with-packages"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("stores")
+        .select("id, name, package_id, store_packages(name, product_limit)");
+      return data || [];
+    }
+  });
+
+  const selectedStoreId = watch("store_id");
+  const activeStorePackage = storesData?.find(s => s.id === selectedStoreId);
+  const currentStoreProductCount = products?.filter(p => p.store_id === selectedStoreId).length || 0;
+  const productLimit = (activeStorePackage?.store_packages as any)?.product_limit ?? -1;
+  const isAtLimit = productLimit >= 0 && currentStoreProductCount >= productLimit;
 
   const onSubmit = (values: ProductFormValues) => {
     // ─── Auto-SEO Generation ─────────────────────────────────────────────
@@ -751,6 +774,31 @@ const ProductManager = () => {
   const startIndex = (currentPage - 1) * pageSize;
   const pagedProducts = filteredProducts.slice(startIndex, startIndex + pageSize);
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (productsError || !products) {
+    return (
+      <div className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <AlertCircle className="h-8 w-8 text-amber-500" />
+        </div>
+        <div>
+          <p className="font-medium text-sm">Unable to load products</p>
+          <p className="text-xs text-muted-foreground mt-1">Database connection issue. Please try again.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -937,7 +985,18 @@ const ProductManager = () => {
                       <Label htmlFor="in_stock">In Stock</Label>
                     </div>
                   </div>
-                  <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+
+                  {isAtLimit && !editingProduct && (
+                    <div className="bg-destructive/10 p-3 rounded-md flex items-start gap-2 text-destructive text-sm">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-semibold">Product Limit Reached</p>
+                        <p>Your plan is limited to {productLimit} products. Upgrade to add more.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || (isAtLimit && !editingProduct)}>
                     {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {editingProduct ? "Update Product" : "Add Product"}
                   </Button>

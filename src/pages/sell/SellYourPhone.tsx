@@ -105,9 +105,25 @@ export default function SellYourPhone() {
   const [storePickerOpen, setStorePickerOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string>("");
   const [storeSearch, setStoreSearch] = useState("");
-  const [submissionTargetStoreId, setSubmissionTargetStoreId] = useState<string | undefined>();
+  const [submissionTargetStoreId, setSubmissionTargetStoreId] = useState<string | undefined>(searchParams.get("store") || undefined);
   const [buyerPassword, setBuyerPassword] = useState("");
   const [deviceImei, setDeviceImei] = useState("");
+
+  const [sourceStore, setSourceStore] = useState<StoreDirectoryItem | null>(null);
+
+  // Fetch store if ID is provided in URL
+  useEffect(() => {
+    async function fetchSourceStore() {
+      if (submissionTargetStoreId) {
+        const { data, error } = await storeDirectoryService.getStoreById(submissionTargetStoreId);
+        if (data) {
+          setSourceStore(data as unknown as StoreDirectoryItem);
+          setSelectedStoreId(data.id);
+        }
+      }
+    }
+    fetchSourceStore();
+  }, [submissionTargetStoreId]);
 
   const saveDraftAndLogin = () => {
     if (typeof window !== "undefined") {
@@ -171,12 +187,13 @@ export default function SellYourPhone() {
     }
   }, []);
 
-  // Pre-fill contact info if user is logged in
+  // Pre-fill contact info if user is logged in — always sync email from auth session
   useEffect(() => {
     if (user) {
       setContactName(prev => prev || user.user_metadata?.full_name || "");
       setContactPhone(prev => prev || user.user_metadata?.phone || "");
-      setContactEmail(prev => prev || user.email || "");
+      // Always use the confirmed email from auth — do not allow empty
+      setContactEmail(user.email || "");
     }
   }, [user]);
 
@@ -201,7 +218,16 @@ export default function SellYourPhone() {
     }
   });
 
-  const logos = sellSettings?.sell_phone_logos || BRAND_LOGOS;
+  const rawLogos = sellSettings?.sell_phone_logos || BRAND_LOGOS;
+  // Case-insensitive logo lookup helper
+  const logos: Record<string, string> = rawLogos;
+  const getLogoUrl = (brandName: string, brandLogoUrl?: string): string | undefined => {
+    if (brandLogoUrl) return brandLogoUrl;
+    if (logos[brandName]) return logos[brandName];
+    const lower = brandName.toLowerCase();
+    const match = Object.entries(logos).find(([k]) => k.toLowerCase() === lower);
+    return match?.[1];
+  };
   const content = sellSettings?.sell_phone_content || {
     headline: "Sell Your Phone",
     subheadline: "Get an instant quote in less than 60 seconds.",
@@ -366,7 +392,7 @@ export default function SellYourPhone() {
   });
 
   const createLeadMutation = useMutation({
-    mutationFn: async (storeId?: string) => {
+    mutationFn: async ({ storeId, userId }: { storeId?: string; userId?: string } = {}) => {
       if (!valuation) throw new Error("No valuation available");
 
       return sellPhoneService.saveLead({
@@ -384,7 +410,7 @@ export default function SellYourPhone() {
         imei: deviceImei,
         assigned_store_id: storeId,
         source: "sell_your_phone"
-      });
+      }, userId);
     },
     onSuccess: () => {
       const targetStore = submissionTargetStoreId
@@ -519,11 +545,11 @@ export default function SellYourPhone() {
                         scrollToTop();
                       }}
                     >
-                      {brand.logo_url || logos[brand.name] ? (
+                      {getLogoUrl(brand.name, brand.logo_url) ? (
                         <div className="h-10 w-full flex items-center justify-center">
-                          <img 
-                            src={brand.logo_url || logos[brand.name]} 
-                            alt={brand.name} 
+                          <img
+                            src={getLogoUrl(brand.name, brand.logo_url)}
+                            alt={brand.name}
                             className="h-full w-auto max-w-[80%] object-contain opacity-90 group-hover:opacity-100"
                             loading="lazy"
                           />
@@ -803,15 +829,23 @@ export default function SellYourPhone() {
                 <Label>Phone</Label>
                 <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="98XXXXXXXX" />
               </div>
-              <div>
-                <Label>Email</Label>
-                <Input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} type="email" placeholder="you@example.com" />
-              </div>
+              {user ? (
+                <div>
+                  <Label>Email</Label>
+                  <Input value={contactEmail} readOnly className="bg-muted cursor-not-allowed" />
+                  <p className="text-xs text-muted-foreground mt-1">Using your account email. Change it in profile settings.</p>
+                </div>
+              ) : (
+                <div>
+                  <Label>Email</Label>
+                  <Input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} type="email" placeholder="you@example.com" />
+                </div>
+              )}
             </div>
             <Button
               className="w-full h-12 text-lg hero-gradient"
               size="lg"
-              disabled={!contactName.trim() || !contactPhone.trim() || !contactEmail.trim() || estimateMutation.isPending}
+              disabled={!contactName.trim() || !contactPhone.trim() || (!user && !contactEmail.trim()) || estimateMutation.isPending}
               onClick={() => estimateMutation.mutate()}
             >
               {estimateMutation.isPending ? (
@@ -822,6 +856,16 @@ export default function SellYourPhone() {
               ) : (
                 <>Get Instant Quote <ArrowRight className="ml-2 h-5 w-5" /></>
               )}
+            </Button>
+          </div>
+        )}
+
+        {step === 5 && !valuation && (
+          <div className="flex flex-col items-center gap-4 py-16 text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-muted-foreground">Calculating your quote...</p>
+            <Button variant="ghost" size="sm" onClick={() => setStep(4)}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
             </Button>
           </div>
         )}
@@ -901,16 +945,18 @@ export default function SellYourPhone() {
                 className="h-14 hero-gradient shadow-glow font-bold"
                 onClick={openPlatformSubmit}
               >
-                Sell Now at Tamrakar Complex
+                {sourceStore ? `Sell at ${sourceStore.name}` : "Sell Now at Tamrakar Complex"}
               </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-14 border-primary/40 hover:border-primary font-bold"
-                onClick={() => setStorePickerOpen(true)}
-              >
-                Choose a Store
-              </Button>
+              {!sourceStore && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="h-14 border-primary/40 hover:border-primary font-bold"
+                  onClick={() => setStorePickerOpen(true)}
+                >
+                  Choose a Store
+                </Button>
+              )}
             </div>
 
             <Dialog open={storePickerOpen} onOpenChange={setStorePickerOpen}>
@@ -1033,52 +1079,85 @@ export default function SellYourPhone() {
                   <DialogTitle>{submissionTargetStoreId ? "Submit to Selected Store" : "Sell It Now"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
+                  {/* Device + quote summary */}
                   <div className="bg-secondary/30 rounded-lg p-3 text-sm">
                     <div className="font-semibold">{selectedBrandName} {selectedModel}</div>
                     <div className="text-muted-foreground">Storage: {storage || "N/A"} · Condition: {condition}</div>
-                    <div className="text-muted-foreground">Quote: {valuation.currency} {valuation.estimated_price.toLocaleString()}</div>
+                    <div className="text-muted-foreground font-medium text-primary">Quote: {valuation.currency} {valuation.estimated_price.toLocaleString()}</div>
                     <div className="mt-2 rounded-md bg-background/70 px-2 py-1 text-xs">
-                      Request target: <span className="font-semibold">{selectedStore && submissionTargetStoreId ? selectedStore.name : "Tamrakar Complex Admin Team"}</span>
+                      Request goes to: <span className="font-semibold">{selectedStore && submissionTargetStoreId ? selectedStore.name : "Tamrakar Complex Admin Team"}</span>
                     </div>
                   </div>
-                  <div className="grid gap-3">
-                    <div>
-                      <Label>Name</Label>
-                      <Input placeholder="Your full name" value={contactName} onChange={(e) => setContactName(e.target.value)} />
+
+                  {user ? (
+                    /* Logged in: just show pre-filled info + IMEI */
+                    <div className="grid gap-3">
+                      <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm">
+                        <UserCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+                        <div>
+                          <p className="font-semibold">{user.email}</p>
+                          <p className="text-xs text-muted-foreground">Contact info auto-filled from your account</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Name</Label>
+                          <Input placeholder="Your full name" value={contactName} onChange={(e) => setContactName(e.target.value)} />
+                        </div>
+                        <div>
+                          <Label>Mobile Number</Label>
+                          <Input placeholder="98XXXXXXXX" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Device IMEI <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                        <Input placeholder="15-digit IMEI — dial *#06# on your phone" value={deviceImei} onChange={(e) => setDeviceImei(e.target.value)} />
+                      </div>
                     </div>
-                    <div>
-                      <Label>Mobile Number</Label>
-                      <Input placeholder="98XXXXXXXX" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Device IMEI</Label>
-                      <Input placeholder="15-digit IMEI" value={deviceImei} onChange={(e) => setDeviceImei(e.target.value)} />
-                    </div>
-                    {!user && (
-                      <>
-                        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <span className="text-muted-foreground">Already registered? Login before submitting.</span>
-                            <Button type="button" size="sm" variant="outline" onClick={saveDraftAndLogin}>
-                              <LogIn className="mr-2 h-4 w-4" /> Login
-                            </Button>
+                  ) : (
+                    /* Not logged in: account options + contact form */
+                    <div className="grid gap-3">
+                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-semibold text-foreground">Already have an account?</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Login to auto-fill and track this request.</p>
                           </div>
+                          <Button type="button" size="sm" variant="outline" onClick={saveDraftAndLogin}>
+                            <LogIn className="mr-2 h-4 w-4" /> Login
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center">— or fill in your details below —</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Name</Label>
+                          <Input placeholder="Your full name" value={contactName} onChange={(e) => setContactName(e.target.value)} />
                         </div>
                         <div>
-                          <Label>Email</Label>
-                          <Input type="email" placeholder="you@example.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+                          <Label>Mobile Number</Label>
+                          <Input placeholder="98XXXXXXXX" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
                         </div>
-                        <div>
-                          <Label>Password</Label>
-                          <Input type="password" placeholder="Create a password" value={buyerPassword} onChange={(e) => setBuyerPassword(e.target.value)} />
-                        </div>
-                      </>
-                    )}
-                  </div>
+                      </div>
+                      <div>
+                        <Label>Email</Label>
+                        <Input type="email" placeholder="you@example.com" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Device IMEI <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                        <Input placeholder="15-digit IMEI — dial *#06# on your phone" value={deviceImei} onChange={(e) => setDeviceImei(e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Password</Label>
+                        <Input type="password" placeholder="Create a password for your new account" value={buyerPassword} onChange={(e) => setBuyerPassword(e.target.value)} />
+                        <p className="text-xs text-muted-foreground mt-1">We'll automatically create a Tamrakar account for you so you can track this request.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setSellDialogOpen(false)}>Cancel</Button>
-                  <Button 
+                  <Button
                     disabled={createLeadMutation.isPending}
                     onClick={async () => {
                       if (!contactName.trim()) {
@@ -1090,11 +1169,17 @@ export default function SellYourPhone() {
                         toast.error("Invalid mobile number");
                         return;
                       }
-                      const imeiDigits = deviceImei.replace(/\D/g, "");
-                      if (imeiDigits.length < 14 || imeiDigits.length > 16) {
-                        toast.error("Invalid IMEI");
-                        return;
+                      // IMEI is optional — only validate format if provided
+                      if (deviceImei.trim()) {
+                        const imeiDigits = deviceImei.replace(/\D/g, "");
+                        if (imeiDigits.length < 14 || imeiDigits.length > 16) {
+                          toast.error("Invalid IMEI — must be 15 digits. Leave blank if unknown.");
+                          return;
+                        }
                       }
+                      
+                      let authenticatedUserId: string | undefined = undefined;
+                      
                       if (!user) {
                         if (!contactEmail.trim()) {
                           toast.error("Email is required");
@@ -1105,16 +1190,44 @@ export default function SellYourPhone() {
                           return;
                         }
                         
-                        // Create account first if not logged in
-                        const { error: signUpError } = await signUp(contactEmail, buyerPassword, contactName, contactPhone);
+                        // Create account if not logged in
+                        const { data: signUpData, error: signUpError } = await signUp(contactEmail, buyerPassword, contactName, contactPhone);
                         if (signUpError) {
-                          toast.error("Account creation failed", { description: signUpError.message });
+                          // If user already exists, prompt them to login instead
+                          if (signUpError.message?.toLowerCase().includes("already registered") || signUpError.message?.toLowerCase().includes("user already exists")) {
+                            toast.error("An account with this email already exists. Please login instead.", {
+                              action: { label: "Login", onClick: saveDraftAndLogin }
+                            });
+                          } else {
+                            toast.error("Account creation failed", { description: signUpError.message });
+                          }
                           return;
                         }
-                        toast.success("Account created! Logging you in...");
+
+                        // Check if session is immediately available (email confirmation disabled)
+                        // or if it requires email confirmation (common in production)
+                        const { data: authData } = await supabase.auth.getUser();
+                        if (authData?.user?.id) {
+                          authenticatedUserId = authData.user.id;
+                          toast.success("Account created! Submitting your request...");
+                        } else if (signUpData?.user?.id) {
+                          // Supabase returned a user but session not started — email confirmation required
+                          // Still save the lead; user can log in later to track it
+                          authenticatedUserId = signUpData.user.id;
+                          toast.info("Check your email to confirm your account. Your sell request will be saved and linked once confirmed.", { duration: 8000 });
+                        } else {
+                          // Complete guest — save lead without user_id
+                          toast.info("Sell request submitted. Please check your email to create your tracking account.");
+                        }
+                      } else {
+                        // User already logged in - use their ID
+                        authenticatedUserId = user.id;
                       }
                       
-                      createLeadMutation.mutate(submissionTargetStoreId); // Platform or chosen store assignment
+                      createLeadMutation.mutate({
+                        storeId: submissionTargetStoreId,
+                        userId: authenticatedUserId
+                      });
                     }}
                   >
                     {createLeadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm & Submit"}

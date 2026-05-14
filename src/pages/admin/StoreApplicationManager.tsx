@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -31,21 +32,24 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/utils";
-import { completeFullStackStoreOnboarding } from "@/services/submissionService";
+import { completeFullStackStoreOnboarding, publishStore } from "@/services/submissionService";
 
 interface StoreApplication {
   id: string;
   owner_name: string;
+  contact_name: string; // Add this
   store_name: string;
+  business_name: string; // Add this
   phone: string;
   email: string;
   location: string;
   shop_number: string | null;
   business_type: string | null;
+  description: string | null; // Add this
   message: string | null;
   logo_url: string | null;
   license_url: string | null;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'needs_info';
   created_at: string;
 }
 
@@ -63,49 +67,73 @@ export default function StoreApplicationManager() {
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      return data as StoreApplication[];
+      
+      // Normalize data to handle potential schema variations
+      return (data || []).map(app => ({
+        ...app,
+        owner_name: app.owner_name || app.contact_name,
+        store_name: app.store_name || app.business_name,
+        message: app.message || app.description
+      })) as StoreApplication[];
     },
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'approved' | 'rejected' }) => {
+    mutationFn: async ({ id, status }: { id: string; status: 'approved' | 'rejected' | 'needs_info' }) => {
       setIsProcessing(true);
       try {
         if (status === 'approved' && selectedApp) {
-          // Find user by email to onboard
-          const { data: userData, error: userError } = await supabase
-            .from("profiles")
+          // Check for existing store with same email or name to prevent duplicates
+          const { data: existingStore } = await supabase
+            .from("stores")
             .select("id")
-            .eq("email", selectedApp.email)
+            .or(`email.eq.${selectedApp.email},name.eq.${selectedApp.store_name}`)
             .maybeSingle();
 
-          if (userError) throw userError;
-
-          if (userData) {
-            // User exists, use the centralized onboarding function
-            await completeFullStackStoreOnboarding(selectedApp, userData.id);
+          if (existingStore) {
+            toast.warning("A store with this name or email already exists.");
           } else {
-            // User doesn't exist yet, we'll just create the store and application record
-            // The user will be linked when they sign up with this email
-            const { data: storeData, error: storeError } = await supabase
-              .from("stores")
-              .insert({
-                name: selectedApp.store_name,
-                location: selectedApp.location,
-                shop_no: selectedApp.shop_number,
-                phone: selectedApp.phone,
-                email: selectedApp.email,
-                description: selectedApp.message,
-                logo_url: selectedApp.logo_url,
-                is_verified: true,
-                status: "active",
-              })
-              .select()
-              .single();
+            // Find user by email to onboard
+            const { data: userData, error: userError } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("email", selectedApp.email)
+              .maybeSingle();
 
-            if (storeError) throw storeError;
-            
-            toast.info("Store created. User not found, owner link will be manual or on signup.");
+            if (userError) throw userError;
+
+            if (userData) {
+              // User exists, use the centralized onboarding function
+              await completeFullStackStoreOnboarding(selectedApp, userData.id);
+            } else {
+              // User doesn't exist yet, create store and link by email
+              const storeSlug = selectedApp.store_name
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)/g, "");
+
+              const { data: storeData, error: storeError } = await supabase
+                .from("stores")
+                .insert({
+                  name: selectedApp.store_name,
+                  slug: `${storeSlug}-${Math.floor(Math.random() * 1000)}`,
+                  location: selectedApp.location,
+                  shop_no: selectedApp.shop_number,
+                  phone: selectedApp.phone,
+                  email: selectedApp.email,
+                  description: selectedApp.message,
+                  logo_url: selectedApp.logo_url,
+                  is_verified: true,
+                  status: "pending_approval",
+                  public_status: "draft",
+                })
+                .select()
+                .single();
+
+              if (storeError) throw storeError;
+              
+              toast.info("Store created. User not found, owner link will be manual or on signup.");
+            }
           }
         }
 
@@ -149,6 +177,8 @@ export default function StoreApplicationManager() {
         return <Badge className="bg-green-500">Approved</Badge>;
       case 'rejected':
         return <Badge variant="destructive">Rejected</Badge>;
+      case 'needs_info':
+        return <Badge className="bg-amber-500">Needs Info</Badge>;
       default:
         return <Badge variant="secondary">Pending</Badge>;
     }
@@ -269,6 +299,22 @@ export default function StoreApplicationManager() {
                   </Label>
                   <p>{selectedApp.business_type || "N/A"}</p>
                 </div>
+                {(selectedApp as any).whatsapp && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground uppercase flex items-center">
+                      WhatsApp
+                    </Label>
+                    <p>{(selectedApp as any).whatsapp}</p>
+                  </div>
+                )}
+                {(selectedApp as any).viber && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground uppercase flex items-center">
+                      Viber
+                    </Label>
+                    <p>{(selectedApp as any).viber}</p>
+                  </div>
+                )}
               </div>
 
               {selectedApp.message && (
@@ -332,8 +378,17 @@ export default function StoreApplicationManager() {
           )}
 
           <DialogFooter className="gap-2 sm:gap-0 border-t pt-4">
-            {selectedApp?.status === 'pending' && (
+            {selectedApp?.status !== 'approved' && selectedApp?.status !== 'rejected' && (
               <>
+                <Button 
+                  variant="outline" 
+                  className="text-amber-600 hover:bg-amber-50"
+                  onClick={() => updateStatusMutation.mutate({ id: selectedApp!.id, status: 'needs_info' })}
+                  disabled={isProcessing}
+                >
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  Needs Info
+                </Button>
                 <Button 
                   variant="outline" 
                   className="text-destructive hover:bg-destructive/10"
@@ -347,16 +402,55 @@ export default function StoreApplicationManager() {
                   onClick={handleApprove}
                   disabled={isProcessing}
                 >
-                  {isProcessing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Approve & Onboard Store
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                  Approve & Create Store
                 </Button>
               </>
             )}
-            <Button variant="ghost" onClick={() => setSelectedApp(null)}>Close</Button>
+            {selectedApp?.status === 'approved' && (
+              <Button 
+                onClick={async () => {
+                  try {
+                    setIsProcessing(true);
+                    // Get the store for this application
+                    const { data: store, error: storeError } = await supabase
+                      .from("stores")
+                      .select("id")
+                      .eq("email", selectedApp.email)
+                      .maybeSingle();
+                    
+                    if (storeError || !store) {
+                      toast.error("Store not found for this application");
+                      return;
+                    }
+
+                    // Get current user ID for audit log
+                    const { data: { user }, error: userError } = await supabase.auth.getUser();
+                    if (userError || !user) {
+                      toast.error("Could not get current user");
+                      return;
+                    }
+
+                    await publishStore(store.id, user.id);
+                    toast.success("Store published successfully!");
+                    queryClient.invalidateQueries({ queryKey: ["admin_store_applications"] });
+                    setSelectedApp(null);
+                  } catch (error) {
+                    toast.error(`Failed to publish store: ${getErrorMessage(error)}`);
+                  } finally {
+                    setIsProcessing(false);
+                  }
+                }}
+                disabled={isProcessing}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                Publish Store
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => setSelectedApp(null)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

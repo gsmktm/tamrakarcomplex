@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,6 @@ import {
   Eye, EyeOff, Link, Calendar, AlertTriangle, Merge, BarChart3, Database
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { PRODUCTS } from "@/utils/productData";
 import { gsmArenaService, GsmArenaProduct } from "@/services/gsmArenaService";
 import { evostoreService, EvostoreProduct } from "@/services/evostoreService";
 
@@ -30,18 +30,24 @@ interface CatalogProduct {
   variant: { storage?: string; ram?: string; color?: string };
   image_url?: string;
   specs_json: Record<string, unknown>;
+  official_price?: number;
+  market_price?: number;
   price_npr?: number;
   price_text?: string;
   source_url?: string;
   source_site?: string;
+  updated_by?: string;
+  approved_by?: string;
   verified: boolean;
   verified_at?: string;
+  price_source?: string;
+  is_price_list_item?: boolean;
   is_active: boolean;
   created_at: string;
 }
 
 export default function PriceListManager() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<CatalogProduct>>({});
   const [filters, setFilters] = useState({
@@ -81,8 +87,9 @@ export default function PriceListManager() {
       let query = supabase
         .from("catalog_products")
         .select(`
-          id, name, slug, image_url, specs_json, price_npr, price_text,
-          source_url, source_site, verified, verified_at, is_active, created_at,
+          id, name, slug, image_url, specs_json, official_price, market_price, price_npr, price_text,
+          source_url, source_site, verified, verified_at, is_price_list_item, price_source,
+          updated_by, approved_by, is_active, created_at,
           brand:brands(name, logo_url),
           model:device_models(name),
           variant:device_variants(storage, ram, color)
@@ -110,10 +117,14 @@ export default function PriceListManager() {
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<CatalogProduct> }) => {
+      // Remove relation objects that are not columns in the database
+      const { brand, model, variant, ...cleanUpdates } = updates as any;
       const { error } = await supabase
         .from("catalog_products")
         .update({
-          ...updates,
+          ...cleanUpdates,
+          updated_by: user?.id ?? cleanUpdates.updated_by ?? null,
+          approved_by: updates.verified ? user?.id ?? cleanUpdates.approved_by ?? null : cleanUpdates.approved_by ?? null,
           verified_at: updates.verified ? new Date().toISOString() : null
         })
         .eq("id", id);
@@ -139,10 +150,15 @@ export default function PriceListManager() {
 
   const handleSave = () => {
     if (editingId && editData) {
-      // Generate price_text from price_npr
+      const officialPrice = editData.official_price ?? editData.price_npr;
       const updates = {
         ...editData,
-        price_text: editData.price_npr ? `Rs. ${editData.price_npr.toLocaleString('en-IN')}` : editData.price_text
+        official_price: officialPrice,
+        market_price: editData.market_price ?? officialPrice,
+        price_npr: officialPrice,
+        price_text: officialPrice ? `Rs. ${officialPrice.toLocaleString('en-IN')}` : editData.price_text,
+        price_source: editData.price_source || "manual",
+        is_price_list_item: editData.is_price_list_item ?? true,
       };
       updateProductMutation.mutate({ id: editingId, updates });
     }
@@ -193,14 +209,21 @@ export default function PriceListManager() {
         });
 
         // Data type conversions
-        if (obj.price_npr) {
-          const price = parseFloat(obj.price_npr as string);
+        const rawPrice = obj.official_price ?? obj.price_npr;
+        if (rawPrice) {
+          const price = parseFloat(rawPrice as string);
           if (isNaN(price)) {
-            throw new Error(`Row ${lineIdx + 2}: Invalid price_npr "${obj.price_npr}"`);
+            throw new Error(`Row ${lineIdx + 2}: Invalid official_price "${rawPrice}"`);
           }
+          obj.official_price = price;
+          obj.market_price = obj.market_price ? parseFloat(obj.market_price as string) : price;
           obj.price_npr = price;
           obj.price_text = `Rs. ${price.toLocaleString('en-IN')}`;
         }
+        obj.price_source = obj.price_source || "csv";
+        obj.is_price_list_item = obj.is_price_list_item === undefined || obj.is_price_list_item === null
+          ? true
+          : ["true", "1", "yes"].includes(String(obj.is_price_list_item).toLowerCase());
         
         if (obj.verified !== undefined) {
           obj.verified = obj.verified === 'true' || obj.verified === '1' || obj.verified === 'yes';
@@ -237,12 +260,15 @@ export default function PriceListManager() {
             name: p.name,
             slug: p.slug,
             brand_id: brandMap.get(p.brand.toLowerCase()),
+            official_price: p.price_npr,
+            market_price: p.price_npr,
             price_npr: p.price_npr,
             price_text: `Rs. ${p.price_npr.toLocaleString('en-IN')}`,
             image_url: p.image,
             specs_json: p.specs,
             source_site: "gsmarena.com",
             source_url: `https://www.gsmarena.com/${p.slug}`,
+            price_source: "gsmarena",
             verified: false, // Must be verified by admin
             is_active: true,
             is_price_list_item: true
@@ -254,12 +280,15 @@ export default function PriceListManager() {
             name: p.name,
             slug: p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
             brand_id: brandMap.get(p.brand.toLowerCase()),
+            official_price: p.price_value,
+            market_price: p.price_value,
             price_npr: p.price_value,
             price_text: p.price,
             image_url: p.image,
             specs_json: p.specs,
             source_site: "evostore.com.np",
             source_url: p.url,
+            price_source: "evostore",
             verified: false, // Must be verified by admin
             is_active: true,
             is_price_list_item: true
@@ -302,50 +331,6 @@ export default function PriceListManager() {
     onError: (error) => {
       toast.error("Failed to merge duplicates: " + error.message);
     },
-  });
-
-  const seedMarketDataMutation = useMutation({
-    mutationFn: async () => {
-      // 1. Get existing brands to map names to IDs
-      const { data: existingBrands } = await supabase.from("brands").select("id, name");
-      const brandMap = new Map(existingBrands?.map(b => [b.name.toLowerCase(), b.id]) || []);
-
-      // 2. Prepare data
-      const dataToInsert = PRODUCTS.map(device => {
-        const brandId = brandMap.get(device.brand.toLowerCase());
-        const slug = `${device.brand.toLowerCase()}-${device.model.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-        
-        return {
-          name: `${device.brand} ${device.model}`,
-          slug: slug,
-          brand_id: brandId,
-          price_npr: device.retail_npr,
-          price_text: `Rs. ${device.retail_npr?.toLocaleString('en-IN')}`,
-          image_url: device.image,
-          is_active: true,
-          verified: true,
-          verified_at: new Date().toISOString(),
-          is_price_list_item: true,
-          source_site: "Tamrakar Market Update",
-          specs_json: {}
-        };
-      });
-
-      // 3. Upsert into catalog_products
-      const { error } = await supabase
-        .from("catalog_products")
-        .upsert(dataToInsert, { onConflict: 'slug' });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["price-list"] });
-      queryClient.invalidateQueries({ queryKey: ["price-list-stats"] });
-      toast.success("Market data seeded successfully from local catalog");
-    },
-    onError: (error) => {
-      toast.error("Failed to seed market data: " + error.message);
-    }
   });
 
   const toggleVerified = (product: CatalogProduct) => {
@@ -444,19 +429,6 @@ export default function PriceListManager() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Price List Manager</CardTitle>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => seedMarketDataMutation.mutate()}
-              disabled={seedMarketDataMutation.isPending}
-            >
-              {seedMarketDataMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Database className="mr-2 h-4 w-4" />
-              )}
-              Seed Market Data
-            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowAutoImportDialog(true)}>
               <Search className="mr-2 h-4 w-4" />
               Auto-Import
@@ -541,7 +513,16 @@ export default function PriceListManager() {
                     </div>
                   </TableCell>
                   <TableCell>{product.brand?.name}</TableCell>
-                  <TableCell>{product.price_text || 'N/A'}</TableCell>
+                  <TableCell>
+                    {product.official_price
+                      ? `Rs. ${product.official_price.toLocaleString('en-IN')}`
+                      : product.price_text || 'N/A'}
+                    {product.market_price && product.market_price !== product.official_price && (
+                      <div className="text-xs text-muted-foreground">
+                        Market: Rs. {product.market_price.toLocaleString('en-IN')}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Badge variant={product.verified ? "default" : "secondary"}>
@@ -588,12 +569,29 @@ export default function PriceListManager() {
               />
             </div>
             <div>
-              <Label htmlFor="price">Price (NPR)</Label>
+              <Label htmlFor="official_price">Official Price (NPR)</Label>
               <Input
-                id="price"
+                id="official_price"
                 type="number"
-                value={editData.price_npr || ''}
-                onChange={(e) => setEditData({ ...editData, price_npr: parseFloat(e.target.value) })}
+                value={editData.official_price ?? editData.price_npr ?? ''}
+                onChange={(e) => setEditData({ ...editData, official_price: parseFloat(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="market_price">Market Price (NPR)</Label>
+              <Input
+                id="market_price"
+                type="number"
+                value={editData.market_price ?? ''}
+                onChange={(e) => setEditData({ ...editData, market_price: parseFloat(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="price_source">Price Source</Label>
+              <Input
+                id="price_source"
+                value={editData.price_source || 'manual'}
+                onChange={(e) => setEditData({ ...editData, price_source: e.target.value })}
               />
             </div>
             <div>
@@ -649,8 +647,8 @@ export default function PriceListManager() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              <p>Format: name, slug, brand_id, model_id, price_npr, source_url, verified, is_active</p>
-              <p>Example: iPhone 15 Pro, iphone-15-pro, brand-uuid, model-uuid, 150000, site.com/p, true, true</p>
+              <p>Format: name, slug, brand_id, model_id, variant_id, official_price, market_price, price_source, source_url, verified, is_active</p>
+              <p>Example: iPhone 15 Pro, iphone-15-pro, brand-uuid, model-uuid, variant-uuid, 150000, 145000, manual, site.com/p, true, true</p>
             </div>
             <Textarea
               placeholder="Paste CSV content here..."

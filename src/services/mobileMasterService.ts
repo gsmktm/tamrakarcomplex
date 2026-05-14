@@ -70,8 +70,45 @@ export const mobileMasterService = {
     if (error) throw error;
     return data;
   },
+  async updateBrand(id: string, brand: Partial<Brand>) {
+    const { data, error } = await supabase.from("brands").update(brand).eq("id", id).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async deleteBrand(id: string) {
+    const { error } = await supabase.from("brands").delete().eq("id", id);
+    if (error) throw error;
+  },
 
   // Series
+  async getVariants(modelId: string) {
+    const { data, error } = await supabase
+      .from('phone_variants')
+      .select('*')
+      .eq('model_id', modelId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async createVariant(variant: Partial<PhoneVariant>) {
+    const { data, error } = await supabase
+      .from('phone_variants')
+      .insert(variant)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteVariant(id: string) {
+    const { error } = await supabase
+      .from('phone_variants')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
   async getSeriesByBrand(brandId: string) {
     const { data, error } = await supabase.from("phone_series").select("*").eq("brand_id", brandId).order("name");
     if (error) throw error;
@@ -81,6 +118,15 @@ export const mobileMasterService = {
     const { data, error } = await supabase.from("phone_series").insert(series).select().single();
     if (error) throw error;
     return data;
+  },
+  async updateSeries(id: string, series: Partial<PhoneSeries>) {
+    const { data, error } = await supabase.from("phone_series").update(series).eq("id", id).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async deleteSeries(id: string) {
+    const { error } = await supabase.from("phone_series").delete().eq("id", id);
+    if (error) throw error;
   },
 
   // Models
@@ -106,17 +152,14 @@ export const mobileMasterService = {
     if (error) throw error;
     return data;
   },
-
-  // Variants
-  async getVariants(modelId: string) {
-    const { data, error } = await supabase.from("phone_variants").select("*").eq("model_id", modelId);
+  async updateModel(id: string, model: Partial<PhoneModel>) {
+    const { data, error } = await supabase.from("phone_models").update(model).eq("id", id).select().single();
     if (error) throw error;
     return data;
   },
-  async createVariant(variant: Partial<PhoneVariant>) {
-    const { data, error } = await supabase.from("phone_variants").insert(variant).select().single();
+  async deleteModel(id: string) {
+    const { error } = await supabase.from("phone_models").delete().eq("id", id);
     if (error) throw error;
-    return data;
   },
 
   // Specs

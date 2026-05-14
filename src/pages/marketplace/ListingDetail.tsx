@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, MapPin, Calendar, User, Edit } from "lucide-react";
+import { Loader2, ArrowLeft, MapPin, Calendar, User, Edit, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -21,31 +21,120 @@ import { SEO } from "@/components/common/SEO";
 import { SafeImage } from "@/components/common/SafeImage";
 import { decodeListingDescription, formatCondition, toCoarseLocation } from "@/lib/listingMeta";
 import { absoluteUrl, breadcrumbSchema } from "@/lib/seo";
+import { getPublicStorePath } from "@/lib/storeRoutes";
 import { getFallbackMarketplaceListings } from "@/services/publicFallbackData";
+
+interface StoreInfo {
+  id: string;
+  name: string;
+  slug: string;
+  seo_slug?: string | null;
+  logo_url: string | null;
+  shop_no: string | null;
+  location: string | null;
+  is_verified: boolean;
+}
+
+type ListingDetailRecord = {
+  id: string;
+  source_type?: "store_product" | "user_listing";
+  user_id?: string | null;
+  owner_user_id?: string | null;
+  created_by?: string | null;
+  store_id?: string | null;
+  store_name?: string | null;
+  catalog_product_id?: string | null;
+  stock?: number | null;
+  contact_info?: string | null;
+  title: string;
+  description: string | null;
+  price: number;
+  condition: string;
+  category: string | null;
+  brand: string | null;
+  model: string | null;
+  images: string[] | null;
+  location: string | null;
+  created_at: string;
+};
 
 export default function ListingDetail() {
   const { id } = useParams();
   const { session } = useAuth();
   const [activeImage, setActiveImage] = useState<string | null>(null);
+  const [store, setStore] = useState<StoreInfo | null>(null);
 
   const { data: listing, isLoading } = useQuery({
     queryKey: ["sell_listing", id],
     queryFn: async () => {
+      const { data: unifiedData } = await (supabase as any)
+        .from("public_marketplace_items")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (unifiedData) {
+        const images = Array.isArray(unifiedData.images)
+          ? unifiedData.images
+          : unifiedData.images
+            ? Object.values(unifiedData.images as Record<string, string>).filter(Boolean)
+            : [];
+        return {
+          ...unifiedData,
+          user_id: unifiedData.created_by,
+          owner_user_id: unifiedData.created_by,
+          listing_type: unifiedData.source_type,
+          images,
+          contact_info: null,
+        } as ListingDetailRecord;
+      }
+
       const { data, error } = await supabase
         .from("sell_listings")
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) {
-        const fallback = getFallbackMarketplaceListings().find((item) => item.id === id);
-        if (fallback) return fallback;
-        throw error || new Error("Listing not found");
+      if (data) return data as ListingDetailRecord;
+
+      const { data: marketplaceData, error: marketplaceError } = await supabase
+        .from("marketplace_listings")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (marketplaceData) {
+        return {
+          ...marketplaceData,
+          user_id: marketplaceData.owner_user_id,
+          contact_info: null,
+        } as ListingDetailRecord;
       }
-      return data;
+
+      if (error || marketplaceError || !data) {
+        const fallback = getFallbackMarketplaceListings().find((item) => item.id === id);
+        if (fallback) return fallback as ListingDetailRecord;
+        throw error || marketplaceError || new Error("Listing not found");
+      }
+      return data as ListingDetailRecord;
     },
     enabled: !!id,
   });
+
+  // Fetch store if store_id exists in listing
+  useEffect(() => {
+    async function fetchStore() {
+      if (listing?.store_id) {
+        const { data } = await supabase
+          .from("stores")
+          .select("id, name, slug, seo_slug, logo_url, shop_no, location, is_verified")
+          .eq("id", listing.store_id)
+          .single();
+        if (data) setStore(data as StoreInfo);
+      }
+    }
+    fetchStore();
+  }, [listing?.store_id]);
 
   if (isLoading) {
     return (
@@ -74,7 +163,7 @@ export default function ListingDetail() {
     );
   }
 
-  const isOwner = session?.user.id === listing.user_id;
+  const isOwner = session?.user.id === (listing.user_id || listing.owner_user_id || listing.created_by);
   const images = listing.images || [];
   const currentImage = activeImage || (images.length > 0 ? images[0] : null);
   const { text: publicDescription, meta } = decodeListingDescription(listing.description);
@@ -133,7 +222,7 @@ export default function ListingDetail() {
           </Button>
           {isOwner && (
             <Button asChild variant="outline" size="sm" className="gap-2">
-              <Link to={`/marketplace/edit/${listing.id}`}>
+              <Link to={listing.source_type === "store_product" ? "/storeadmin/products" : `/marketplace/edit/${listing.id}`}>
                 <Edit className="h-4 w-4" />
                 Edit Listing
               </Link>
@@ -310,33 +399,77 @@ export default function ListingDetail() {
               </Card>
             ) : null}
 
-            <Card>
-              <CardContent className="p-6 space-y-4">
-                <h3 className="font-semibold flex items-center gap-2 text-lg">
-                  <User className="h-5 w-5 text-primary" />
-                  Seller Information
-                </h3>
-                
-                <div className="bg-muted/30 p-4 rounded-lg border">
-                  <p className="text-sm text-muted-foreground mb-1">Contact Details</p>
-                  <p className="text-lg font-medium select-all">{contactInfo || "Not provided"}</p>
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1 w-full"
-                    disabled={!contactInfo}
-                    onClick={() => window.open(`tel:${contactInfo}`)}
-                  >
-                    Call Seller
-                  </Button>
-                  {/* Future: Add Chat Button Here */}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  This form may be protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.
-                </p>
-              </CardContent>
-            </Card>
+            {store ? (
+              <Card className="border-primary/20 bg-primary/5 overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="bg-primary/10 px-6 py-3 border-b border-primary/10 flex items-center justify-between">
+                    <h3 className="font-bold flex items-center gap-2 text-sm uppercase tracking-wider text-primary">
+                      <Store className="h-4 w-4" />
+                      Store Listing
+                    </h3>
+                    {store.is_verified && (
+                      <Badge className="bg-emerald-500 hover:bg-emerald-600">Verified Store</Badge>
+                    )}
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="h-16 w-16 rounded-xl border bg-white overflow-hidden shrink-0">
+                        {store.logo_url ? (
+                          <img src={store.logo_url} alt={store.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-secondary">
+                            <Store className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-xl">{store.name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {store.location} {store.shop_no ? `· Shop ${store.shop_no}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button className="flex-1 rounded-xl h-11 font-bold" asChild>
+                        <Link to={getPublicStorePath(store)}>Visit Store Page</Link>
+                      </Button>
+                      <Button variant="outline" className="rounded-xl h-11 font-bold border-primary/20" asChild>
+                        <Link to={`/marketplace?store=${store.id}`}>All Listings</Link>
+                      </Button>
+                      {contactInfo && (
+                        <Button variant="outline" className="h-11 font-bold" onClick={() => window.open(`tel:${contactInfo}`)}>
+                          Call Store
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2 text-lg">
+                    <User className="h-5 w-5 text-primary" />
+                    Seller Information
+                  </h3>
+                  
+                  <div className="bg-muted/30 p-4 rounded-lg border">
+                    <p className="text-sm text-muted-foreground mb-1">Contact Details</p>
+                    <p className="text-lg font-medium select-all">{contactInfo || "Not provided"}</p>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 w-full"
+                      disabled={!contactInfo}
+                      onClick={() => window.open(`tel:${contactInfo}`)}
+                    >
+                      Call Seller
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <div>
               <h3 className="font-semibold text-lg mb-3">Description</h3>

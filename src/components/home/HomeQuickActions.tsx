@@ -5,7 +5,8 @@ import {
   RefreshCw, 
   Wrench, 
   Unlock, 
-  Store 
+  Store,
+  ShieldAlert 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,6 +46,13 @@ const actions = [
     icon: Unlock,
     route: "/unlocking",
     color: "bg-red-500/10 text-red-600",
+  },
+  {
+    title: "Diagnostics",
+    text: "Identify hardware & software issues",
+    icon: ShieldAlert,
+    route: "/repair#diagnostics-section",
+    color: "bg-amber-500/10 text-amber-600",
   },
   {
     title: "Store Directory",

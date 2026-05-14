@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Mail, MapPin, Phone } from "lucide-react";
+import { Loader2, Mail, MapPin, Phone, MessageCircle } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
@@ -103,11 +103,22 @@ export default function ContactUs() {
                 <div className="rounded-full bg-primary/10 p-3">
                   <Phone className="h-6 w-6 text-primary" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <h3 className="text-xl font-semibold mb-1">Customer Support</h3>
                   <p className="text-muted-foreground">Landline: +977-015351731</p>
-                  <p className="text-muted-foreground">Mobile/WhatsApp: +977-9851091542</p>
-                  <p className="text-sm text-muted-foreground mt-1 italic">Available Sun-Fri, 10:00 AM - 7:00 PM</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className="text-muted-foreground">Mobile/WhatsApp: +977-9851091542</p>
+                    <a
+                      href="https://api.whatsapp.com/send?phone=9779851091542"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#25D366] text-white text-sm font-medium hover:bg-[#128C7E] transition-colors"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Chat Now
+                    </a>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2 italic">Available Sun-Fri, 10:00 AM - 7:00 PM</p>
                 </div>
               </div>
 

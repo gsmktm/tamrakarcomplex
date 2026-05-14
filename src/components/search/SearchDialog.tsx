@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/useDebounce";
 import { autoSearchPageService, type AutoSearchBuildResult } from "@/services/autoSearchPageService";
+import { getPublicStoreSlug } from "@/lib/storeRoutes";
 
 interface SearchResult {
   id: string;
@@ -62,8 +63,10 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
           .limit(5),
         supabase
           .from("stores")
-          .select("id, name, location")
+          .select("id, name, slug, seo_slug, location")
           .or(`name.ilike.%${searchQuery}%,location.ilike.%${searchQuery}%`)
+          .eq("status", "active")
+          .eq("public_status", "published")
           .limit(5),
         supabase
           .from("phone_models")
@@ -119,7 +122,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       const stores: SearchResult[] = storeRows.map((store) => ({
         id: store.id,
         title: store.name,
-        slug: store.id,
+        slug: getPublicStoreSlug(store),
         type: "store" as const,
         category: store.location,
       }));

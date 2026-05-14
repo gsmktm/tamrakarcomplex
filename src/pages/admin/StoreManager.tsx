@@ -10,8 +10,9 @@ import {
   Loader2, Trash2, Search, CheckCircle, XCircle,
   ExternalLink, Pencil, MoreVertical, ShieldCheck,
   Calendar, CreditCard, Star, Store, ShoppingBag, Palette,
-  Phone, MapPin, Upload
+  Phone, MapPin, Upload, AlertCircle
 } from "lucide-react";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -159,85 +160,98 @@ const StoreManager = () => {
   const { data: stores, isLoading, error: storesError } = useQuery({
     queryKey: ["admin_stores", user?.id, role],
     queryFn: async () => {
-      // 1. Get stores user has access to
-      let storeIds: string[] = [];
-      
-      if (role === "suadmin" || role === "staffadmin") {
-        // Platform admins see all stores
-        const { data } = await supabase.from("stores").select("id");
-        storeIds = data?.map(s => s.id) || [];
-      } else if (role === "storeadmin" && user?.id) {
-        // Store admins see stores they belong to
-        const { data: memberships } = await supabase
-          .from("store_admins")
-          .select("store_id")
-          .eq("user_id", user.id)
-          .eq("status", "active");
-        
-        // Also check legacy owner_id
-        const { data: ownedStores } = await supabase
-          .from("stores")
-          .select("id")
-          .eq("owner_id", user.id);
-          
-        storeIds = Array.from(new Set([
-          ...(memberships?.map(m => m.store_id) || []),
-          ...(ownedStores?.map(s => s.id) || [])
-        ]));
-      }
-
-      if (storeIds.length === 0 && role !== "suadmin" && role !== "staffadmin") return [];
-
-      const loadBaseStores = async () => {
-        let baseQuery = supabase.from("stores").select("*");
-        if (storeIds.length > 0) {
-          baseQuery = baseQuery.in("id", storeIds);
-        }
-        const { data: baseData, error: baseError } = await baseQuery.order("created_at", { ascending: false });
-        if (baseError) throw baseError;
-        return (baseData ?? []) as StoreRow[];
-      };
-
-      const tryLoadWithSubscriptions = async () => {
-        let query = supabase.from("stores").select(`
-            *,
-            store_subscriptions (
-              *,
-              packages (*)
-            )
-          `);
-        if (storeIds.length > 0) {
-          query = query.in("id", storeIds);
-        }
-        const { data, error } = await query.order("created_at", { ascending: false });
-        if (error) throw error;
-        return (data ?? []) as StoreWithSubscriptionsRaw[];
-      };
-
-      let data: StoreWithSubscriptionsRaw[] | StoreRow[] = [];
-
       try {
-        try {
-          data = await tryLoadWithSubscriptions();
-        } catch (e) {
-          if (!isMissingRelationshipError(e)) throw e;
-          data = await loadBaseStores();
+        // 1. Get stores user has access to
+        let storeIds: string[] = [];
+        
+        if (role === "suadmin" || role === "staffadmin") {
+          // Platform admins see all stores — storeIds stays empty, no filter applied
+        } else if (role === "storeadmin" && user?.id) {
+          // Store admins see stores they belong to
+          const { data: memberships } = await supabase
+            .from("store_admins")
+            .select("store_id")
+            .eq("user_id", user.id)
+            .eq("status", "active");
+          
+          // Also check legacy owner_id
+          const { data: ownedStores } = await supabase
+            .from("stores")
+            .select("id")
+            .eq("owner_id", user.id);
+            
+          storeIds = Array.from(new Set([
+            ...(memberships?.map(m => m.store_id) || []),
+            ...(ownedStores?.map(s => s.id) || [])
+          ]));
         }
-      } catch (e) {
-        throw e;
-      }
 
-      // Flatten store_subscriptions from array to single object (when join exists)
-      return (data || []).map((store) => {
-        const s = store as StoreWithSubscriptionsRaw;
-        const subscriptions = s.store_subscriptions;
-        const activeSub = Array.isArray(subscriptions) && subscriptions.length > 0 ? subscriptions[0] : null;
-        return {
-          ...s,
-          store_subscriptions: activeSub,
-        } as StoreWithSubscription;
-      });
+        if (storeIds.length === 0 && role !== "suadmin" && role !== "staffadmin") return [];
+
+        const loadBaseStores = async () => {
+          let baseQuery = supabase.from("stores").select("*, store_packages(name)");
+          if (storeIds.length > 0) {
+            baseQuery = baseQuery.in("id", storeIds);
+          }
+          const { data: baseData, error: baseError } = await baseQuery.order("name");
+          if (baseError) {
+            if (isMissingRelationshipError(baseError)) {
+              let fallbackQuery = supabase.from("stores").select("*");
+              if (storeIds.length > 0) fallbackQuery = fallbackQuery.in("id", storeIds);
+              const { data: fallbackData, error: fallbackError } = await fallbackQuery.order("name");
+              if (fallbackError) throw fallbackError;
+              return (fallbackData ?? []) as StoreRow[];
+            }
+            throw baseError;
+          }
+          return (baseData ?? []) as StoreRow[];
+        };
+
+        const tryLoadWithSubscriptions = async () => {
+          let query = supabase.from("stores").select(`
+              *,
+              store_subscriptions (
+                *,
+                packages (*)
+              )
+            `);
+          if (storeIds.length > 0) {
+            query = query.in("id", storeIds);
+          }
+          const { data, error } = await query.order("created_at", { ascending: false });
+          if (error) throw error;
+          return (data ?? []) as StoreWithSubscriptionsRaw[];
+        };
+
+        let data: StoreWithSubscriptionsRaw[] | StoreRow[] = [];
+
+        try {
+          try {
+            data = await tryLoadWithSubscriptions();
+          } catch (e) {
+            if (!isMissingRelationshipError(e)) throw e;
+            data = await loadBaseStores();
+          }
+        } catch (e) {
+          throw e;
+        }
+
+        // Flatten store_subscriptions from array to single object (when join exists)
+        return (data || []).map((store) => {
+          const s = store as StoreWithSubscriptionsRaw;
+          const subscriptions = s.store_subscriptions;
+          const activeSub = Array.isArray(subscriptions) && subscriptions.length > 0 ? subscriptions[0] : null;
+          return {
+            ...s,
+            store_subscriptions: activeSub,
+          } as StoreWithSubscription;
+        });
+      } catch (err) {
+        handleSupabaseError(err, "StoreManager: Failed to fetch stores list");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const { data: packages } = useQuery({
@@ -349,7 +363,7 @@ const StoreManager = () => {
     },
     onSuccess: (newStoreId) => {
       queryClient.invalidateQueries({ queryKey: ["admin_stores"] });
-      if ((role === "suadmin" || role === "admin") && newStoreId) {
+      if ((role === "suadmin" || role === "staffadmin") && newStoreId) {
         saveTierOverrideMutation.mutate({ storeId: newStoreId, tier: tierOverride });
       }
       setIsOpen(false);
@@ -362,7 +376,7 @@ const StoreManager = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (values: StoreFormValues) => {
+    mutationFn: async (values: StoreFormValues & { package_id?: string }) => {
       const servicesArray = values.services.split(",").map(s => s.trim()).filter(s => s);
       const { error } = await supabase
         .from("stores")
@@ -385,16 +399,14 @@ const StoreManager = () => {
           marketplace_commission: values.marketplace_commission,
           status: values.status,
           theme_slug: values.theme_slug,
+          package_id: (values as any).package_id,
         })
         .eq("id", editingStore.id);
       if (error) throw error;
       return editingStore.id;
     },
-    onSuccess: (storeId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin_stores"] });
-      if ((role === "suadmin" || role === "staffadmin") && storeId) {
-        saveTierOverrideMutation.mutate({ storeId, tier: tierOverride });
-      }
       setIsOpen(false);
       setEditingStore(null);
       reset();
@@ -433,6 +445,14 @@ const StoreManager = () => {
     },
     onError: (error: unknown) => {
       toast.error(`Error deleting store: ${getErrorMessage(error)}`);
+    },
+  });
+
+  const { data: allPackages } = useQuery({
+    queryKey: ["all_store_packages_for_select"],
+    queryFn: async () => {
+      const { data } = await supabase.from("store_packages").select("id, name").order("price");
+      return data || [];
     },
   });
 
@@ -622,21 +642,38 @@ const StoreManager = () => {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
                             <SelectItem value="suspended">Suspended</SelectItem>
-                            <SelectItem value="maintenance">Maintenance</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       
                       <div className="grid gap-2">
-                        <Label htmlFor="marketplace_commission">Commission (%)</Label>
-                        <Input 
-                          id="marketplace_commission" 
-                          type="number" 
-                          step="0.01" 
-                          {...register("marketplace_commission")} 
-                        />
+                        <Label>Store Package</Label>
+                        <Select 
+                          onValueChange={(v) => (setValue as any)("package_id", v)} 
+                          defaultValue={(editingStore as any)?.package_id}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Package" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allPackages?.map(pkg => (
+                              <SelectItem key={pkg.id} value={pkg.id}>{pkg.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="marketplace_commission">Commission (%)</Label>
+                      <Input 
+                        id="marketplace_commission" 
+                        type="number" 
+                        step="0.01" 
+                        {...register("marketplace_commission")} 
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 gap-4">
@@ -807,6 +844,21 @@ const StoreManager = () => {
                         </div>
                         <div className="text-[10px] text-muted-foreground truncate uppercase tracking-tighter">
                           {store.services?.slice(0, 2).join(" • ") || "No services listed"}
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          <Badge variant="outline" className="text-[10px] capitalize">
+                            {(store as any).store_packages?.name || "Free"}
+                          </Badge>
+                          {store.is_verified && (
+                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 border-blue-100">
+                              Verified
+                            </Badge>
+                          )}
+                          {store.is_featured && (
+                            <Badge variant="secondary" className="text-[10px] bg-amber-50 text-amber-700 border-amber-100">
+                              Featured
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>

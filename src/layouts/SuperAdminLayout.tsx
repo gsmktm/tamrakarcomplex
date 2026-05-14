@@ -1,157 +1,145 @@
 import type { ComponentType } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
-  BarChart3,
-  Calendar,
-  Database,
-  ExternalLink,
-  LayoutDashboard,
-  LogOut,
-  Settings,
   ShieldAlert,
-  Users,
-  User,
-  Wrench,
+  LogOut,
   Menu,
-  Store,
-  Package,
-  CreditCard,
-  FileText,
-  ShoppingBag,
-  MessageSquare,
-  Unlock,
-  Tag,
-  ListTodo,
+  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getFilteredMenu } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { AdminGlobalSearch } from "@/components/admin/AdminGlobalSearch";
-
-type SuperAdminNavGroup = {
-  title: string;
-  items: Array<{
-    href: string;
-    icon: ComponentType<{ className?: string }>;
-    label: string;
-  }>;
-};
 
 export default function SuperAdminLayout() {
-  const { signOut, role } = useAuth();
-  const { permissions } = usePermissions();
   const location = useLocation();
+  const { role, signOut } = useAuth();
+  const { permissions } = usePermissions();
+  const [navQuery, setNavQuery] = useState("");
 
-  const menuGroups = useMemo(() => getFilteredMenu(role || "suadmin", permissions), [role, permissions]);
+  const menuGroups = useMemo(
+    () => getFilteredMenu("suadmin", role === "suadmin" ? permissions : null),
+    [role, permissions]
+  );
 
-  const NavContent = () => (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="p-6 border-b">
-        <div className="flex items-center justify-between gap-3">
-          <div className="rounded-full bg-red-500/10 p-2">
-            <ShieldAlert className="h-6 w-6 text-red-500" />
+  const filteredGroups = useMemo(() => {
+    const q = navQuery.trim().toLowerCase();
+    if (!q) return menuGroups;
+    return menuGroups.map(group => ({
+      ...group,
+      items: group.items.filter(item => item.label.toLowerCase().includes(q))
+    })).filter(group => group.items.length > 0);
+  }, [menuGroups, navQuery]);
+
+  const NavContent = ({ onNavigate }: { onNavigate?: () => void }) => (
+    <div className="flex flex-col h-full">
+      <div className="px-6 py-5 border-b">
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-primary/10 p-2">
+            <ShieldAlert className="h-6 w-6 text-primary" />
           </div>
-          <div className="min-w-0">
-            <h2 className="font-semibold text-lg">Super Admin</h2>
-            <p className="text-sm text-muted-foreground">System Control Panel</p>
+          <div>
+            <h1 className="font-bold text-lg leading-none">Super Admin</h1>
+            <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wider">System Control</p>
           </div>
-          <Button variant="ghost" size="icon" asChild title="View Live Site">
-            <Link to="/" target="_blank" rel="noreferrer">
-              <ExternalLink className="h-5 w-5 text-muted-foreground" />
-            </Link>
-          </Button>
         </div>
       </div>
 
-      <div className="px-4 py-2 border-b">
-        <AdminGlobalSearch />
+      <div className="p-4">
+        <Input
+          value={navQuery}
+          onChange={(e) => setNavQuery(e.target.value)}
+          placeholder="Search menu..."
+          className="h-10 rounded-xl bg-muted/40"
+        />
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto p-4 space-y-6">
-        {menuGroups.map((group) => (
-          <div key={group.title}>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground mb-3">
+      <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-6 scrollbar-hide">
+        {filteredGroups.map((group) => (
+          <div key={group.title} className="space-y-2">
+            <h3 className="px-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
               {group.title}
             </h3>
-            <div className="space-y-1">
+            <ul className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isRoot = item.href === "/suadmin";
-                const isActive = isRoot
-                  ? location.pathname === item.href
-                  : location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
+                const isActive = location.pathname === item.href || (item.href !== "/suadmin" && location.pathname.startsWith(item.href));
                 return (
-                  <Link
-                    key={item.href}
-                    to={item.href}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-                      isActive
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
+                  <li key={item.href}>
+                    <Link
+                      to={item.href}
+                      onClick={onNavigate}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {item.label}
+                    </Link>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </div>
         ))}
       </nav>
 
       <div className="p-4 border-t">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
-          onClick={signOut}
-        >
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button variant="ghost" className="w-full justify-start gap-2" onClick={() => signOut()}>
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Desktop Sidebar */}
-      <div className="fixed inset-y-0 left-0 z-50 hidden w-80 bg-card border-r lg:block">
+    <div className="flex min-h-screen bg-muted/30">
+      <aside className="hidden w-72 border-r border-border bg-background md:flex md:flex-col fixed inset-y-0">
         <NavContent />
-      </div>
+      </aside>
 
-      {/* Mobile Header */}
-      <div className="sticky top-0 z-40 lg:hidden">
-        <div className="flex h-16 items-center gap-4 border-b bg-card px-4">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
+      <div className="flex flex-1 flex-col md:pl-72">
+        <header className="sticky top-0 z-30 border-b border-border bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex items-center justify-between px-4 py-4 md:px-8">
+            <div className="flex items-center gap-4">
+              <div className="md:hidden">
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <Menu className="h-5 w-5" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-72 p-0">
+                    <NavContent onNavigate={() => {}} />
+                  </SheetContent>
+                </Sheet>
+              </div>
+              <h2 className="text-sm font-semibold text-muted-foreground md:text-base">
+                System Command Center
+              </h2>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" asChild title="View Live Site">
+                <Link to="/" target="_blank">
+                  <ExternalLink className="h-5 w-5" />
+                </Link>
               </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-80 p-0">
-              <SheetHeader className="sr-only">
-                <SheetTitle>Super Admin Navigation</SheetTitle>
-              </SheetHeader>
-              <NavContent />
-            </SheetContent>
-          </Sheet>
-
-          <div className="flex items-center gap-3">
-            <ShieldAlert className="h-5 w-5 text-red-500" />
-            <span className="font-semibold">Super Admin</span>
+            </div>
           </div>
-        </div>
-      </div>
+        </header>
 
-      {/* Main Content */}
-      <div className="lg:pl-80">
-        <main className="py-8 px-4 sm:px-6 lg:px-8">
+        <main className="flex-1 p-4 md:p-8">
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>

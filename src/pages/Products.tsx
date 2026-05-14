@@ -37,7 +37,7 @@ export default function Products() {
   const brandParam = searchParams.get("brand");
   const minPrice = searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : undefined;
   const maxPrice = searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : undefined;
-  const search = searchParams.get("q") || "";
+  const search = searchParams.get("q") || searchParams.get("search") || "";
 
   // Local State
   const [activeCategory, setActiveCategory] = useState(categoryParam);

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -153,6 +153,7 @@ const MODEL_SUGGESTIONS: Record<string, string[]> = {
 
 export default function SellWizard() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const { session, role } = useAuth();
   const isAdmin = role === "suadmin" || role === "staffadmin";
   const { data: myStores } = useMyStores();
@@ -165,6 +166,7 @@ export default function SellWizard() {
   const [estimate, setEstimate] = useState<number | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [profileCompletion, setProfileCompletion] = useState<{ pct: number; missing: string[] } | null>(null);
+  const requestedStoreId = searchParams.get("store") || searchParams.get("storeId") || "";
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -203,9 +205,10 @@ export default function SellWizard() {
   // Automatically select the first store if the user has stores
   useEffect(() => {
     if (myStores && myStores.length > 0 && !form.getValues("store_id") && !id) {
-      form.setValue("store_id", myStores[0].id);
+      const requestedStore = myStores.find((store) => store.id === requestedStoreId);
+      form.setValue("store_id", requestedStore?.id || myStores[0].id);
     }
-  }, [myStores, form, id]);
+  }, [myStores, form, id, requestedStoreId]);
 
   const watched = form.watch();
   const subcategories = SUBCATEGORY_OPTIONS[watched.category] || [];
@@ -228,8 +231,17 @@ export default function SellWizard() {
             const decoded = decodeListingDescription(data.description);
             const meta = decoded.meta;
             const specs = meta?.specs ?? {};
-             // Check if user is owner or admin
-             if (session && data.user_id !== session.user.id && !isAdmin) {
+             // Check if user is listing owner, store owner, or platform admin.
+             let canEdit = Boolean(isAdmin || (session && data.user_id === session.user.id));
+             if (!canEdit && session && data.store_id) {
+               const { data: storeOwner } = await supabase
+                 .from("stores")
+                 .select("owner_id")
+                 .eq("id", data.store_id)
+                 .maybeSingle();
+               canEdit = storeOwner?.owner_id === session.user.id;
+             }
+             if (session && !canEdit) {
                toast({
                  title: "Access denied",
                  description: "You do not have permission to edit this listing.",
@@ -386,7 +398,7 @@ export default function SellWizard() {
 
       if (id) {
         // Update existing listing
-        await updateListingMutation.mutateAsync({
+        const updated = await updateListingMutation.mutateAsync({
           id,
           data: {
             title: values.title,
@@ -407,9 +419,10 @@ export default function SellWizard() {
           title: "Success!",
           description: "Your listing has been updated.",
         });
+        navigate(`/marketplace/listing/${updated.id}`);
       } else {
         // Create new listing
-        await createListingMutation.mutateAsync({
+        const created = await createListingMutation.mutateAsync({
           title: values.title,
           description: descriptionWithMeta,
           price: values.price,
@@ -428,9 +441,8 @@ export default function SellWizard() {
           title: "Success!",
           description: "Your listing has been posted.",
         });
+        navigate(`/marketplace/listing/${created.id}`);
       }
-      
-      navigate("/marketplace");
     } catch (error: unknown) {
       toast({
         title: "Error",

@@ -9,13 +9,15 @@ import {
 import { 
   TrendingUp, TrendingDown, Users, ShoppingBag, Store, CreditCard, 
   ArrowUpRight, ArrowDownRight, Activity, Calendar, Download,
-  ExternalLink, ArrowRight, Globe, MapPin, MousePointer2, Clock, ShieldCheck
+  ExternalLink, ArrowRight, Globe, MapPin, MousePointer2, Clock, ShieldCheck, AlertCircle
 } from "lucide-react";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
+import { getPublicStorePath } from "@/lib/storeRoutes";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d"];
 
@@ -59,15 +61,18 @@ interface RecentOrderItem {
 interface TopStoreItem {
   id: string;
   name: string;
+  slug?: string | null;
+  seo_slug?: string | null;
   logo_url: string | null;
 }
 
 export default function Analytics() {
   const [visitorPeriod, setVisitorPeriod] = useState<"daily" | "weekly" | "monthly" | "yearly">("monthly");
   
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading, error: statsError } = useQuery({
     queryKey: ["admin-analytics", visitorPeriod],
     queryFn: async () => {
+      try {
       const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
       
       const [
@@ -89,7 +94,7 @@ export default function Analytics() {
         supabase.from("stores").select("id, created_at, package_slug, subscription_status"),
         supabase.from("profiles").select("id, created_at"),
         supabase.from("sell_listings").select("id, created_at"),
-        supabase.from("stores").select("id, name, logo_url").limit(5),
+        supabase.from("stores").select("id, name, slug, seo_slug, logo_url").limit(5),
         supabase.from("orders").select("id, total_amount, status, created_at, profiles(display_name)").order("created_at", { ascending: false }).limit(5),
         supabase.from("visitor_logs").select("*", { count: "exact", head: true }),
         supabase.from("visitor_logs").select("*", { count: "exact", head: true }).eq("is_unique", true).gte("created_at", startOfDay(new Date()).toISOString()),
@@ -99,10 +104,10 @@ export default function Analytics() {
       ]);
 
       // Process visitor stats for chart
-      const visitorChartData = Array.isArray(visitorStatsData) ? (visitorStatsData as VisitorStatsItem[]).map((item) => ({
-        date: visitorPeriod === 'daily' ? format(new Date(item.period), "HH:00") : format(new Date(item.period), "MMM dd"),
-        total: item.total_visits,
-        unique: item.unique_visitors
+      const visitorChartData = Array.isArray(visitorStatsData) ? (visitorStatsData as any[]).map((item) => ({
+        date: visitorPeriod === 'daily' ? format(new Date(item.label || item.period), "HH:00") : format(new Date(item.label || item.period), "MMM dd"),
+        total: item.total_visits || 0,
+        unique: item.unique_visits || item.unique_visitors || 0
       })) : [];
 
       // Aggregate revenue by day
@@ -160,7 +165,12 @@ export default function Analytics() {
           topCountries: Array.isArray(countriesGrouped) ? countriesGrouped as CountryStatsItem[] : []
         }
       };
-    }
+      } catch (err) {
+        handleSupabaseError(err, "Analytics: Failed to fetch analytics data");
+        return null;
+      }
+    },
+    retry: 1,
   });
 
   if (isLoading) {
@@ -172,6 +182,23 @@ export default function Analytics() {
           ))}
         </div>
         <Skeleton className="h-[400px] rounded-xl" />
+      </div>
+    );
+  }
+
+  if (statsError || !stats) {
+    return (
+      <div className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <AlertCircle className="h-8 w-8 text-amber-500" />
+        </div>
+        <div>
+          <p className="font-medium text-sm">Unable to load analytics</p>
+          <p className="text-xs text-muted-foreground mt-1">Database connection issue. Please try again.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
       </div>
     );
   }
@@ -396,7 +423,7 @@ export default function Analytics() {
                         </div>
                       </div>
                       <Button variant="ghost" size="icon" asChild>
-                        <Link to={`/stores/${store.id}`}><ExternalLink className="h-4 w-4" /></Link>
+                        <Link to={getPublicStorePath(store)}><ExternalLink className="h-4 w-4" /></Link>
                       </Button>
                     </div>
                   ))}

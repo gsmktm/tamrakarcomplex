@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -71,22 +72,28 @@ export default function ThemeManager() {
   const [editingSection, setEditingSection] = useState<SectionConfig | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
 
-  const { data: themeSettings, isLoading: isThemeLoading } = useQuery({
+  const { data: themeSettings, isLoading: isThemeLoading, error: themeError } = useQuery({
     queryKey: ["admin-theme-settings"],
     queryFn: async () => {
-      const localSettings = readThemeSettings();
-      const { data, error } = await supabase
-        .from("app_settings")
-        .select("value")
-        .eq("key", "theme_settings")
-        .maybeSingle();
+      try {
+        const localSettings = readThemeSettings();
+        const { data, error } = await supabase
+          .from("app_settings")
+          .select("value")
+          .eq("key", "theme_settings")
+          .maybeSingle();
 
-      if (error) {
-        return localSettings;
+        if (error) {
+          return localSettings;
+        }
+
+        return mergeThemeSettings(data?.value ?? localSettings);
+      } catch (err) {
+        handleSupabaseError(err, "ThemeManager: Failed to fetch theme settings");
+        return readThemeSettings();
       }
-
-      return mergeThemeSettings(data?.value ?? localSettings);
     },
+    retry: 1,
     staleTime: 60_000,
   });
 

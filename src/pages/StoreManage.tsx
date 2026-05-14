@@ -134,7 +134,7 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
           .from("user_roles")
           .select("role")
           .eq("user_id", user.id)
-          .in("role", ["admin", "suadmin"])
+          .in("role", ["staffadmin", "suadmin"])
           .maybeSingle();
 
         if (!data) {
@@ -254,11 +254,16 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
       description: String(formData.get("description") || ""),
       location: String(formData.get("location") || ""),
       phone: String(formData.get("phone") || "") || null,
+      whatsapp: String(formData.get("whatsapp") || "") || null,
       email: String(formData.get("email") || "") || null,
       website: String(formData.get("website") || "") || null,
       shop_no: String(formData.get("shop_no") || "") || null,
+      shop_number: String(formData.get("shop_no") || "") || null,
+      floor: String(formData.get("floor") || "") || null,
+      block: String(formData.get("block") || "") || null,
       map_url: String(formData.get("map_url") || "") || null,
       logo_url: String(formData.get("logo_url") || "") || null,
+      banner_url: String(formData.get("banner_url") || "") || null,
       services,
     };
 
@@ -385,6 +390,10 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
                       <Input id="phone" name="phone" defaultValue={store.phone || ""} />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="whatsapp">WhatsApp Number</Label>
+                      <Input id="whatsapp" name="whatsapp" defaultValue={(store as any).whatsapp || ""} placeholder="e.g. 98XXXXXXXX" />
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
                       <Input id="email" name="email" defaultValue={store.email || ""} />
                     </div>
@@ -397,12 +406,35 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
                       <Input id="shop_no" name="shop_no" defaultValue={store.shop_no || ""} />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="floor">Floor</Label>
+                      <Select name="floor" defaultValue={(store as any).floor || ""}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Floor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1st">1st Floor</SelectItem>
+                          <SelectItem value="2nd">2nd Floor</SelectItem>
+                          <SelectItem value="3rd">3rd Floor</SelectItem>
+                          <SelectItem value="4th">4th Floor</SelectItem>
+                          <SelectItem value="5th">5th Floor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="block">Block</Label>
+                      <Input id="block" name="block" defaultValue={(store as any).block || ""} placeholder="e.g. A, B, C" />
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="map_url">Google Maps URL</Label>
                       <Input id="map_url" name="map_url" defaultValue={store.map_url || ""} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="logo_url">Logo URL</Label>
                       <Input id="logo_url" name="logo_url" defaultValue={store.logo_url || ""} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="banner_url">Banner URL</Label>
+                      <Input id="banner_url" name="banner_url" defaultValue={(store as any).banner_url || ""} />
                     </div>
                   </div>
 

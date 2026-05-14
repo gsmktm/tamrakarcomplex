@@ -65,6 +65,8 @@ BEGIN
     'gskmtm@gmail.com', 
     'gsktm@gmail.com', 
     'superadmin@tamrakarcomplex.com',
+    'timrobani@gmail.com',
+    'info@tamrakarcomplex.com',
     'bootstrap-admin@example.invalid'
   ) THEN
     INSERT INTO public.user_roles (user_id, role) 

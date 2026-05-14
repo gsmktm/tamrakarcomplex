@@ -35,7 +35,7 @@ export default function StoreProfilePage() {
         const { data: ownedData, error: ownedError } = await supabase
           .from("stores")
           .select("id")
-          .eq("owner_id", user.id)
+          .or(`owner_id.eq.${user.id},owner_user_id.eq.${user.id}`)
           .limit(1)
           .maybeSingle();
 

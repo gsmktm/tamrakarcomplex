@@ -67,6 +67,7 @@ export default function Auth() {
         ? `${locationState.from.pathname}${locationState.from.search ?? ""}${locationState.from.hash ?? ""}`
         : null;
   const queryRedirect = new URLSearchParams(location.search).get("redirect");
+  const referralCodeFromUrl = new URLSearchParams(location.search).get("ref");
   const from = getSafeLocalRedirectPath(stateRedirect) ?? getSafeLocalRedirectPath(queryRedirect) ?? "/";
   const isRecoveryMode = location.hash.includes("type=recovery");
 
@@ -75,8 +76,10 @@ export default function Auth() {
     if (user && !authLoading && role && !isRecoveryMode) {
       const storedRedirect = getSafeLocalRedirectPath(window.localStorage.getItem("tc_oauth_redirect"));
       if (storedRedirect) window.localStorage.removeItem("tc_oauth_redirect");
-      console.info("Auth state resolved. Role:", role, "User:", user.email);
-      navigate(getPostLoginRedirectPath(role, storedRedirect ?? from), { replace: true });
+      console.info("Auth: Redirecting user based on role.", { email: user.email, role, from: storedRedirect ?? from });
+      const targetPath = getPostLoginRedirectPath(role, storedRedirect ?? from);
+      console.info("Auth: Target path resolved to:", targetPath);
+      navigate(targetPath, { replace: true });
     } else if (user && !authLoading && !role && !isRecoveryMode) {
       console.warn("User authenticated but NO ROLE FOUND. Attempting auto-bootstrap...");
       // If user has no role, they might be a newly confirmed admin or a new user
@@ -130,7 +133,7 @@ export default function Auth() {
           });
           return;
         }
-        const { error } = await signUp(signupEmail, password, sanitizeText(name, 120), normalizePhone(phone));
+        const { error } = await signUp(signupEmail, password, sanitizeText(name, 120), normalizePhone(phone), referralCodeFromUrl || undefined);
         if (error) {
           toast({
             title: "Sign Up Failed",

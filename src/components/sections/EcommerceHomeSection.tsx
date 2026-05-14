@@ -30,6 +30,7 @@ import {
   Globe,
   ExternalLink,
   Search,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +59,7 @@ import { useHomepageSettings } from "@/hooks/useHomepageSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { readThemeSettings } from "@/lib/siteSettings";
+import { getPublicStorePath } from "@/lib/storeRoutes";
 import type { SectionConfig } from "@/types/app";
 import { formatDistanceToNow } from "date-fns";
 import { FlagshipShowcase } from "@/components/sections/FlagshipShowcase";
@@ -65,6 +67,8 @@ import { FlagshipShowcase } from "@/components/sections/FlagshipShowcase";
 type HomeStore = {
   id: string;
   name: string;
+  slug?: string | null;
+  seo_slug?: string | null;
   location?: string | null;
   description?: string | null;
   services?: string[] | null;
@@ -181,11 +185,11 @@ const serviceCards = [
     bg: "bg-[linear-gradient(135deg,rgba(14,165,233,0.1),rgba(59,130,246,0.06))]",
   },
   {
-    title: "Interactive Map",
-    subtitle: "Navigate the complex",
-    description: "Floor-by-floor visual guide to find any shop or service instantly.",
-    href: "/map",
-    icon: Globe,
+    title: "Diagnostics Hub",
+    subtitle: "Identify device faults",
+    description: "Smart troubleshooting to find hardware issues and get instant repair estimates.",
+    href: "/repair#diagnostics-section",
+    icon: ShieldAlert,
     gradient: "from-amber-500 to-orange-500",
     glow: "shadow-[0_8px_32px_rgba(245,158,11,0.25)]",
     bg: "bg-[linear-gradient(135deg,rgba(245,158,11,0.1),rgba(251,191,36,0.06))]",
@@ -345,7 +349,7 @@ export function EcommerceHomeSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stores")
-        .select("id,name,location,description,services,is_verified,phone,email,website,logo_url,shop_no,subscription_status")
+        .select("id,name,slug,seo_slug,location,description,services,is_verified,phone,email,website,logo_url,shop_no,subscription_status")
         .eq("is_verified", true)
         .limit(10);
 
@@ -358,7 +362,7 @@ export function EcommerceHomeSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stores")
-        .select("id,name,location,description,services,is_verified,phone,email,website,logo_url")
+        .select("id,name,slug,seo_slug,location,description,services,is_verified,phone,email,website,logo_url")
         .order("is_verified", { ascending: false })
         .limit(6);
       if (error) throw error;
@@ -1097,15 +1101,15 @@ function StoresSection({
                     /* ─── With Login View ────────────────────────────────────── */
                     <div className="flex-1 flex flex-col relative">
                       <div className="grid grid-cols-2 gap-2 mb-4">
-                        <Link to={`/marketplace?store=${store.id}`} className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-primary/5 border border-primary/10 hover:bg-primary/10 hover:border-primary/20 transition-all text-center">
+                        <Link to={`/marketplace?store=${store.slug || store.id}`} className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-primary/5 border border-primary/10 hover:bg-primary/10 hover:border-primary/20 transition-all text-center">
                           <ShoppingBag className="h-4 w-4 text-primary" />
                           <span className="text-[10px] font-bold uppercase tracking-tight">Sales</span>
                         </Link>
-                        <Link to={`/exchange-your-phone?store=${store.id}`} className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 hover:bg-emerald-500/10 hover:border-emerald-500/20 transition-all text-center">
+                        <Link to={`/exchange-your-phone?store=${store.slug || store.id}`} className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 hover:bg-emerald-500/10 hover:border-emerald-500/20 transition-all text-center">
                           <RefreshCw className="h-4 w-4 text-emerald-600" />
                           <span className="text-[10px] font-bold uppercase tracking-tight">Repair Ex.</span>
                         </Link>
-                        <Link to={`/marketplace?store=${store.id}&category=Accessories`} className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-blue-500/5 border border-blue-500/10 hover:bg-blue-500/10 hover:border-blue-500/20 transition-all text-center">
+                        <Link to={`/marketplace?store=${store.slug || store.id}&category=Accessories`} className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-blue-500/5 border border-blue-500/10 hover:bg-blue-500/10 hover:border-blue-500/20 transition-all text-center">
                           <Headphones className="h-4 w-4 text-blue-600" />
                           <span className="text-[10px] font-bold uppercase tracking-tight">Accessories</span>
                         </Link>
@@ -1128,7 +1132,7 @@ function StoresSection({
 
                       <div className="mt-auto pt-4 border-t border-dashed border-border/60">
                         <Button className="w-full rounded-2xl bg-primary hover:bg-primary/90 text-white shadow-glow group/btn gap-2" asChild>
-                          <Link to={`/stores/${store.id}`}>
+                          <Link to={getPublicStorePath(store)}>
                             View Store Page <ExternalLink className="h-4 w-4 group-hover/btn:scale-110 transition-transform" />
                           </Link>
                         </Button>

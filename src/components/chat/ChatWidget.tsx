@@ -1,67 +1,46 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
+import { askChatbot, fetchPublicChatbotConfig, normalizeChatbotConfig, type ChatbotAnswer } from "@/lib/chatbot";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, MessageSquare, X, Phone, Mail, User } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2, MessageSquare, X, Phone, Mail, User, Send, Bot, CheckCircle2, ShoppingBag, Store, IndianRupee } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import type { DeviceCatalogRow, StoreRow } from "@/types/app";
-
-type ChatbotSettings = {
-  allowAnonymous: boolean;
-  requireContact: boolean;
-  supportName: string;
-  showStoreContacts: boolean;
-  sourcesEnabled: {
-    products: boolean;
-    articles: boolean;
-    guides: boolean;
-    content_pages: boolean;
-    device_catalog: boolean;
-  };
-};
-
-type ChatInfoResult = {
-  kind: "answer" | "stores";
-  title: string;
-  text: string;
-};
-
-type ChatLinkResult = {
-  kind: "product" | "article" | "guide" | "page" | "device";
-  title: string;
-  excerpt?: string;
-  href: string;
-  price?: string;
-};
-
-type ChatResult = ChatInfoResult | ChatLinkResult;
-
-function isChatLinkResult(result: ChatResult): result is ChatLinkResult {
-  return result.kind !== "answer" && result.kind !== "stores";
-}
-
-const defaultChatbotSettings: ChatbotSettings = {
-  allowAnonymous: true,
-  requireContact: false,
-  supportName: "Support",
-  showStoreContacts: true,
-  sourcesEnabled: {
-    products: true,
-    articles: true,
-    guides: true,
-    content_pages: true,
-    device_catalog: true,
-  },
-};
 
 interface ChatWidgetProps {
-    settings?: {
-        position?: "bottom-right" | "bottom-left";
-    };
+  settings?: {
+    position?: "bottom-right" | "bottom-left";
+  };
 }
+
+type UiMessage = {
+  id: string;
+  sender: "user" | "bot" | "system";
+  text: string;
+  payload?: ChatbotAnswer;
+};
+
+const STORAGE_PROFILE = "tamrakar-chat-profile";
+const STORAGE_SESSION = "tamrakar-chat-session-id";
+
+const formatMoney = (value: unknown) => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number") return `Rs. ${value.toLocaleString("en-IN")}`;
+  return String(value);
+};
+
+const readProfile = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_PROFILE);
+    return raw ? JSON.parse(raw) as { name?: string; email?: string; phone?: string } : {};
+  } catch {
+    return {};
+  }
+};
 
 export const ChatWidget = ({ settings: propSettings = {} }: ChatWidgetProps) => {
   const { user } = useAuth();
@@ -69,229 +48,103 @@ export const ChatWidget = ({ settings: propSettings = {} }: ChatWidgetProps) => 
   const [profileOpen, setProfileOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<ChatResult[]>([]);
-  const [welcome, setWelcome] = useState("Hello! How can I help you today?");
-  const [isActive, setIsActive] = useState(true);
-  const [supportName, setSupportName] = useState("Support");
+  const [messages, setMessages] = useState<UiMessage[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
+
   const positionClass = propSettings.position === "bottom-left" ? "left-4" : "right-4";
 
-  const chatbotSettings = useMemo(() => {
-    try {
-      const raw = localStorage.getItem("chatbot-settings");
-      return raw ? (JSON.parse(raw) as ChatbotSettings) : defaultChatbotSettings;
-    } catch {
-      return defaultChatbotSettings;
-    }
-  }, []);
-
-  const { data: config } = useQuery({
-    queryKey: ["chatbot_config_public"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("chatbot_config").select("*").single();
-      if (error && error.code !== "PGRST116") throw error;
-      return data;
-    }
+  const { data: configRaw } = useQuery({
+    queryKey: ["chatbot_config_public_complete"],
+    queryFn: fetchPublicChatbotConfig,
+    staleTime: 1000 * 60 * 2,
   });
 
+  const config = useMemo(() => normalizeChatbotConfig(configRaw), [configRaw]);
+
   useEffect(() => {
-    if (config) {
-      setWelcome(config.welcome_message || welcome);
-      setIsActive(!!config.is_active);
-    }
-    setSupportName(chatbotSettings.supportName || "Support");
-    try {
-      const raw = localStorage.getItem("chatbot-profile");
-      const p = raw ? JSON.parse(raw) : {};
-      setName(p.name || "");
-      setEmail(p.email || "");
-      setPhone(p.phone || "");
-    } catch {
-      // Ignore malformed local chatbot profile data.
-    }
-  }, [config, chatbotSettings, welcome]);
+    const profile = readProfile();
+    setName(profile.name || user?.user_metadata?.full_name || "");
+    setEmail(profile.email || user?.email || "");
+    setPhone(profile.phone || user?.user_metadata?.phone || "");
+    setSessionId(localStorage.getItem(STORAGE_SESSION));
+  }, [user]);
 
-  const canUse = isActive && (chatbotSettings.allowAnonymous || !!user);
+  useEffect(() => {
+    if (open && messages.length === 0) {
+      setMessages([
+        {
+          id: "welcome",
+          sender: "bot",
+          text: config.welcome_message,
+        },
+      ]);
+    }
+  }, [open, config.welcome_message, messages.length]);
 
-  const ask = async () => {
-    if (!question.trim()) return;
-    if (chatbotSettings.requireContact && !phone) {
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading, open]);
+
+  const saveProfile = () => {
+    const nextProfile = { name: name.trim(), email: email.trim(), phone: phone.trim() };
+    localStorage.setItem(STORAGE_PROFILE, JSON.stringify(nextProfile));
+    setProfileOpen(false);
+  };
+
+  const canUse = config.is_active && (config.allow_anonymous || !!user);
+  const needsContact = config.require_contact && (!name.trim() || !phone.trim());
+
+  const sendQuestion = async () => {
+    const q = question.trim();
+    if (!q || loading) return;
+
+    if (needsContact) {
       setProfileOpen(true);
+      setMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), sender: "system", text: "Please add your name and phone number so support can track your request." },
+      ]);
       return;
     }
+
+    saveProfile();
+    setQuestion("");
     setLoading(true);
-    setResults([]);
-    const q = question.trim();
-    const like = `%${q}%`;
-
-    type ChatQueryResult = ChatLinkResult[] | Pick<StoreRow, "name" | "phone" | "location">[];
-    const queries: Array<PromiseLike<ChatQueryResult>> = [];
-    const enabled: ChatbotSettings["sourcesEnabled"] = {
-      ...defaultChatbotSettings.sourcesEnabled,
-      ...(chatbotSettings.sourcesEnabled ?? {}),
-    };
-
-    if (enabled.products) {
-      queries.push(
-        supabase
-          .from("products")
-          .select("name,slug,price,description")
-          .ilike("name", like)
-          .limit(5)
-          .then(({ data, error }) => {
-            if (error) return [];
-            return (data ?? []).map((product) => ({
-              kind: "product" as const,
-              title: product.name,
-              excerpt: product.description || undefined,
-              href: `/product/${product.slug}`,
-              price: product.price,
-            }));
-          })
-      );
-    }
-    if (enabled.articles) {
-      queries.push(
-        supabase
-          .from("articles")
-          .select("title,slug,excerpt")
-          .ilike("title", like)
-          .limit(5)
-          .then(({ data, error }) => {
-            if (error) return [];
-            return (data ?? []).map((article) => ({
-              kind: "article" as const,
-              title: article.title,
-              excerpt: article.excerpt || undefined,
-              href: `/article/${article.slug}`,
-            }));
-          })
-      );
-    }
-    if (enabled.guides) {
-      queries.push(
-        supabase
-          .from("guides")
-          .select("title,slug,excerpt")
-          .ilike("title", like)
-          .limit(5)
-          .then(({ data, error }) => {
-            if (error) return [];
-            return (data ?? []).map((guide) => ({
-              kind: "guide" as const,
-              title: guide.title,
-              excerpt: guide.excerpt || undefined,
-              href: `/guide/${guide.slug}`,
-            }));
-          })
-      );
-    }
-    if (enabled.content_pages) {
-      queries.push(
-        supabase
-          .from("content_pages")
-          .select("title,slug,content")
-          .ilike("title", like)
-          .limit(5)
-          .then(({ data, error }) => {
-            if (error) return [];
-            return (data ?? []).map((page) => ({
-              kind: "page" as const,
-              title: page.title,
-              excerpt: typeof page.content === "string" ? page.content.slice(0, 160) : undefined,
-              href: `/${page.slug}`,
-            }));
-          })
-      );
-    }
-    if (enabled.device_catalog) {
-      queries.push(
-        supabase
-          .from("device_catalog")
-          .select("brand,model,canonical_slug")
-          .ilike("model", like)
-          .limit(5)
-          .then(({ data, error }) => {
-            if (error) return [];
-            return (data ?? []).map((device: Pick<DeviceCatalogRow, "brand" | "model" | "canonical_slug">) => ({
-              kind: "device" as const,
-              title: `${device.brand} ${device.model}`.trim(),
-              excerpt: "Open the valuation estimator for pricing guidance.",
-              href: "/valuation-estimator",
-            }));
-          })
-      );
-    }
-    // Stores for contact/location
-    if (chatbotSettings.showStoreContacts) {
-      queries.push(
-        supabase.from("stores").select("name,phone,location").limit(3).then(({ data, error }) => {
-          if (error) return [];
-          return ((data ?? []) as unknown) as Pick<StoreRow, "name" | "phone" | "location">[];
-        })
-      );
-    }
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: "user", text: q }]);
 
     try {
-      const responses = await Promise.all(queries);
-      const items: ChatLinkResult[] = [];
-      let stores: Pick<StoreRow, "name" | "phone" | "location">[] = [];
-      responses.forEach((res) => {
-        if (Array.isArray(res) && res.length > 0 && "phone" in res[0]) {
-          stores = res as Pick<StoreRow, "name" | "phone" | "location">[];
-        } else if (Array.isArray(res)) {
-          items.push(...(res as ChatLinkResult[]));
-        }
+      const answer = await askChatbot({
+        question: q,
+        customer: {
+          name: name.trim() || user?.user_metadata?.full_name || undefined,
+          email: email.trim() || user?.email || undefined,
+          phone: phone.trim() || user?.user_metadata?.phone || undefined,
+        },
+        sessionId,
+        sourceUrl: window.location.href,
       });
-      // Compose an auto answer if price/product present
-      const product = items.find((item): item is ChatLinkResult => item.kind === "product" && typeof item.price === "string");
-      const autoAnswer: ChatInfoResult[] = [];
-      if (product) {
-        autoAnswer.push({
-            kind: "answer",
-            title: "Price Info",
-            text: `Price of ${product.title} is ${product.price}.`,
-        });
-        if (stores.length) {
-            const storeLines = stores.map((store) => `${store.name} · ${store.phone}${store.location ? ` · ${store.location}` : ""}`);
-            autoAnswer.push({
-            kind: "stores",
-            title: "Store Contacts",
-            text: `Contact stores:\n- ${storeLines.join("\n- ")}`,
-            });
-        }
+
+      if (answer.session_id) {
+        setSessionId(answer.session_id);
+        localStorage.setItem(STORAGE_SESSION, answer.session_id);
       }
 
-      // Add stores if found even without product match (optional enhancement)
-      if (!product && stores.length > 0) {
-           const storeLines = stores.map((store) => `${store.name} · ${store.phone}${store.location ? ` · ${store.location}` : ""}`);
-           autoAnswer.push({
-            kind: "stores",
-            title: "Store Contacts",
-            text: `Contact stores:\n- ${storeLines.join("\n- ")}`,
-            });
-      }
-
-      const final = [...autoAnswer, ...items];
-      // Filter duplicates or limit
-      setResults(final.length > 0 ? final : []);
-
-      // Log interaction
-      await supabase.from("contact_messages").insert({
-        name: name || user?.user_metadata?.full_name || "Guest",
-        email: email || user?.email || null,
-        subject: "chatbot: question",
-        message: JSON.stringify({
-          question: q,
-          phone,
-          results_count: final.length,
-          product: product?.title || null,
-          price: product?.price || null,
-        }),
-      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          sender: answer.ok ? "bot" : "system",
+          text: answer.ok ? (answer.answer || config.fallback_message) : (answer.error || config.fallback_message),
+          payload: answer,
+        },
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Chat support failed. Please try again.";
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: "system", text: message }]);
     } finally {
       setLoading(false);
     }
@@ -304,125 +157,170 @@ export const ChatWidget = ({ settings: propSettings = {} }: ChatWidgetProps) => 
       {!open && (
         <Button
           className={cn(
-              "fixed bottom-20 z-40 rounded-full h-12 w-12 p-0 shadow-lg bg-primary text-primary-foreground hover:scale-105 transition-transform",
-              positionClass
+            "fixed bottom-20 z-40 h-12 w-12 rounded-full bg-primary p-0 text-primary-foreground shadow-lg transition-transform hover:scale-105",
+            positionClass,
           )}
           onClick={() => setOpen(true)}
-          aria-label="Open Chat"
+          aria-label="Open Chat Support"
         >
-          <MessageSquare className="h-6 w-6" />
+          <MessageSquare className="h-5 w-5" />
         </Button>
       )}
+
       {open && (
-        <Card className={cn(
-            "fixed bottom-20 z-40 w-[340px] shadow-2xl border-2",
-            positionClass
-        )}>
-          <div className="p-3 border-b bg-gradient-to-r from-primary/10 to-secondary/20">
-            <div className="flex items-center justify-between">
-              <div className="font-semibold">{supportName}</div>
-              <Button variant="ghost" size="icon" onClick={() => setOpen(false)}>
-                <X className="h-4 w-4" />
-              </Button>
+        <Card className={cn("fixed bottom-20 z-50 flex h-[580px] w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden shadow-2xl", positionClass)}>
+          <div className="flex items-center justify-between border-b bg-primary p-4 text-primary-foreground">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-foreground/15">
+                <Bot className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="font-semibold">{config.support_name}</div>
+                <div className="text-xs opacity-90">Product price • repair • exchange • support</div>
+              </div>
             </div>
-            <div className="mt-2 text-xs text-muted-foreground">{welcome}</div>
-            <div className="mt-2 flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setProfileOpen((v) => !v)}>
-                {profileOpen ? "Hide Contact" : "Add Contact"}
-              </Button>
-            </div>
-            {profileOpen && (
-              <div className="mt-2 grid grid-cols-1 gap-2">
-                <div className="flex items-center gap-2">
-                  <User className="h-3 w-3" />
-                  <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-3 w-3" />
-                  <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-3 w-3" />
-                  <Input placeholder="Mobile" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                </div>
-                <div className="flex items-center justify-end">
-                  <Button
-                    size="sm"
-                    onClick={async () => {
-                      localStorage.setItem("chatbot-profile", JSON.stringify({ name, email, phone }));
-                      await supabase.from("contact_messages").insert({
-                        name: name || "Guest",
-                        email: email || null,
-                        subject: "chatbot: profile",
-                        message: JSON.stringify({ name, email, phone }),
-                      });
-                      setProfileOpen(false);
-                    }}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="p-3 space-y-3 max-h-[420px] overflow-y-auto">
-            {loading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Searching…
-              </div>
-            )}
-            {!loading && results.length === 0 && (
-              <div className="text-xs text-muted-foreground">Ask about products, articles, guides or pages.</div>
-            )}
-            {!loading && results.length > 0 && (
-              <div className="space-y-2">
-	                {results.slice(0, 8).map((item, idx) => {
-	                  return (
-	                    <div
-	                      key={idx}
-	                      className={cn(
-	                        "border rounded p-2",
-	                        item.kind === "answer" || item.kind === "stores" ? "bg-secondary/40" : "",
-	                      )}
-	                    >
-	                      <div className="font-medium text-sm">{item.title}</div>
-	                      {isChatLinkResult(item) ? (
-	                        <>
-	                          {item.excerpt ? (
-	                            <div className="text-xs text-muted-foreground line-clamp-2">{item.excerpt}</div>
-	                          ) : null}
-	                          <div className="mt-1 text-xs">
-	                            <a href={item.href} className="text-primary hover:underline">
-	                              View
-	                            </a>
-	                          </div>
-	                        </>
-	                      ) : (
-	                        <div className="text-xs whitespace-pre-line">{item.text}</div>
-	                      )}
-	                    </div>
-	                  );
-	                })}
-              </div>
-            )}
-          </div>
-          <div className="p-3 border-t flex items-center gap-2">
-            <Input
-              placeholder="Type your question…"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                      ask();
-                  }
-              }}
-            />
-            <Button onClick={ask} disabled={loading || !question.trim()}>
-              Ask
+            <Button size="icon" variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/15" onClick={() => setOpen(false)}>
+              <X className="h-4 w-4" />
             </Button>
+          </div>
+
+          <div className="border-b p-3">
+            <button
+              type="button"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-xs hover:bg-muted"
+            >
+              <span className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                {name || phone ? `${name || "Customer"}${phone ? ` · ${phone}` : ""}` : "Add name, phone and email"}
+              </span>
+              {name && phone ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Badge variant="secondary">Needed</Badge>}
+            </button>
+
+            {profileOpen && (
+              <div className="mt-3 grid gap-2">
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" />
+                <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email optional" type="email" />
+                <Button size="sm" onClick={saveProfile}>Save Contact</Button>
+              </div>
+            )}
+          </div>
+
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-3">
+              {messages.map((message) => (
+                <div key={message.id} className={cn("flex", message.sender === "user" ? "justify-end" : "justify-start")}>
+                  <div className={cn(
+                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
+                    message.sender === "user" ? "bg-primary text-primary-foreground" : message.sender === "system" ? "bg-amber-50 text-amber-900 border border-amber-200" : "bg-muted",
+                  )}>
+                    <p className="whitespace-pre-line">{message.text}</p>
+                    {message.payload?.tracking_code && (
+                      <div className="mt-2 rounded bg-background/60 px-2 py-1 text-xs">
+                        Tracking: <span className="font-semibold">{message.payload.tracking_code}</span>
+                      </div>
+                    )}
+                    {message.payload && <AnswerCards payload={message.payload} />}
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="rounded-2xl bg-muted px-3 py-2 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                </div>
+              )}
+              <div ref={endRef} />
+            </div>
+          </ScrollArea>
+
+          <div className="border-t p-3">
+            <div className="flex gap-2">
+              <Input
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void sendQuestion();
+                }}
+                placeholder="Ask: iPhone 15 price, exchange, repair..."
+                disabled={loading}
+              />
+              <Button size="icon" onClick={() => void sendQuestion()} disabled={loading || !question.trim()}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              <QuickAsk label="iPhone price" onClick={() => setQuestion("iPhone price")}/>
+              <QuickAsk label="Exchange phone" onClick={() => setQuestion("Exchange phone")}/>
+              <QuickAsk label="Repair support" onClick={() => setQuestion("Repair support")}/>
+            </div>
           </div>
         </Card>
       )}
     </>
   );
+};
+
+const QuickAsk = ({ label, onClick }: { label: string; onClick: () => void }) => (
+  <button type="button" onClick={onClick} className="rounded-full border px-2 py-1 hover:bg-muted">
+    {label}
+  </button>
+);
+
+const AnswerCards = ({ payload }: { payload: ChatbotAnswer }) => {
+  const products = payload.products || [];
+  const prices = payload.official_prices || [];
+  const offers = payload.store_offers || [];
+  const stores = payload.stores || [];
+
+  if (!products.length && !prices.length && !offers.length && !stores.length) return null;
+
+  return (
+    <div className="mt-3 space-y-2">
+      {prices.slice(0, 3).map((item, index) => (
+        <ResultCard key={`price-${index}`} icon={<IndianRupee className="h-3.5 w-3.5" />} title={String(item.title || "Official price")} href={String(item.href || "/mobile-price")}>
+          <div>{formatMoney(item.price_text) || formatMoney(item.price_npr) || "Price on request"}</div>
+          {item.verified ? <Badge variant="secondary" className="mt-1">Verified</Badge> : null}
+        </ResultCard>
+      ))}
+
+      {products.slice(0, 3).map((item, index) => (
+        <ResultCard key={`product-${index}`} icon={<ShoppingBag className="h-3.5 w-3.5" />} title={String(item.title || "Product")} href={String(item.href || "/products")}>
+          <div>{formatMoney(item.price) || "Price on request"}</div>
+          {item.description ? <div className="line-clamp-2 text-muted-foreground">{String(item.description)}</div> : null}
+        </ResultCard>
+      ))}
+
+      {offers.slice(0, 3).map((item, index) => (
+        <ResultCard key={`offer-${index}`} icon={<Store className="h-3.5 w-3.5" />} title={String(item.title || "Store offer")}>
+          <div>{formatMoney(item.price_sale) || "Price on request"}</div>
+          <div className="text-muted-foreground">{String(item.store_name || "Store")} {item.store_phone ? `· ${item.store_phone}` : ""}</div>
+        </ResultCard>
+      ))}
+
+      {stores.slice(0, 3).map((item, index) => (
+        <ResultCard key={`store-${index}`} icon={<Phone className="h-3.5 w-3.5" />} title={String(item.name || "Store")} href={String(item.href || "/stores")}>
+          <div>{String(item.phone || "Contact from store page")}</div>
+          {item.location ? <div className="text-muted-foreground">{String(item.location)}</div> : null}
+        </ResultCard>
+      ))}
+    </div>
+  );
+};
+
+const ResultCard = ({ icon, title, href, children }: { icon: React.ReactNode; title: string; href?: string; children: React.ReactNode }) => {
+  const body = (
+    <div className="rounded-lg border bg-background/75 p-2 text-xs text-foreground">
+      <div className="mb-1 flex items-center gap-1.5 font-semibold">
+        {icon}
+        <span className="line-clamp-1">{title}</span>
+      </div>
+      <div className="space-y-1">{children}</div>
+    </div>
+  );
+
+  if (!href) return body;
+  return <Link to={href}>{body}</Link>;
 };

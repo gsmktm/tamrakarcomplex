@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -30,20 +31,36 @@ export default function DeviceVerificationManager() {
 
   const queryClient = useQueryClient();
 
-  const { data: products, isLoading } = useQuery<{ data: VerificationProduct[] }>({
+  const { data: products, isLoading, error: productsError } = useQuery<{ data: VerificationProduct[] }>({
     queryKey: ["device-verification", filters],
-    queryFn: () => deviceVerificationService.getProductsForVerification({
-      verified: filters.verified === 'true' ? true : filters.verified === 'false' ? false : undefined,
-      has_image: filters.has_image === 'true' ? true : filters.has_image === 'false' ? false : undefined,
-      has_specs: filters.has_specs === 'true' ? true : filters.has_specs === 'false' ? false : undefined,
-      has_price: filters.has_price === 'true' ? true : filters.has_price === 'false' ? false : undefined,
-      search: filters.search || undefined,
-    }),
+    queryFn: async () => {
+      try {
+        return await deviceVerificationService.getProductsForVerification({
+          verified: filters.verified === 'true' ? true : filters.verified === 'false' ? false : undefined,
+          has_image: filters.has_image === 'true' ? true : filters.has_image === 'false' ? false : undefined,
+          has_specs: filters.has_specs === 'true' ? true : filters.has_specs === 'false' ? false : undefined,
+          has_price: filters.has_price === 'true' ? true : filters.has_price === 'false' ? false : undefined,
+          search: filters.search || undefined,
+        });
+      } catch (err) {
+        handleSupabaseError(err, "DeviceVerificationManager: Failed to fetch products");
+        return { data: [] };
+      }
+    },
+    retry: 1,
   });
 
-  const { data: stats } = useQuery({
+  const { data: stats, error: statsError } = useQuery({
     queryKey: ["verification-stats"],
-    queryFn: () => deviceVerificationService.getVerificationStats(),
+    queryFn: async () => {
+      try {
+        return await deviceVerificationService.getVerificationStats();
+      } catch (err) {
+        handleSupabaseError(err, "DeviceVerificationManager: Failed to fetch stats");
+        return null;
+      }
+    },
+    retry: 1,
   });
 
   const updateVerificationMutation = useMutation({

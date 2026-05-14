@@ -12,7 +12,10 @@ import { publicRoutes } from "@/routes/publicRoutes";
 import { adminRoutes } from "@/routes/adminRoutes";
 import { staffAdminRoutes } from "@/routes/staffAdminRoutes";
 import { superAdminRoutes } from "@/routes/superAdminRoutes";
+import { RequireSuperAdmin } from "@/routes/RequireSuperAdmin";
+import SuperAdminLayout from "@/layouts/SuperAdminLayout";
 import { storeAdminRoutes } from "@/routes/storeAdminRoutes";
+import { staffRoutes } from "@/routes/staffRoutes";
 import ScrollToTop from "@/components/ScrollToTop";
 import { OfflineBanner } from "@/components/system/OfflineBanner";
 import { FrontendLiveEditor } from "@/components/system/FrontendLiveEditor";
@@ -21,7 +24,8 @@ import { DynamicFavicon } from "@/components/system/DynamicFavicon";
 import { useVisitorTracking } from "@/hooks/useVisitorTracking";
 import { MaintenanceGate } from "@/components/system/MaintenanceGate";
 import { ErrorBoundary } from "@/components/system/ErrorBoundary";
-import { WhatsAppButton } from "@/components/WhatsAppButton";
+
+import StoreRedirect from "@/components/routing/StoreRedirect";
 import "@/styles/dynamic-theme.css";
 
 const queryClient = new QueryClient();
@@ -52,15 +56,34 @@ const AppContent = () => {
       <OfflineBanner />
       {enableLiveEditor && <FrontendLiveEditor />}
       <ScrollToTop />
-      <WhatsAppButton />
       <ErrorBoundary>
         <MaintenanceGate>
           <Routes>
             {publicRoutes}
             {adminRoutes}
             {staffAdminRoutes}
-            {superAdminRoutes}
+            <Route
+              path="/suadmin"
+              element={
+                <RequireSuperAdmin>
+                  <SuperAdminLayout />
+                </RequireSuperAdmin>
+              }
+            >
+              {superAdminRoutes.map((route) => {
+                const relativePath = route.path.replace("/suadmin", "").replace(/^\//, "");
+                return (
+                  <Route
+                    key={route.path}
+                    index={!relativePath}
+                    path={relativePath || undefined}
+                    element={route.element}
+                  />
+                );
+              })}
+            </Route>
             {storeAdminRoutes}
+            {staffRoutes}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </MaintenanceGate>

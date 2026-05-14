@@ -33,9 +33,10 @@ export function useVisitorTracking() {
         try {
           // Use a timeout to prevent hanging on blocked IP tracking
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 1500); // Reduced timeout
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
 
           // Silent fetch with no-error guarantee for console
+          // Use a fallback-friendly approach to avoid ERR_ABORTED logs in some browsers
           const geoResponse = await fetch("https://ipapi.co/json/", { 
             signal: controller.signal,
             mode: 'cors',
@@ -54,7 +55,7 @@ export function useVisitorTracking() {
             };
           }
         } catch (e) {
-          // Silent fail for geo tracking
+          // Completely silent fail for geo tracking to avoid console clutter
         }
 
         // Log to Supabase via RPC

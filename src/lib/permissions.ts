@@ -96,9 +96,9 @@ export async function getStaffPermissions(userId: string): Promise<StaffPermissi
 
   try {
     const { data, error } = await supabase
-      .from("staff_permissions")
+      .from("staffadmin_permissions")
       .select("module_key, can_view, can_create, can_edit, can_delete, can_approve, can_assign, can_export")
-      .eq("staff_user_id", userId);
+      .eq("user_id", userId);
 
     if (error) {
       console.error("Error fetching staff permissions:", error);

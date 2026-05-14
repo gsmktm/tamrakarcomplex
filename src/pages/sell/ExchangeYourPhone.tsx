@@ -1,14 +1,14 @@
-import { PRODUCTS, estimateDevicePrice } from "@/utils/productData";
+import { PRODUCTS, estimateDevicePrice, type ProductData } from "@/utils/productData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, ArrowRight, Loader2, Smartphone, RefreshCw, Zap, Sparkles } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Loader2, Smartphone, RefreshCw, Zap, Sparkles, MapPin, Store } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -41,6 +41,13 @@ interface ValuationResult {
   valid_until: string;
 }
 
+interface StoreData {
+  id: string;
+  store_name: string;
+  shop_number: string | null;
+  location: string | null;
+}
+
 const BRAND_LOGOS: Record<string, string> = {
   Apple: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg",
   Samsung: "https://upload.wikimedia.org/wikipedia/commons/2/24/Samsung_Logo.svg",
@@ -64,8 +71,23 @@ const BRAND_LOGOS: Record<string, string> = {
   Lenovo: "https://upload.wikimedia.org/wikipedia/commons/b/b8/Lenovo_logo_2015.svg"
 };
 
+function cleanModelName(model: string) {
+  return model.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function buildValuationFallbackDevice(brand: string, model: string, storage: string, selectedDevice?: ProductData): ProductData {
+  return {
+    id: selectedDevice?.id ?? 0,
+    brand,
+    model: `${model} ${storage}`.trim(),
+    image: selectedDevice?.image ?? BRAND_LOGOS[brand] ?? "/placeholder.svg",
+    retail_npr: selectedDevice?.retail_npr ?? 20000,
+  };
+}
+
 export default function ExchangeYourPhone() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, signUp } = useAuth();
   const [step, setStep] = useState(1);
   const [selectedBrand, setSelectedBrand] = useState<string>("");
@@ -86,36 +108,44 @@ export default function ExchangeYourPhone() {
   const [buyerPhone, setBuyerPhone] = useState("");
   const [deviceImei, setDeviceImei] = useState("");
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const [selectedStoreId, setSelectedStoreId] = useState<string>(searchParams.get("store") || "");
+  const [sourceStore, setSourceStore] = useState<StoreData | null>(null);
+  const [storePickerOpen, setStorePickerOpen] = useState(false);
+  const [storeSearch, setStoreSearch] = useState("");
 
-  const cleanModelName = (model: string) =>
-    model
-      .replace(/\s\(\d+\+\d+(?:GB|TB)\)/i, "")
-      .replace(/\s\d+(?:GB|TB)/i, "")
-      .trim();
+  const { data: stores, isLoading: loadingStores } = useQuery({
+    queryKey: ["exchange-stores"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("stores")
+        .select("id, store_name, shop_number, location, logo_url, is_verified")
+        .eq("status", "active")
+        .order("is_verified", { ascending: false });
+      if (error) throw error;
+      return data;
+    }
+  });
 
-  const selectBrand = (brand: string) => {
-    setSelectedBrand(brand);
-    setSelectedModel("");
-    setSelectedCanonicalSlug("");
-    setSelectedDeviceId("");
-    setStorage("");
-    setValuation(null);
-    setStep(2);
-    scrollToTop();
-  };
+  const filteredStores = (stores || []).filter(s => 
+    s.store_name.toLowerCase().includes(storeSearch.toLowerCase()) ||
+    (s.shop_number && s.shop_number.includes(storeSearch))
+  );
 
-  const selectModel = (device: Device) => {
-    setSelectedModel(device.model);
-    setSelectedDeviceId(device.id);
-    setSelectedCanonicalSlug(device.canonical_slug || "");
-    setStorage("");
-    setValuation(null);
-    setStep(3);
-    scrollToTop();
-  };
+  // Fetch store if ID is provided in URL
+  useEffect(() => {
+    async function fetchSourceStore() {
+      if (selectedStoreId) {
+        const { data, error } = await supabase
+          .from("stores")
+          .select("id, store_name, shop_number, location")
+          .eq("id", selectedStoreId)
+          .single();
+        
+        if (data) setSourceStore(data);
+      }
+    }
+    fetchSourceStore();
+  }, [selectedStoreId]);
 
   // Queries
   const { data: brands, isLoading: loadingBrands } = useQuery({
@@ -206,17 +236,16 @@ export default function ExchangeYourPhone() {
       condition: string;
       defects: string[];
     }) => {
-      const selectedDevice = PRODUCTS.find((device) => device.id.toString() === data.deviceId);
-      if (!selectedDevice) {
-        throw new Error("Selected device was not found");
-      }
+      // Note: deviceId is a UUID from catalog, not a numeric PRODUCTS ID
+      // Don't try to match against PRODUCTS array - use edge function or local estimator
 
       const normalizedCondition = normalizeCondition(data.condition);
       const normalizedStorage = normalizeStorage(data.storage);
       const canonical_slug = selectedCanonicalSlug || slugifyDeviceKey(`${selectedBrand} ${selectedModel}`);
 
-      const baseDevice = { ...selectedDevice, model: selectedModel };
-      const storageDevice = { ...selectedDevice, model: `${selectedModel} ${normalizedStorage ?? ""}`.trim() };
+      // Build fallback devices for local estimation (not using PRODUCTS lookup)
+      const baseDevice = buildValuationFallbackDevice(selectedBrand, selectedModel, "", undefined);
+      const storageDevice = buildValuationFallbackDevice(selectedBrand, selectedModel, normalizedStorage ?? "", undefined);
 
       let estimatedPrice = 0;
       let basePrice = 0;
@@ -312,6 +341,7 @@ export default function ExchangeYourPhone() {
         createAccount: !user && data.buyerPassword
           ? async () => signUp(data.buyerEmail, data.buyerPassword as string, data.buyerName)
           : undefined,
+        storeId: selectedStoreId || null,
       });
     },
     onSuccess: (result) => {
@@ -411,6 +441,30 @@ export default function ExchangeYourPhone() {
     scrollToTop();
   };
 
+  const selectBrand = (brand: string) => {
+    setSelectedBrand(brand);
+    setSelectedModel("");
+    setSelectedCanonicalSlug("");
+    setSelectedDeviceId("");
+    setStorage("");
+    setValuation(null);
+    setStep(2);
+    scrollToTop();
+  };
+
+  const selectModel = (device: Device) => {
+    setSelectedModel(device.model);
+    setSelectedCanonicalSlug(device.canonical_slug);
+    setSelectedDeviceId(device.id);
+    setValuation(null);
+    setStep(3);
+    scrollToTop();
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <SEO
@@ -431,7 +485,16 @@ export default function ExchangeYourPhone() {
             <h1 className="text-4xl md:text-5xl font-display font-extrabold mb-3 tracking-tight text-white">
               Exchange Your Phone
             </h1>
-            <p className="text-lg text-white/60">Get the best trade-in value and upgrade to your dream device</p>
+            <p className="text-lg text-white/60">
+              {sourceStore ? `Exchange at ${sourceStore.store_name}` : "Get the best trade-in value and upgrade to your dream device"}
+            </p>
+            {sourceStore && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-primary">
+                <Store className="h-5 w-5" />
+                <span className="font-bold">{sourceStore.store_name}</span>
+                {sourceStore.shop_number && <span className="text-white/40">· Shop {sourceStore.shop_number}</span>}
+              </div>
+            )}
           </div>
         </div>
 
@@ -764,15 +827,77 @@ export default function ExchangeYourPhone() {
                     <Button variant="outline" onClick={handleBack} className="h-12">
                       <ArrowLeft className="h-4 w-4 mr-2" /> Back
                     </Button>
-                    <Button onClick={() => setExchangeDialogOpen(true)} size="lg" className="flex-1 h-12 hero-gradient shadow-glow font-bold">
-                      <RefreshCw className="h-4 w-4 mr-2" /> Claim This Exchange Deal
-                    </Button>
+                    {sourceStore ? (
+                      <Button onClick={() => setExchangeDialogOpen(true)} size="lg" className="flex-1 h-12 hero-gradient shadow-glow font-bold">
+                        <RefreshCw className="h-4 w-4 mr-2" /> Exchange at {sourceStore.store_name}
+                      </Button>
+                    ) : (
+                      <Button onClick={() => setStorePickerOpen(true)} size="lg" className="flex-1 h-12 hero-gradient shadow-glow font-bold">
+                        <Store className="h-4 w-4 mr-2" /> Choose Store for Exchange
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
             </Card>
           </div>
         </div>
+
+        {/* Store Picker Dialog */}
+        <Dialog open={storePickerOpen} onOpenChange={setStorePickerOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Choose a Store for Exchange</DialogTitle>
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search store name or shop number..." 
+                  className="pl-10"
+                  value={storeSearch}
+                  onChange={(e) => setStoreSearch(e.target.value)}
+                />
+              </div>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto py-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {loadingStores ? (
+                <div className="col-span-full py-12 flex justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+              ) : filteredStores.length > 0 ? (
+                filteredStores.map(store => (
+                  <button
+                    key={store.id}
+                    onClick={() => {
+                      setSelectedStoreId(store.id);
+                      setSourceStore(store);
+                      setStorePickerOpen(false);
+                      setExchangeDialogOpen(true);
+                    }}
+                    className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all text-left group"
+                  >
+                    <div className="h-12 w-12 rounded-lg border bg-muted overflow-hidden shrink-0">
+                      {store.logo_url ? (
+                        <img src={store.logo_url} alt={store.store_name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-secondary">
+                          <Store className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold truncate">{store.store_name}</h4>
+                        {store.is_verified && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">Shop {store.shop_number} · {store.location}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </button>
+                ))
+              ) : (
+                <div className="col-span-full py-12 text-center text-muted-foreground italic">No stores found.</div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Exchange Dialog */}
         <Dialog open={exchangeDialogOpen} onOpenChange={setExchangeDialogOpen}>

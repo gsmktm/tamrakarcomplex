@@ -11,6 +11,7 @@ import { useRepairDevices, useRepairCategories, useRepairCategory, type RepairDe
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { DiagnosticsFlow } from "@/components/repair/DiagnosticsFlow";
 
 const BRANDS = ["Apple", "Samsung", "Xiaomi", "OnePlus", "Google"];
 
@@ -125,7 +126,13 @@ export default function RepairHub() {
               <Button size="lg" className="h-12 rounded-full px-8 font-black" asChild>
                 <Link to="/repair/custom">Submit Repair Request</Link>
               </Button>
-              <Button size="lg" variant="outline" className="h-12 rounded-full border-white/30 bg-white/10 px-8 font-black text-white hover:bg-white/20" asChild>
+              <Button size="lg" variant="outline" className="h-12 rounded-full border-white/30 bg-white/10 px-8 font-black text-white hover:bg-white/20" onClick={() => {
+                const el = document.getElementById('diagnostics-section');
+                el?.scrollIntoView({ behavior: 'smooth' });
+              }}>
+                Identify Problem
+              </Button>
+              <Button size="lg" variant="ghost" className="h-12 rounded-full px-8 font-black text-white hover:bg-white/10" asChild>
                 <Link to="/repair/track">Track Repair</Link>
               </Button>
             </div>
@@ -133,6 +140,22 @@ export default function RepairHub() {
         </div>
 
         <div className="container mt-16 space-y-20">
+          {/* Diagnostics Section */}
+          <section id="diagnostics-section" className="scroll-mt-24">
+            <div className="bg-white p-8 md:p-12 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 border-b-4 border-slate-50 pb-8">
+                <div>
+                  <Badge variant="outline" className="mb-4 bg-primary/5 text-primary border-primary/20 font-bold px-4 py-1">
+                    Smart Diagnostic Tool
+                  </Badge>
+                  <h2 className="text-4xl font-black tracking-tight text-slate-900">Problems & Diagnostics</h2>
+                  <p className="text-lg text-slate-500 mt-2 font-medium">Select symptoms to identify common faults and get instant estimates.</p>
+                </div>
+              </div>
+              <DiagnosticsFlow />
+            </div>
+          </section>
+
           {/* Breadcrumbs / Navigation */}
           <div className="flex items-center gap-3 text-sm bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50">
             <Button 

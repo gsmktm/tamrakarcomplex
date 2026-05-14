@@ -7,9 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Loader2, Pencil, Save, X, Trash2, Plus, CheckCircle, XCircle
-} from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertCircle, Loader2, Pencil, Save, X, Trash2, Plus, CheckCircle, XCircle } from "lucide-react";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { toast } from "sonner";
 import { brandService, Brand } from "@/services/brandService";
 
@@ -21,9 +21,17 @@ export default function BrandManager() {
 
   const queryClient = useQueryClient();
 
-  const { data: brands, isLoading } = useQuery({
+  const { data: brands, isLoading, error: brandsError } = useQuery({
     queryKey: ["brands", filters],
-    queryFn: () => brandService.getBrands(filters),
+    queryFn: async () => {
+      try {
+        return await brandService.getBrands(filters);
+      } catch (err) {
+        handleSupabaseError(err, "BrandManager: Failed to fetch brands");
+        return [];
+      }
+    },
+    retry: 1,
   });
 
   const createBrandMutation = useMutation({

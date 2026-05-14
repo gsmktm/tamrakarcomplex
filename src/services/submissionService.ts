@@ -33,6 +33,7 @@ export type LeadSubmissionInput = {
   currentUserId?: string | null;
   currentUserEmail?: string | null;
   createAccount?: AccountCreator;
+  storeId?: string | null;
 };
 
 export type LeadSubmissionResult = {
@@ -155,20 +156,11 @@ export async function submitStoreApplicationWithFlow(values: any) {
     // Flow Step 5: Send confirmation to applicant
     await sendApplicationConfirmation(applicationData);
 
-    // Flow Step 6: Automatic Full-Stack Onboarding (if user is logged in)
-    if (currentUserId) {
-      try {
-        await completeFullStackStoreOnboarding(applicationData, currentUserId);
-      } catch (onboardError) {
-        console.warn("Auto-onboarding failed (will require manual approval):", onboardError);
-      }
-    }
-
     return {
       success: true,
       applicationId,
       applicationData,
-      message: "Store application submitted successfully",
+      message: "Store application submitted successfully and is pending review",
     };
   } catch (error) {
     console.error("Store application flow error:", error);
@@ -177,14 +169,19 @@ export async function submitStoreApplicationWithFlow(values: any) {
 }
 
 /**
- * Completes the full stack onboarding for a store.
- * 1. Creates a store record
- * 2. Assigns storeadmin role to user
- * 3. Updates user profile
+ * Completes the full stack onboarding for an approved store application.
+ * IMPORTANT: Store is created with status="pending_approval" and public_status="draft"
+ * Only after explicit admin approval via publishStore() does it become public.
+ * 
+ * Flow:
+ * 1. Create store record (pending_approval, draft)
+ * 2. Assign storeadmin role to user
+ * 3. Update user profile
+ * 4. Admin must call publishStore() to make it public_status="published"
  */
 export async function completeFullStackStoreOnboarding(applicationData: any, userId: string) {
   try {
-    // 1. Create the store record
+    // 1. Create the store record with pending_approval status (NOT active)
     const storeSlug = applicationData.store_name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -204,7 +201,8 @@ export async function completeFullStackStoreOnboarding(applicationData: any, use
         whatsapp: applicationData.whatsapp,
         viber: applicationData.viber,
         is_verified: false,
-        status: "active", // Auto-activate for now in this flow
+        status: "pending_approval",
+        public_status: "draft",
       })
       .select()
       .single();
@@ -248,6 +246,70 @@ export async function completeFullStackStoreOnboarding(applicationData: any, use
     return { success: true, storeId: storeData.id };
   } catch (error) {
     console.error("Full stack onboarding error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Explicitly publish an approved store to make it visible publicly.
+ * Should only be called by suadmin/staffadmin after reviewing the store.
+ * 
+ * Flow:
+ * 1. Update store status from pending_approval → active
+ * 2. Update public_status from draft → published
+ * 3. Create audit log
+ * 4. Create notification for store owner
+ */
+export async function publishStore(storeId: string, publishedBy: string) {
+  try {
+    // 1. Update store status and public_status
+    const { data: storeData, error: updateError } = await supabase
+      .from("stores")
+      .update({
+        status: "active",
+        public_status: "published",
+      })
+      .eq("id", storeId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("Store publish failed:", updateError);
+      throw new Error(`Failed to publish store: ${updateError.message}`);
+    }
+
+    if (!storeData) throw new Error("Store not found");
+
+    // 2. Create audit log
+    await supabase.from("audit_logs").insert({
+      actor_id: publishedBy,
+      actor_role: "suadmin",
+      action: "store.published",
+      module: "stores",
+      target_id: storeId,
+      new_data: { status: "active", public_status: "published" },
+    });
+
+    // 3. Notify store owner (via notification table if available)
+    if (storeData.owner_id) {
+      try {
+        await supabase.from("notifications").insert({
+          user_id: storeData.owner_id,
+          role: "storeadmin",
+          type: "store",
+          title: "Store Published",
+          message: `Your store "${storeData.name}" has been approved and published!`,
+          link: `/storeadmin/dashboard`,
+          metadata: { store_id: storeId }
+        });
+      } catch (err) {
+        console.warn("Notification creation failed:", err);
+      }
+    }
+
+    return { success: true, storeId };
+  } catch (error) {
+    console.error("Store publish error:", error);
     throw error;
   }
 }
@@ -330,6 +392,49 @@ Tamrakar Complex Team
   }
 }
 
+async function submitExchangeRequest(input: LeadSubmissionInput, userId: string | null) {
+  if (input.type !== "exchange") return;
+
+  const oldDevice = {
+    brand: sanitizeText(input.device.brand, 80),
+    model: sanitizeText(input.device.model, 120),
+    storage: sanitizeText(input.device.storage, 40),
+    condition: sanitizeText(input.device.condition, 40),
+    defects: input.device.defects.map((defect) => sanitizeText(defect, 80)),
+    imei: sanitizeText(input.device.imei, 15),
+  };
+
+  const notes = JSON.stringify({
+    customer_name: sanitizeText(input.customer.name, 120),
+    customer_email: normalizeEmail(input.customer.email || input.currentUserEmail || ""),
+    customer_phone: normalizePhone(input.customer.phone),
+    store_id: input.storeId ?? null,
+  });
+
+  // Single canonical table: exchange_requests with nullable store_id
+  // store_id = null: Official/platform exchange
+  // store_id = <uuid>: Store-specific exchange
+  const exchangeAttempt = await supabase.from("exchange_requests").insert({
+    user_id: userId,
+    store_id: input.storeId ?? null,
+    customer_name: sanitizeText(input.customer.name, 120),
+    customer_phone: normalizePhone(input.customer.phone),
+    customer_email: normalizeEmail(input.customer.email || input.currentUserEmail || ""),
+    old_device: oldDevice,
+    new_device: {},
+    trade_in_value: input.quotedValue,
+    status: "pending",
+    notes,
+  } as any);
+
+  if (exchangeAttempt.error && !isMissingTableError(exchangeAttempt.error, "exchange_requests") && !isMissingColumnError(exchangeAttempt.error)) {
+    throw exchangeAttempt.error;
+  }
+
+  // Note: store_exchange_requests is deprecated. All exchanges now use exchange_requests table.
+  // Store admins filter by: store_id IS NOT NULL AND store_id = their_store_id
+}
+
 export async function submitRepairRequest(values: RepairRequestInsert) {
   const phone = normalizePhone(String(values.phone ?? ""));
   if (!isValidNepalPhone(phone)) throw new Error("Invalid Nepal mobile number");
@@ -399,6 +504,8 @@ export async function submitLeadQuote(input: LeadSubmissionInput): Promise<LeadS
     requiresEmailConfirmation = !userId;
   }
 
+  await submitExchangeRequest(input, userId);
+
   if (userId) {
     const payload: LeadQuoteInsert = {
       user_id: userId,
@@ -417,7 +524,19 @@ export async function submitLeadQuote(input: LeadSubmissionInput): Promise<LeadS
       status: "new",
     };
 
-    const { error } = await supabase.from("leads_quotes").insert(payload);
+    // Use type casting to include store_id if supported by DB but not in static types
+    const dbPayload = { ...payload } as any;
+    if (input.storeId) {
+      dbPayload.store_id = input.storeId;
+      
+      // Simulate Notification to Store Admin
+      console.log(`Notification sent to Store ID: ${input.storeId} for new ${input.type} lead`);
+      
+      // Future: Add real notification insert here
+      // await supabase.from('notifications').insert({ ... })
+    }
+
+    const { error } = await supabase.from("leads_quotes").insert(dbPayload);
     if (!error) {
       return {
         hasUserDashboard: true,

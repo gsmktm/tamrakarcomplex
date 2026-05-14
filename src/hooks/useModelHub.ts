@@ -33,7 +33,7 @@ export function useModelHub(modelIdOrSlug: string) {
       ] = await Promise.all([
         supabase.from("phone_variants").select("*").eq("model_id", modelId),
         supabase.from("phone_specs").select("*").eq("model_id", modelId).maybeSingle(),
-        supabase.from("inventory_items").select("*, stores(name, slug)").eq("model_id", modelId),
+        supabase.from("store_products").select("*, stores(name, slug)").eq("model_id", modelId).eq("status", "active"),
         supabase.from("used_phone_listings").select("*").eq("model_id", modelId).eq("status", "approved"),
         supabase.from("exchange_values").select("*").eq("model_id", modelId),
         supabase.from("repair_services").select("*").eq("model_id", modelId),

@@ -84,10 +84,18 @@ export function ProfileCenter({ defaultTab = "overview" }: { defaultTab?: string
             <Activity className="h-4 w-4" />
             <span className="text-xs">Activity</span>
           </TabsTrigger>
+          <TabsTrigger value="referral" className="flex-col gap-1 h-16 rounded-lg data-[state=active]:bg-background">
+            <Gift className="h-4 w-4" />
+            <span className="text-xs">Refer & Earn</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
           <ProfileOverview />
+        </TabsContent>
+
+        <TabsContent value="referral">
+          <ReferralRewardsPanel />
         </TabsContent>
 
         <TabsContent value="rewards">

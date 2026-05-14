@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route } from "react-router-dom";
 import { RequireAuth } from "@/routes/RequireAuth";
 import { ParamRouteRedirect } from "@/components/routing/ParamRouteRedirect";
+import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
 import { RouteFallback } from "@/components/routing/RouteFallback";
 
 // Eager load critical routes
@@ -54,9 +55,11 @@ const UserDashboard = lazy(() => import("@/pages/UserDashboard"));
 const UserProfilePage = lazy(() => import("@/pages/user/UserProfilePage"));
 const UserSettingsPage = lazy(() => import("@/pages/user/UserSettingsPage"));
 const UserHistoryCenter = lazy(() => import("@/pages/user/UserHistoryCenter"));
+const UserNotificationsPage = lazy(() => import("@/pages/user/UserNotificationsPage"));
 const ModelHub = lazy(() => import("@/pages/ModelHub"));
 const ProfileRedirect = lazy(() => import("@/components/routing/ProfileRedirect"));
 const DashboardRedirect = lazy(() => import("@/components/routing/DashboardRedirect"));
+const StoreRedirect = lazy(() => import("@/components/routing/StoreRedirect"));
 
 const withSuspense = (Component: React.ComponentType) => (
   <Suspense fallback={<RouteFallback />}>
@@ -84,10 +87,10 @@ export const publicRoutes = (
     <Route path="/stores" element={withSuspense(Stores)} />
     <Route path="/stores/apply" element={withSuspense(StoreApply)} />
     <Route path="/map" element={withSuspense(ComplexMap)} />
-    <Route path="/stores/:slug" element={withSuspense(StoreDetail)} />
+    <Route path="/stores/:id/manage" element={<RequireAuth>{withSuspense(StoreManage)}</RequireAuth>} />
     <Route path="/stores/inside/:shop_no" element={withSuspense(StoreDetail)} />
     <Route path="/stores/outside/:slug" element={withSuspense(StoreDetail)} />
-    <Route path="/stores/:id/manage" element={<RequireAuth>{withSuspense(StoreManage)}</RequireAuth>} />
+    <Route path="/stores/:slug" element={withSuspense(StoreDetail)} />
     <Route path="/my-subscription" element={<RequireAuth>{withSuspense(MySubscription)}</RequireAuth>} />
     
     {/* User Routes */}
@@ -95,9 +98,11 @@ export const publicRoutes = (
     <Route path="/user/me" element={<RequireAuth allowedRoles={["user"]}><Suspense fallback={<RouteFallback />}><UserProfilePage /></Suspense></RequireAuth>} />
     <Route path="/user/settings" element={<RequireAuth allowedRoles={["user"]}><Suspense fallback={<RouteFallback />}><UserSettingsPage /></Suspense></RequireAuth>} />
     <Route path="/user/history" element={<RequireAuth allowedRoles={["user"]}><Suspense fallback={<RouteFallback />}><UserHistoryCenter /></Suspense></RequireAuth>} />
+    <Route path="/user/notifications" element={<RequireAuth><Suspense fallback={<RouteFallback />}><UserNotificationsPage /></Suspense></RequireAuth>} />
     <Route path="/user/orders" element={<RequireAuth allowedRoles={["user"]}><Suspense fallback={<RouteFallback />}><UserHistoryCenter defaultTab="orders" /></Suspense></RequireAuth>} />
     <Route path="/user/repairs" element={<RequireAuth allowedRoles={["user"]}><Suspense fallback={<RouteFallback />}><UserHistoryCenter defaultTab="repairs" /></Suspense></RequireAuth>} />
-    <Route path="/user/unlocking" element={<RequireAuth allowedRoles={["user"]}><Suspense fallback={<RouteFallback />}><UserHistoryCenter defaultTab="exchanges" /></Suspense></RequireAuth>} />
+    <Route path="/user/unlocking" element={<RequireAuth allowedRoles={["user"]}><Suspense fallback={<RouteFallback />}><UserHistoryCenter defaultTab="unlocks" /></Suspense></RequireAuth>} />
+    <Route path="/user/exchanges" element={<RequireAuth allowedRoles={["user"]}><Suspense fallback={<RouteFallback />}><UserHistoryCenter defaultTab="exchanges" /></Suspense></RequireAuth>} />
     <Route path="/user/listings" element={<RequireAuth allowedRoles={["user"]}><Suspense fallback={<RouteFallback />}><UserHistoryCenter defaultTab="listings" /></Suspense></RequireAuth>} />
 
     {/* Redirects */}
@@ -105,6 +110,8 @@ export const publicRoutes = (
     <Route path="/profile/*" element={withSuspense(ProfileRedirect)} />
     <Route path="/account" element={withSuspense(ProfileRedirect)} />
     <Route path="/dashboard" element={withSuspense(DashboardRedirect)} />
+    <Route path="/store-admin/*" element={<WildcardRedirect from="/store-admin" to="/storeadmin" />} />
+    <Route path="/staff/*" element={<WildcardRedirect from="/staff" to="/staffadmin" />} />
     
     <Route path="/repair" element={withSuspense(RepairHub)} />
     <Route path="/unlocking" element={withSuspense(UnlockingHub)} />
@@ -165,6 +172,6 @@ export const publicRoutes = (
     <Route path="/listing/:id" element={<ParamRouteRedirect to="/marketplace/listing/:id" />} />
     
     {/* Legacy single-segment store URLs -> canonical store route */}
-    <Route path="/:slug" element={<ParamRouteRedirect to="/stores/:slug" />} />
+    <Route path="/:slug" element={withSuspense(StoreRedirect)} />
   </>
 );

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Heart, Menu, Search, X } from "lucide-react";
+import { Heart, Menu, MessageCircle, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { isStoreAdminRole } from "@/lib/roles";
@@ -9,11 +9,12 @@ import { SearchDialog } from "@/components/search/SearchDialog";
 import { CartSheet } from "@/components/cart/CartSheet";
 import { defaultQuickMenuItems, exploreLandingItem, siteNavigationGroups } from "@/data/siteNavigation";
 import { useWishlist } from "@/hooks/useWishlist";
-import { readThemeSettings } from "@/lib/siteSettings";
+import { readAppSettings, readThemeSettings } from "@/lib/siteSettings";
 import type { StoreThemeSettings } from "@/types/app";
 import { NavigationBar } from "@/components/layout/NavigationBar";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 import { UserMenuDropdown } from "@/components/layout/UserMenuDropdown";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import logo from "@/assets/logo.png";
 
 let categories = defaultQuickMenuItems;
@@ -40,6 +41,7 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [navItems, setNavItems] = useState(categories);
+  const [contactInfo, setContactInfo] = useState(readAppSettings().contact_info);
   const { user, signOut, role } = useAuth();
   const isStoreAdminUser = isStoreAdminRole(role);
   const { count: wishlistCount } = useWishlist();
@@ -81,12 +83,23 @@ export function Header() {
       }
     };
 
+    const syncContact = () => {
+      try {
+        setContactInfo(readAppSettings().contact_info);
+      } catch {
+        // Ignore errors
+      }
+    };
+
     syncMenu();
+    syncContact();
     window.addEventListener("storage", syncMenu);
     window.addEventListener("theme-update", syncMenu);
+    window.addEventListener("app-settings-update", syncContact);
     return () => {
       window.removeEventListener("storage", syncMenu);
       window.removeEventListener("theme-update", syncMenu);
+      window.removeEventListener("app-settings-update", syncContact);
     };
   }, []);
 
@@ -140,8 +153,20 @@ export function Header() {
               <Search className="h-5 w-5" />
             </Button>
 
+            <a
+              href={`https://api.whatsapp.com/send?phone=${contactInfo.whatsapp}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white hover:bg-[#128C7E] transition-colors"
+              aria-label="WhatsApp Chat"
+            >
+              <MessageCircle className="h-5 w-5" />
+            </a>
+
             <ThemeToggle />
             <CartSheet />
+
+            {user && <NotificationBell />}
 
             <Button variant="ghost" size="icon" className="relative hidden md:flex" asChild>
               <Link to="/wishlist" aria-label="Open wishlist">
@@ -157,6 +182,14 @@ export function Header() {
             <Button variant="outline" size="sm" className="hidden xl:inline-flex" asChild>
               <Link to="/valuation-estimator">Get Estimate</Link>
             </Button>
+
+            {user && (role === "suadmin" || role === "staffadmin" || isStoreAdminUser) && (
+              <Button size="sm" className="hidden xl:inline-flex hero-gradient" asChild>
+                <Link to={role === "suadmin" ? "/suadmin/console" : role === "staffadmin" ? "/staffadmin/console" : "/storeadmin/console"}>
+                  Console
+                </Link>
+              </Button>
+            )}
 
             <UserMenuDropdown user={user} onSignOut={handleSignOut} />
 

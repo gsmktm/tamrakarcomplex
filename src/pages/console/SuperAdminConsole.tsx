@@ -21,7 +21,7 @@ const PLATFORM_CONTROLS = [
     title: "Core System",
     items: [
       { label: "Global Settings", href: "/suadmin/settings", icon: Settings, description: "Manage platform-wide configurations" },
-      { label: "Permission Matrix", href: "/suadmin/permissions", icon: ShieldCheck, description: "Manage staff and store permissions" },
+      { label: "Permission Matrix", href: "/suadmin/staff-permissions", icon: ShieldCheck, description: "Manage staff and store permissions" },
       { label: "Database Maintenance", href: "/suadmin/maintenance", icon: Database, description: "System health and data tools" },
       { label: "Audit Logs", href: "/suadmin/audit", icon: FileText, description: "Track all administrative actions" },
     ]

@@ -7,16 +7,22 @@ import { Plus, Tag, Loader2, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CategoryManager() {
-  const { data: categories, isLoading } = useQuery({
+  const { data: categories, isLoading, error: categoriesError } = useQuery({
     queryKey: ["product-categories"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("product_categories")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from("product_categories")
+          .select("*")
+          .order("name");
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        handleSupabaseError(err, "CategoryManager: Failed to fetch categories");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   if (isLoading) {

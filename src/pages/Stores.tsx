@@ -4,8 +4,9 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { useStoreDirectory } from "@/hooks/useStoreDirectory";
-import type { StoreDirectoryItem, SubscriptionTier } from "@/hooks/useStores";
+import type { SubscriptionTier } from "@/hooks/useStores";
 import { TIER_META } from "@/hooks/useStores";
+import type { StoreDirectoryItem } from "@/services/storeDirectoryService";
 import { useAuth } from "@/hooks/useAuth";
 import { isAdminRole } from "@/lib/roles";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { STORES } from "@/data/storeData";
+import { getPublicStorePath, getPublicStoreSlug } from "@/lib/storeRoutes";
 import {
   Search, MapPin, Phone, Mail, Globe, ExternalLink,
   CheckCircle2, Gem, Star, Award, Lock, Store as StoreIcon,
@@ -22,6 +24,8 @@ import { cn } from "@/lib/utils";
 
 // ─── Tier filter tabs ─────────────────────────────────────────────────────────
 type TierFilter = "all" | "diamond" | "gold" | "silver" | "free";
+type ServiceFilter = "all" | "new phones" | "accessories" | "repair" | "exchange";
+type FloorFilter = "all" | "1st" | "2nd" | "3rd" | "4th" | "5th";
 
 const TIER_TABS: { key: TierFilter; label: string; icon: React.ReactNode }[] = [
   { key: "all",     label: "All Stores", icon: <StoreIcon className="h-4 w-4" /> },
@@ -31,8 +35,25 @@ const TIER_TABS: { key: TierFilter; label: string; icon: React.ReactNode }[] = [
   { key: "free",    label: "Basic",      icon: <Building2 className="h-4 w-4" /> },
 ];
 
+const SERVICE_TABS: { key: ServiceFilter; label: string }[] = [
+  { key: "all", label: "All Services" },
+  { key: "new phones", label: "New Phones" },
+  { key: "accessories", label: "Accessories" },
+  { key: "repair", label: "Repair" },
+  { key: "exchange", label: "Exchange" },
+];
+
+const FLOOR_TABS: { key: FloorFilter; label: string }[] = [
+  { key: "all", label: "All Floors" },
+  { key: "1st", label: "1st Floor" },
+  { key: "2nd", label: "2nd Floor" },
+  { key: "3rd", label: "3rd Floor" },
+  { key: "4th", label: "4th Floor" },
+  { key: "5th", label: "5th Floor" },
+];
+
 function getStorePath(store: StoreDirectoryItem): string {
-  return `/stores/${store.slug || store.id}`;
+  return getPublicStorePath(store);
 }
 
 // ─── Store avatar ────────────────────────────────────────────────────────────
@@ -191,23 +212,23 @@ function ModernStoreCard({ store, isAdmin }: { store: StoreDirectoryItem; isAdmi
         </div>
 
         <div className="flex gap-2">
-          <Button 
-            variant="ghost" 
-            className="flex-1 rounded-2xl h-12 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50" 
-            asChild
-          >
-            <Link to={getStorePath(store)}>Store Profile</Link>
-          </Button>
-          <Button 
-            className={cn(
-              "flex-1 rounded-2xl h-12 font-black text-[11px] uppercase tracking-widest shadow-lg shadow-primary/20",
-              isDiamond ? "bg-cyan-500 hover:bg-cyan-600" : "bg-primary"
-            )}
-            asChild
-          >
-            <Link to={getStorePath(store)}>Visit Marketplace</Link>
-          </Button>
-        </div>
+                  <Button 
+                    variant="ghost" 
+                    className="flex-1 rounded-2xl h-12 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50" 
+                    asChild
+                  >
+                    <Link to={getStorePath(store)}>Store Profile</Link>
+                  </Button>
+                  <Button 
+                    className={cn(
+                      "flex-1 rounded-2xl h-12 font-black text-[11px] uppercase tracking-widest shadow-lg shadow-primary/20",
+                      isDiamond ? "bg-cyan-500 hover:bg-cyan-600" : "bg-primary"
+                    )}
+                    asChild
+                  >
+                    <Link to={`/marketplace?store=${store.slug || store.id}`}>Visit Marketplace</Link>
+                  </Button>
+                </div>
       </div>
     </div>
   );
@@ -673,11 +694,16 @@ function LoadingSkeleton() {
 export default function Stores() {
   const [search, setSearch]     = useState("");
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
+  const [serviceFilter, setServiceFilter] = useState<ServiceFilter>("all");
+  const [floorFilter, setFloorFilter] = useState("all");
+  const [blockFilter, setBlockFilter] = useState("all");
 
   const { data: storesResponse, isLoading } = useStoreDirectory();
   const stores = storesResponse?.data || [];
   const { user, role } = useAuth();
   const isAdmin = isAdminRole(role);
+  const floorOptions = useMemo(() => Array.from(new Set(stores.map((s) => s.floor).filter(Boolean))).sort(), [stores]);
+  const blockOptions = useMemo(() => Array.from(new Set(stores.map((s) => s.block).filter(Boolean))).sort(), [stores]);
 
   // ── Filter & search ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -688,6 +714,12 @@ export default function Stores() {
     else if (tierFilter === "gold") list = list.filter((s) => s.subscription_tier === "gold");
     else if (tierFilter === "silver") list = list.filter((s) => s.subscription_tier === "silver");
     else if (tierFilter === "free") list = list.filter((s) => s.subscription_tier === "free" || !s.has_active_subscription);
+
+    if (serviceFilter !== "all") {
+      list = list.filter((s) => s.services?.some((sv) => sv.toLowerCase().includes(serviceFilter)));
+    }
+    if (floorFilter !== "all") list = list.filter((s) => s.floor === floorFilter);
+    if (blockFilter !== "all") list = list.filter((s) => s.block === blockFilter);
 
     // Search
     if (search.trim()) {
@@ -703,7 +735,7 @@ export default function Stores() {
     }
 
     return list;
-  }, [stores, tierFilter, search]);
+  }, [stores, tierFilter, serviceFilter, floorFilter, blockFilter, search]);
 
   // ── Group by tier ────────────────────────────────────────────────────────────
   const diamondStores = filtered.filter((s) => s.subscription_tier === "diamond");
@@ -737,7 +769,7 @@ export default function Stores() {
           name: s.name,
           address: { "@type": "PostalAddress", streetAddress: s.location, addressLocality: "Kathmandu", addressCountry: "NP" },
           telephone: s.phone ?? undefined,
-          url: s.website ?? `https://tamrakarcomplex.com/${s.slug || s.id}`,
+          url: s.website ?? `https://tamrakarcomplex.com${getStorePath(s)}`,
         },
       })),
   };
@@ -839,6 +871,45 @@ export default function Stores() {
                 );
               })}
             </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {SERVICE_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setServiceFilter(tab.key)}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                    serviceFilter === tab.key ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted",
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+              {floorOptions.map((floor) => (
+                <button
+                  key={`floor-${floor}`}
+                  onClick={() => setFloorFilter(floorFilter === floor ? "all" : String(floor))}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                    floorFilter === floor ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted",
+                  )}
+                >
+                  Floor {floor}
+                </button>
+              ))}
+              {blockOptions.map((block) => (
+                <button
+                  key={`block-${block}`}
+                  onClick={() => setBlockFilter(blockFilter === block ? "all" : String(block))}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                    blockFilter === block ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted",
+                  )}
+                >
+                  Block {block}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -853,7 +924,7 @@ export default function Stores() {
               </div>
               <h3 className="text-lg font-semibold mb-1">No stores found</h3>
               <p className="text-muted-foreground text-sm mb-4">Try adjusting your search or filter.</p>
-              <Button onClick={() => { setSearch(""); setTierFilter("all"); }}>Clear Filters</Button>
+              <Button onClick={() => { setSearch(""); setTierFilter("all"); setServiceFilter("all"); setFloorFilter("all"); setBlockFilter("all"); }}>Clear Filters</Button>
             </div>
           ) : (
             <>
@@ -943,7 +1014,7 @@ export default function Stores() {
                           </p>
                         </div>
                         <Button className="shrink-0 gap-2 hero-gradient" asChild>
-                          <Link to="/contact-us">Get Listed <ArrowRight className="h-4 w-4" /></Link>
+                          <Link to="/stores/apply">Get Listed <ArrowRight className="h-4 w-4" /></Link>
                         </Button>
                       </div>
                     </div>

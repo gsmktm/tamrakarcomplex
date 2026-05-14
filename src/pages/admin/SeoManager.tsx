@@ -58,26 +58,38 @@ export default function SeoManager() {
   const [ogImage, setOgImage] = useState(SEO_PAGE_CONFIGS[0].og_image);
   const [sitemapXml, setSitemapXml] = useState("");
 
-  const { data: pages, isLoading: pagesLoading } = useQuery({
+  const { data: pages, isLoading: pagesLoading, error: pagesError } = useQuery({
     queryKey: ["seo-pages-admin"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("seo_pages")
-        .select("*")
-        .order("route_key", { ascending: true })
-        .order("path", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as SeoPageRow[];
+      try {
+        const { data, error } = await supabase
+          .from("seo_pages")
+          .select("*")
+          .order("route_key", { ascending: true })
+          .order("path", { ascending: true });
+        if (error) throw error;
+        return (data ?? []) as SeoPageRow[];
+      } catch (err) {
+        handleSupabaseError(err, "SeoManager: Failed to fetch SEO pages");
+        return [];
+      }
     },
+    retry: 1,
   });
 
-  const { data: sitemapRows, isLoading: sitemapLoading, refetch: refetchSitemap } = useQuery({
+  const { data: sitemapRows, isLoading: sitemapLoading, error: sitemapError, refetch: refetchSitemap } = useQuery({
     queryKey: ["seo-sitemap-preview"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("generate_seo_sitemap");
-      if (error) throw error;
-      return (data ?? []) as SitemapRow[];
+      try {
+        const { data, error } = await supabase.rpc("generate_seo_sitemap");
+        if (error) throw error;
+        return (data ?? []) as SitemapRow[];
+      } catch (err) {
+        handleSupabaseError(err, "SeoManager: Failed to generate sitemap");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const missingSeo = useMemo(() => {

@@ -3,6 +3,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isValidEmail, isValidImei, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeText } from "@/lib/security";
 import { PRODUCTS, estimateDevicePrice } from "@/utils/productData";
+import { masterCatalogService } from "./masterCatalogService";
 
 export interface ValuationRequest {
   catalog_product_id: string;
@@ -100,9 +101,15 @@ async function getFallbackCatalogPrice(catalogProductId: string) {
   return Number(parsed || 0);
 }
 
-async function mirrorLeadQuote(leadData: LeadData, phone: string, email: string) {
-  const { data: authData } = await supabase.auth.getUser();
-  const currentUserId = authData?.user?.id || undefined;
+async function mirrorLeadQuote(leadData: LeadData, phone: string, email: string, userId?: string) {
+  // If userId is provided (e.g., after signup), use it directly
+  // Otherwise, fetch current session user
+  let currentUserId = userId;
+  if (!currentUserId) {
+    const { data: authData } = await supabase.auth.getUser();
+    currentUserId = authData?.user?.id || undefined;
+  }
+  
   const device = {
     brand: sanitizeText(leadData.brand, 80),
     model: sanitizeText(leadData.model, 120),
@@ -325,9 +332,15 @@ export const sellPhoneService = {
   },
 
   // Save lead
-  async saveLead(leadData: LeadData) {
-    const { data: authData } = await supabase.auth.getUser();
-    const currentUserId = authData?.user?.id || undefined;
+  async saveLead(leadData: LeadData, userId?: string) {
+    // If userId is provided (e.g., after signup), use it directly
+    // Otherwise, fetch current session user
+    let currentUserId = userId;
+    if (!currentUserId) {
+      const { data: authData } = await supabase.auth.getUser();
+      currentUserId = authData?.user?.id || undefined;
+    }
+    
     const email = normalizeEmail(leadData.customer_email);
     const phone = normalizePhone(leadData.customer_phone);
     if (!isValidEmail(email)) throw new Error("Invalid email address");
@@ -414,13 +427,13 @@ export const sellPhoneService = {
         // Returning the validated fallback lead keeps the user flow complete when optional intake tables lag behind.
       }
 
-      await mirrorLeadQuote(leadData, phone, email);
+      await mirrorLeadQuote(leadData, phone, email, currentUserId);
       return fallbackLead;
     }
 
     if (error) throw error;
 
-    await mirrorLeadQuote(leadData, phone, email);
+    await mirrorLeadQuote(leadData, phone, email, currentUserId);
 
     try {
       await supabase.from("device_search_events").insert({

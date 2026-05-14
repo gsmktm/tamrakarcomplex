@@ -10,10 +10,27 @@ import {
   CreditCard,
   Bell,
   BarChart3,
-  Shield
+  Shield,
+  Smartphone,
+  Wrench,
+  Unlock,
+  MessageSquare,
+  Package,
+  ArrowUpRight
 } from "lucide-react";
 
 const STORE_CONTROLS = [
+  {
+    title: "Store Operations",
+    items: [
+      { label: "Products & Stock", href: "/storeadmin/products", icon: Smartphone, description: "Manage mobile phones and accessories" },
+      { label: "Repair Requests", href: "/storeadmin/repairs", icon: Wrench, description: "Process incoming device repairs" },
+      { label: "Unlock Requests", href: "/storeadmin/unlocking", icon: Unlock, description: "Manage software and carrier unlocks" },
+      { label: "Leads & Exchanges", href: "/storeadmin/leads", icon: ArrowUpRight, description: "Trade-ins and valuation leads" },
+      { label: "Order History", href: "/storeadmin/orders", icon: Package, description: "View and fulfill ecommerce orders" },
+      { label: "Customer Messages", href: "/storeadmin/messages", icon: MessageSquare, description: "Direct inquiries from your customers" },
+    ]
+  },
   {
     title: "Store Configuration",
     items: [

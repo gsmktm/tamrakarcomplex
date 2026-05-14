@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { breadcrumbSchema, faqSchema } from "@/lib/seo";
+import { DiagnosticsFlow } from "@/components/repair/DiagnosticsFlow";
 
 type RepairGuideSummary = {
   id: string;
@@ -202,28 +203,16 @@ export default function DeviceDetail() {
                   ))}
 
                   <TabsContent value="troubleshooting">
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
-                      <div className="flex items-center gap-4 text-amber-600">
+                    <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
+                      <div className="flex items-center gap-4 text-amber-600 border-b border-slate-50 pb-6">
                         <AlertCircle className="h-8 w-8" />
-                        <h3 className="text-2xl font-black">Common Problems</h3>
+                        <h3 className="text-2xl font-black">Common Problems & Diagnostics</h3>
                       </div>
-                      <p className="text-slate-600 text-lg leading-relaxed">
+                      <p className="text-slate-600 text-lg leading-relaxed font-medium">
                         Identify and fix common issues with your {device.name}. 
-                        Our community has documented the following symptoms and solutions.
+                        Use our smart diagnostic tool below to get instant estimates.
                       </p>
-                      <div className="grid gap-4">
-                        {[
-                          "Device won't power on",
-                          "Battery drains too quickly",
-                          "Display is flickering or dark",
-                          "Overheating during normal use"
-                        ].map(issue => (
-                          <div key={issue} className="flex items-center justify-between p-6 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors cursor-pointer group">
-                            <span className="font-bold text-slate-900">{issue}</span>
-                            <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
-                          </div>
-                        ))}
-                      </div>
+                      <DiagnosticsFlow />
                     </div>
                   </TabsContent>
                 </Tabs>

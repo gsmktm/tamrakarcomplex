@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, Trash2, Wrench, Smartphone, FolderTree, FileText, Package, Hammer } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Wrench, Smartphone, FolderTree, FileText, Package, Hammer, ShieldAlert, AlertTriangle } from "lucide-react";
 import { getErrorMessage } from "@/lib/utils";
 
 // Supabase types in this repo may not include the Repair module tables yet.
@@ -163,6 +163,16 @@ const stepSchema = z.object({
   content: z.string().min(1, "Content is required"),
   images_text: z.string().optional().nullable(),
   video_url: z.string().optional().nullable(),
+});
+
+const diagnosticSchema = z.object({
+  symptom_id: z.string().min(1, "Symptom category is required"),
+  title: z.string().min(1, "Diagnosis title is required"),
+  symptom_description: z.string().min(1, "Symptom description is required"),
+  solution_description: z.string().min(1, "Solution description is required"),
+  severity: z.enum(["low", "medium", "high"]),
+  cost_range: z.string().optional().nullable(),
+  is_active: z.boolean().default(true),
 });
 
 function parseJsonOrThrow(text: string | null | undefined) {
@@ -998,7 +1008,7 @@ function GuideEditorDialog({
 
 export function RepairCatalogManager() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"categories" | "devices" | "guides" | "tools" | "parts">("categories");
+  const [activeTab, setActiveTab] = useState<"categories" | "devices" | "guides" | "tools" | "parts" | "diagnostics">("categories");
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<RepairCategory | null>(null);
@@ -1014,6 +1024,10 @@ export function RepairCatalogManager() {
 
   const [guideDialogOpen, setGuideDialogOpen] = useState(false);
   const [editingGuide, setEditingGuide] = useState<RepairGuide | null>(null);
+  
+  const [diagnosticDialogOpen, setDiagnosticDialogOpen] = useState(false);
+  const [editingDiagnostic, setEditingDiagnostic] = useState<any | null>(null);
+
   const [manageGuideOpen, setManageGuideOpen] = useState(false);
   const [manageGuideId, setManageGuideId] = useState<string | null>(null);
   const [guideDeviceFilter, setGuideDeviceFilter] = useState<string>("all");
@@ -1081,6 +1095,16 @@ export function RepairCatalogManager() {
     enabled: !schemaMissing,
     queryFn: async () => {
       const { data, error } = await supabase.from("repair_parts").select("*").order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: diagnostics } = useQuery({
+    queryKey: ["admin-repair-diagnostics"],
+    enabled: !schemaMissing,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("repair_diagnostics").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -1356,6 +1380,56 @@ export function RepairCatalogManager() {
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
+  // ── Diagnostic form ───────────────────────────────────────────────────────
+  const diagnosticForm = useForm<z.infer<typeof diagnosticSchema>>({
+    resolver: zodResolver(diagnosticSchema),
+    defaultValues: {
+      symptom_id: "power",
+      title: "",
+      symptom_description: "",
+      solution_description: "",
+      severity: "medium",
+      cost_range: "",
+      is_active: true,
+    },
+  });
+
+  const saveDiagnosticMutation = useMutation({
+    mutationFn: async (values: z.infer<typeof diagnosticSchema>) => {
+      const payload = {
+        ...values,
+        updated_at: new Date().toISOString(),
+      };
+      if (editingDiagnostic?.id) {
+        const { error } = await supabase.from("repair_diagnostics").update(payload).eq("id", editingDiagnostic.id);
+        if (error) throw error;
+        return;
+      }
+      const { error } = await supabase.from("repair_diagnostics").insert(payload);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-repair-diagnostics"] });
+      toast.success(editingDiagnostic ? "Diagnostic updated" : "Diagnostic created");
+      setDiagnosticDialogOpen(false);
+      setEditingDiagnostic(null);
+      diagnosticForm.reset();
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
+  const deleteDiagnosticMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("repair_diagnostics").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-repair-diagnostics"] });
+      toast.success("Diagnostic deleted");
+    },
+    onError: (e) => toast.error(getErrorMessage(e)),
+  });
+
   const devicesList = devices ?? [];
   const toolsList = tools ?? [];
   const partsList = parts ?? [];
@@ -1379,7 +1453,7 @@ export function RepairCatalogManager() {
       </div>
 
                     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as string)} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="categories" className="gap-2">
             <FolderTree className="h-4 w-4" /> Categories
           </TabsTrigger>
@@ -1394,6 +1468,9 @@ export function RepairCatalogManager() {
           </TabsTrigger>
           <TabsTrigger value="parts" className="gap-2">
             <Package className="h-4 w-4" /> Parts
+          </TabsTrigger>
+          <TabsTrigger value="diagnostics" className="gap-2">
+            <ShieldAlert className="h-4 w-4" /> Diagnostics
           </TabsTrigger>
         </TabsList>
 
@@ -2619,6 +2696,239 @@ export function RepairCatalogManager() {
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-10 text-sm text-muted-foreground">
                       No parts yet.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        {/* Diagnostics */}
+        <TabsContent value="diagnostics" className="pt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">Manage symptoms and diagnoses for the smart diagnostic tool.</div>
+            <Dialog open={diagnosticDialogOpen} onOpenChange={setDiagnosticDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => {
+                    setEditingDiagnostic(null);
+                    diagnosticForm.reset({
+                      symptom_id: "power",
+                      title: "",
+                      symptom_description: "",
+                      solution_description: "",
+                      severity: "medium",
+                      cost_range: "",
+                      is_active: true,
+                    });
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Diagnostic
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingDiagnostic ? "Edit Diagnostic" : "Add Diagnostic"}</DialogTitle>
+                </DialogHeader>
+                <Form {...diagnosticForm}>
+                  <form onSubmit={diagnosticForm.handleSubmit((v) => saveDiagnosticMutation.mutate(v))} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={diagnosticForm.control}
+                        name="symptom_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Symptom Category</FormLabel>
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select symptom" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="power">Power & Startup</SelectItem>
+                                <SelectItem value="battery">Battery & Charging</SelectItem>
+                                <SelectItem value="screen">Display & Touch</SelectItem>
+                                <SelectItem value="audio">Sound & Audio</SelectItem>
+                                <SelectItem value="connectivity">Wifi & Network</SelectItem>
+                                <SelectItem value="camera">Camera & Flash</SelectItem>
+                                <SelectItem value="heat">Overheating</SelectItem>
+                                <SelectItem value="security">Software & Lock</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={diagnosticForm.control}
+                        name="severity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Severity</FormLabel>
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select severity" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="low">Low</SelectItem>
+                                <SelectItem value="medium">Medium</SelectItem>
+                                <SelectItem value="high">High</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={diagnosticForm.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Diagnosis Title</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="e.g. Dead Battery" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={diagnosticForm.control}
+                      name="symptom_description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Symptom Description</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="What the user sees..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={diagnosticForm.control}
+                      name="solution_description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Expert Solution</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Expert advice..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={diagnosticForm.control}
+                        name="cost_range"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cost Range</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="e.g. Rs. 1,500 - 5,500" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={diagnosticForm.control}
+                        name="is_active"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                            <div className="space-y-0.5">
+                              <FormLabel>Active</FormLabel>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <Button type="submit" className="w-full" disabled={saveDiagnosticMutation.isPending}>
+                      {saveDiagnosticMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Save Diagnostic
+                    </Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="border rounded-xl overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Symptom</TableHead>
+                  <TableHead>Diagnosis</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Cost</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(diagnostics ?? []).map((diag: any) => (
+                  <TableRow key={diag.id}>
+                    <TableCell className="capitalize font-medium">{diag.symptom_id}</TableCell>
+                    <TableCell>
+                      <div className="font-bold">{diag.title}</div>
+                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">{diag.symptom_description}</div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={diag.severity === "high" ? "destructive" : diag.severity === "medium" ? "secondary" : "outline"}>
+                        {diag.severity}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">{diag.cost_range || "—"}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setEditingDiagnostic(diag);
+                          diagnosticForm.reset({
+                            symptom_id: diag.symptom_id,
+                            title: diag.title,
+                            symptom_description: diag.symptom_description,
+                            solution_description: diag.solution_description,
+                            severity: diag.severity,
+                            cost_range: diag.cost_range || "",
+                            is_active: diag.is_active,
+                          });
+                          setDiagnosticDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500"
+                        onClick={() => {
+                          if (confirm("Delete this diagnostic?")) deleteDiagnosticMutation.mutate(diag.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(diagnostics ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-sm text-muted-foreground">
+                      No diagnostics defined yet.
                     </TableCell>
                   </TableRow>
                 ) : null}

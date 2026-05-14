@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { toast } from "sonner";
 import { Shield, Users, Store, User, Settings as SettingsIcon, Save, Database, Globe, Key, Loader2, Upload } from "lucide-react";
 import UserManager from "./UserManager";

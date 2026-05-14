@@ -41,7 +41,9 @@ interface Commission {
 }
 
 export default function PayoutManager() {
-  const { role } = useAuth();
+  const { user, role } = useAuth();
+  const isPlatformAdmin = role === "suadmin" || role === "staffadmin";
+  const isStoreAdmin = role === "storeadmin";
   const [selectedPayout, setSelectedPayout] = useState<Payout | null>(null);
   const [showPayoutDialog, setShowPayoutDialog] = useState(false);
   const [filters, setFilters] = useState({
@@ -52,9 +54,10 @@ export default function PayoutManager() {
 
   const queryClient = useQueryClient();
 
-  const { data: payouts, isLoading: payoutsLoading } = useQuery({
-    queryKey: ["payouts", filters],
+  const { data: payouts, isLoading: payoutsLoading, error: payoutsError } = useQuery({
+    queryKey: ["payouts", filters, user?.id, role],
     queryFn: async () => {
+      try {
       let query = supabase
         .from("store_payouts")
         .select(`
@@ -62,6 +65,32 @@ export default function PayoutManager() {
           store:stores(name)
         `)
         .order("created_at", { ascending: false });
+
+      // Store admins can only see payouts for their stores
+      if (isStoreAdmin && !isPlatformAdmin && user?.id) {
+        // Get store IDs from store_admins or owner_id
+        const { data: memberships } = await supabase
+          .from("store_admins")
+          .select("store_id")
+          .eq("user_id", user.id)
+          .eq("status", "active");
+        
+        const { data: ownedStores } = await supabase
+          .from("stores")
+          .select("id")
+          .eq("owner_id", user.id);
+        
+        const myStoreIds = Array.from(new Set([
+          ...(memberships || []).map(m => m.store_id),
+          ...(ownedStores || []).map(s => s.id)
+        ]));
+
+        if (myStoreIds.length === 0) {
+          return [];
+        }
+
+        query = query.in("store_id", myStoreIds);
+      }
 
       if (filters.status && filters.status !== 'all') {
         query = query.eq("status", filters.status);
@@ -76,13 +105,18 @@ export default function PayoutManager() {
       const { data, error } = await query;
       if (error) throw error;
       return data as Payout[];
+      } catch (err) {
+        handleSupabaseError(err, "PayoutManager: Failed to fetch payouts");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const { data: commissions, isLoading: commissionsLoading } = useQuery({
-    queryKey: ["commissions"],
+    queryKey: ["commissions", user?.id, role],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("store_commissions")
         .select(`
           *,
@@ -90,6 +124,33 @@ export default function PayoutManager() {
         `)
         .order("created_at", { ascending: false })
         .limit(50);
+
+      // Store admins can only see commissions for their stores
+      if (isStoreAdmin && !isPlatformAdmin && user?.id) {
+        const { data: memberships } = await supabase
+          .from("store_admins")
+          .select("store_id")
+          .eq("user_id", user.id)
+          .eq("status", "active");
+        
+        const { data: ownedStores } = await supabase
+          .from("stores")
+          .select("id")
+          .eq("owner_id", user.id);
+        
+        const myStoreIds = Array.from(new Set([
+          ...(memberships || []).map(m => m.store_id),
+          ...(ownedStores || []).map(s => s.id)
+        ]));
+
+        if (myStoreIds.length === 0) {
+          return [];
+        }
+
+        query = query.in("store_id", myStoreIds);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Commission[];

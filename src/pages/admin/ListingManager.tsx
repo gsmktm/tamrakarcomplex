@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Trash2, Search, ExternalLink, Eye, MapPin, Edit } from "lucide-react";
+import { CheckCircle2, Loader2, Trash2, Search, Eye, MapPin, Edit, Clock3, BadgeCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -87,20 +88,33 @@ const ListingManager = () => {
   const watchedStatus = watch("status");
   const watchedType = watch("listing_type");
 
-  const { data: listings, isLoading } = useQuery({
+  const { data: listings, isLoading, error: listingsError } = useQuery({
     queryKey: ["admin_listings", role, user?.id],
     queryFn: async () => {
-      let query = supabase.from("sell_listings").select("*");
-      
-      if (!isPlatformAdmin && user?.id) {
-        query = query.eq("user_id", user.id);
+      try {
+        let query = supabase.from("sell_listings").select("*");
+        
+        if (!isPlatformAdmin && user?.id) {
+          const { data: ownedStores } = await supabase
+            .from("stores")
+            .select("id")
+            .eq("owner_id", user.id);
+          const ownedStoreIds = (ownedStores ?? []).map((store) => String(store.id)).filter(Boolean);
+          query = ownedStoreIds.length
+            ? query.or(`user_id.eq.${user.id},store_id.in.(${ownedStoreIds.join(",")})`)
+            : query.eq("user_id", user.id);
+        }
+        
+        const { data, error } = await query.order("created_at", { ascending: false });
+        
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        handleSupabaseError(err, "ListingManager: Failed to fetch listings");
+        return [];
       }
-      
-      const { data, error } = await query.order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data;
     },
+    retry: 1,
   });
 
   const deleteMutation = useMutation({
@@ -114,6 +128,21 @@ const ListingManager = () => {
     },
     onError: (error: unknown) => {
       toast.error(`Error deleting listing: ${getErrorMessage(error)}`);
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("sell_listings").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin_listings"] });
+      queryClient.invalidateQueries({ queryKey: ["marketplace-listings"] });
+      toast.success(`Listing marked ${variables.status}`);
+    },
+    onError: (error: unknown) => {
+      toast.error(`Error updating status: ${getErrorMessage(error)}`);
     },
   });
 
@@ -169,6 +198,7 @@ const ListingManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin_listings"] });
+      queryClient.invalidateQueries({ queryKey: ["marketplace-listings"] });
       setIsEditOpen(false);
       setEditingListing(null);
       toast.success("Listing updated successfully");
@@ -313,6 +343,39 @@ const ListingManager = () => {
                   </TableCell>
                   <TableCell>{new Date(listing.created_at).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right space-x-2">
+                    {listing.status !== "active" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Publish listing"
+                        disabled={statusMutation.isPending}
+                        onClick={() => statusMutation.mutate({ id: listing.id, status: "active" })}
+                      >
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      </Button>
+                    )}
+                    {listing.status === "active" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Mark as sold"
+                        disabled={statusMutation.isPending}
+                        onClick={() => statusMutation.mutate({ id: listing.id, status: "sold" })}
+                      >
+                        <BadgeCheck className="h-4 w-4 text-blue-600" />
+                      </Button>
+                    )}
+                    {listing.status !== "pending" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Move to pending"
+                        disabled={statusMutation.isPending}
+                        onClick={() => statusMutation.mutate({ id: listing.id, status: "pending" })}
+                      >
+                        <Clock3 className="h-4 w-4 text-amber-600" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(listing)}>
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -457,7 +520,7 @@ const ListingManager = () => {
                   <SelectItem value="rejected">Rejected</SelectItem>
                   <SelectItem value="sold">Sold</SelectItem>
                   <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
                 </SelectContent>
               </Select>
             </div>

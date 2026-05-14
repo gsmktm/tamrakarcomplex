@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
+import { AlertCircle, Loader2, Trash2, Search, CheckCircle, Clock, Wrench } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Loader2, Trash2, Search, CheckCircle, Clock, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -43,46 +44,52 @@ const RepairManager = () => {
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
 
-  const { data: repairs, isLoading } = useQuery({
+  const { data: repairs, isLoading, error: repairsError } = useQuery({
     queryKey: ["admin_repairs", user?.id, role],
     queryFn: async () => {
-      let query = supabase.from("repair_requests").select("*, stores(name, package_slug)");
-      
-      if (isStoreAdmin && user?.id) {
-        // Get store IDs from store_admins or owner_id
-        const { data: memberships } = await supabase
-          .from("store_admins")
-          .select("store_id")
-          .eq("user_id", user.id)
-          .eq("status", "active");
+      try {
+        let query = supabase.from("repair_requests").select("*, stores(name, package_slug)");
         
-        const { data: ownedStores } = await supabase
-          .from("stores")
-          .select("id")
-          .eq("owner_id", user.id);
-        
-        const myStoreIds = Array.from(new Set([
-          ...(memberships || []).map(m => m.store_id),
-          ...(ownedStores || []).map(s => s.id)
-        ]));
+        if (isStoreAdmin && user?.id) {
+          // Get store IDs from store_admins or owner_id
+          const { data: memberships } = await supabase
+            .from("store_admins")
+            .select("store_id")
+            .eq("user_id", user.id)
+            .eq("status", "active");
+          
+          const { data: ownedStores } = await supabase
+            .from("stores")
+            .select("id")
+            .eq("owner_id", user.id);
+          
+          const myStoreIds = Array.from(new Set([
+            ...(memberships || []).map(m => m.store_id),
+            ...(ownedStores || []).map(s => s.id)
+          ]));
 
-        if (myStoreIds.length === 0) return [];
-        
-        query = query.in("assigned_store_id", myStoreIds);
+          if (myStoreIds.length === 0) return [];
+          
+          query = query.in("assigned_store_id", myStoreIds);
+        }
+
+        const joined = await query.order("created_at", { ascending: false });
+        if (!joined.error) return joined.data ?? [];
+
+        // Relationship missing or schema behind: fallback to base table query
+        if (isSchemaMissingError(joined.error)) {
+          const base = await supabase.from("repair_requests").select("*").order("created_at", { ascending: false });
+          if (base.error) throw base.error;
+          return base.data ?? [];
+        }
+
+        throw joined.error;
+      } catch (err) {
+        handleSupabaseError(err, "RepairManager: Failed to fetch repairs");
+        return [];
       }
-
-      const joined = await query.order("created_at", { ascending: false });
-      if (!joined.error) return joined.data ?? [];
-
-      // Relationship missing or schema behind: fallback to base table query
-      if (isSchemaMissingError(joined.error)) {
-        const base = await supabase.from("repair_requests").select("*").order("created_at", { ascending: false });
-        if (base.error) throw base.error;
-        return base.data ?? [];
-      }
-
-      throw joined.error;
     },
+    retry: 1,
     enabled: !!user?.id
   });
 

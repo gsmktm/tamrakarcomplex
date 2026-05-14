@@ -49,7 +49,7 @@ export default function StaffAdminLayout() {
   const [navQuery, setNavQuery] = useState("");
 
   const menuGroups = useMemo(
-    () => getFilteredMenu((role as AppRole) || "staffadmin", permissions),
+    () => getFilteredMenu("staffadmin", role === "staffadmin" ? permissions : null),
     [role, permissions]
   );
 

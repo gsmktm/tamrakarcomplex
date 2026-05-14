@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Loader2, Store, Package, CreditCard,
-  ExternalLink, Settings, CheckCircle2, Plus, ArrowRight, Wrench, Unlock, Smartphone
+  ExternalLink, Settings, CheckCircle2, Plus, ArrowRight, Wrench, Unlock, Smartphone,
+  RefreshCw, Clock, Gem, Award, Building2, ShieldCheck, Zap,
+  TrendingUp, Users, Search, Filter, MoreVertical, ArrowUpRight
 } from "lucide-react";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,11 +18,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import MobileInventoryManager from "@/components/admin/storeadmin/MobileInventoryManager";
+import LeadManager from "@/pages/admin/LeadManager";
+import { getStoreEntitlements } from "@/lib/storePackages";
+import { getPublicStorePath } from "@/lib/storeRoutes";
 
 export default function StoreAdminDashboard() {
   const { user, role } = useAuth();
   const queryClient = useQueryClient();
   const isSuperAdmin = role === "suadmin";
+  const [selectedManagedStoreId, setSelectedManagedStoreId] = useState<string | null>(null);
 
   const { data: stores, isLoading: isStoresLoading } = useQuery({
     queryKey: ["my-stores", user?.id, role],
@@ -59,7 +67,7 @@ export default function StoreAdminDashboard() {
       const { data: ownedStores, error: ownedError } = await supabase
         .from("stores")
         .select("id")
-        .eq("owner_id", user?.id);
+        .or(`owner_id.eq.${user?.id},owner_user_id.eq.${user?.id}`);
       
       if (ownedError) throw ownedError;
       
@@ -102,6 +110,24 @@ export default function StoreAdminDashboard() {
         .select("*", { count: 'exact', head: true })
         .in("store_id", storeIds);
 
+      // Get accessories count
+      const { count: accessoryCount } = await supabase
+        .from("store_accessories")
+        .select("*", { count: 'exact', head: true })
+        .in("store_id", storeIds);
+
+      // Get repair services count
+      const { count: repairServiceCount } = await supabase
+        .from("store_repair_services")
+        .select("*", { count: 'exact', head: true })
+        .in("store_id", storeIds);
+
+      // Get exchange requests count
+      const { count: exchangeRequestCount } = await supabase
+        .from("exchange_requests")
+        .select("*", { count: 'exact', head: true })
+        .in("store_id", storeIds);
+
       // Get repair request count
       const { count: repairCount } = await supabase
         .from("repair_requests")
@@ -121,6 +147,9 @@ export default function StoreAdminDashboard() {
       
       return {
         productCount: productCount || 0,
+        accessoryCount: accessoryCount || 0,
+        repairServiceCount: repairServiceCount || 0,
+        exchangeRequestCount: exchangeRequestCount || 0,
         repairCount: repairCount || 0,
         unlockCount: unlockCount || 0,
         sellLeadCount: sellLeadCount || 0,
@@ -229,7 +258,30 @@ export default function StoreAdminDashboard() {
     );
   }
 
-  const primaryStore = stores?.[0];
+  const primaryStore = stores?.find(s => s.id === selectedManagedStoreId) || stores?.[0];
+  const primaryPackage = primaryStore?.package_slug || primaryStore?.store_subscriptions?.packages?.slug || "free";
+  const entitlements = getStoreEntitlements(primaryPackage);
+  
+  // Comprehensive Completion Logic
+  const completionCriteria = [
+    { label: "Store Name", value: !!primaryStore?.name },
+    { label: "Description", value: !!primaryStore?.description },
+    { label: "Logo", value: !!primaryStore?.logo_url },
+    { label: "Banner", value: !!primaryStore?.banner_url },
+    { label: "Phone", value: !!primaryStore?.phone },
+    { label: "WhatsApp", value: !!primaryStore?.whatsapp },
+    { label: "Floor & Block", value: !!(primaryStore?.floor && primaryStore?.block) },
+    { label: "Shop Number", value: !!(primaryStore?.shop_number || primaryStore?.shop_no) },
+    { label: "SEO Slug", value: !!(primaryStore?.seo_slug || primaryStore?.slug) },
+    { label: "Inventory", value: (stats?.productCount || 0) > 0 },
+  ];
+  
+  const completionScore = Math.round((completionCriteria.filter(c => c.value).length / completionCriteria.length) * 100);
+  const pendingTasks = completionCriteria.filter(c => !c.value);
+  const productUsage = stats?.productCount || 0;
+  const accessoryUsage = stats?.accessoryCount || 0;
+  const limitLabel = (limit: number) => (limit >= 100000 ? "Unlimited" : limit.toLocaleString());
+  const productLimitReached = entitlements.productLimit < 100000 && productUsage >= entitlements.productLimit;
 
   return (
     <div className="space-y-8">
@@ -238,17 +290,82 @@ export default function StoreAdminDashboard() {
           <h1 className="text-3xl font-bold tracking-tight">Store Dashboard</h1>
           <p className="text-muted-foreground">Manage your shops and products at Tamrakar Complex.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
+        <div className="flex flex-wrap items-center gap-3">
+          {(stores?.length ?? 0) > 1 && (
+            <Select value={primaryStore?.id} onValueChange={setSelectedManagedStoreId}>
+              <SelectTrigger className="w-[200px] h-10 rounded-xl">
+                <SelectValue placeholder="Switch Store" />
+              </SelectTrigger>
+              <SelectContent>
+                {stores?.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.store_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button variant="outline" asChild className="rounded-xl">
             <Link to="/contact-us">Help & Support</Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="rounded-xl">
             <Link to="/storeadmin/products">
               <Plus className="h-4 w-4 mr-2" /> Add Product
             </Link>
           </Button>
         </div>
       </div>
+
+      {primaryStore && (
+        <Card>
+          <CardContent className="grid gap-5 p-5 md:grid-cols-4">
+            <div>
+              <div className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                Profile Completion
+                <span className={completionScore === 100 ? "text-green-600" : "text-amber-600"}>{completionScore}%</span>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 ${completionScore === 100 ? "bg-green-500" : "bg-primary"}`} 
+                  style={{ width: `${completionScore}%` }} 
+                />
+              </div>
+              {pendingTasks.length > 0 && (
+                <p className="mt-2 text-[10px] text-muted-foreground">
+                  Pending: {pendingTasks.slice(0, 2).map(t => t.label).join(", ")}
+                  {pendingTasks.length > 2 && "..."}
+                </p>
+              )}
+            </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Active Package</div>
+              <div className="mt-2 text-2xl font-bold capitalize">{primaryPackage}</div>
+              <p className="mt-1 text-xs text-muted-foreground">{entitlements.analytics ? "Analytics enabled" : "Analytics unavailable"}</p>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Package Usage</div>
+              <div className="mt-2 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span>Products</span>
+                  <span className={productLimitReached ? "text-red-500 font-bold" : ""}>{productUsage} / {limitLabel(entitlements.productLimit)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Accessories</span>
+                  <span>{accessoryUsage} / {limitLabel(entitlements.accessoriesLimit)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button asChild size="sm">
+                <Link to="/storeadmin/profile">Quick Edit Profile</Link>
+              </Button>
+              <Button asChild size="sm" variant={productLimitReached ? "destructive" : "outline"}>
+                <Link to={productLimitReached ? "/storeadmin/my-subscription" : "/storeadmin/products"}>
+                  {productLimitReached ? "Upgrade Package" : "Add Product"}
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -272,6 +389,39 @@ export default function StoreAdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{stats?.productCount || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">Live in marketplace</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Accessories</CardTitle>
+            <Smartphone className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.accessoryCount || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Stock items</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Exchange Requests</CardTitle>
+            <RefreshCw className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.exchangeRequestCount || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Trade-in leads</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Repair Services</CardTitle>
+            <Wrench className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.repairServiceCount || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Active offerings</p>
           </CardContent>
         </Card>
 
@@ -319,43 +469,20 @@ export default function StoreAdminDashboard() {
         </Card>
       </div>
 
-      <Tabs defaultValue="shops" className="w-full">
-        <TabsList className="w-full max-w-[760px] grid grid-cols-4">
-          <TabsTrigger value="shops">My Shops</TabsTrigger>
-          <TabsTrigger value="sell-leads" className="relative">
-            Sell Leads
-            {stats?.sellLeadCount > 0 && (
-              <Badge className="ml-2 bg-primary text-white h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
-                {stats.sellLeadCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="repairs" className="relative">
-            Repairs
-            {stats?.repairCount > 0 && (
-              <Badge className="ml-2 bg-primary text-white h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
-                {stats.repairCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="unlocks" className="relative">
-            Unlocks
-            {stats?.unlockCount > 0 && (
-              <Badge className="ml-2 bg-primary text-white h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
-                {stats.unlockCount}
-              </Badge>
-            )}
-          </TabsTrigger>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 h-auto">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="sell-leads">Sell Leads</TabsTrigger>
+          <TabsTrigger value="exchange">Exchange</TabsTrigger>
+          <TabsTrigger value="repairs">Repairs</TabsTrigger>
+          <TabsTrigger value="repair-services">Services</TabsTrigger>
+          <TabsTrigger value="unlocks">Unlocks</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="shops" className="pt-6">
-          <div className="grid gap-6 md:grid-cols-3">
-            <div className="md:col-span-2 space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">My Shops</h2>
-              </div>
-              
-              <div className="grid gap-4">
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="grid grid-cols-1 gap-4">
                 {stores?.length === 0 ? (
                   <Card>
                     <CardContent className="p-12 text-center">
@@ -398,7 +525,7 @@ export default function StoreAdminDashboard() {
                             </div>
                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button variant="outline" size="sm" asChild>
-                                <Link to={`/stores/${store.id}`} target="_blank">
+                                <Link to={getPublicStorePath(store)} target="_blank">
                                   <ExternalLink className="h-3.5 w-3.5" />
                                 </Link>
                               </Button>
@@ -473,16 +600,16 @@ export default function StoreAdminDashboard() {
 
                   <div className="grid grid-cols-2 gap-2 mt-4">
                     <Button variant="outline" size="sm" className="text-[10px] h-8" asChild>
-                      <Link to="/storeadmin/products?category=Used+Phones">Used Phones</Link>
+                      <Link to="/storeadmin/products">Phones</Link>
                     </Button>
                     <Button variant="outline" size="sm" className="text-[10px] h-8" asChild>
-                      <Link to="/storeadmin/products?category=Repair+Services">Repair Services</Link>
+                      <Link to="/storeadmin/repair-services">Repair Catalog</Link>
                     </Button>
                     <Button variant="outline" size="sm" className="text-[10px] h-8" asChild>
-                      <Link to="/storeadmin/products?category=Accessories">Accessories</Link>
+                      <Link to="/storeadmin/accessories">Accessories</Link>
                     </Button>
                     <Button variant="outline" size="sm" className="text-[10px] h-8" asChild>
-                      <Link to="/storeadmin/products?category=Gaming">Gaming Gadgets</Link>
+                      <Link to="/storeadmin/exchange">Exchanges</Link>
                     </Button>
                   </div>
 
@@ -527,86 +654,7 @@ export default function StoreAdminDashboard() {
         </TabsContent>
 
         <TabsContent value="sell-leads" className="pt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Assigned Sell Phone Requests</CardTitle>
-              <CardDescription>Customers who chose your store after getting an instant valuation.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Device</TableHead>
-                      <TableHead>Quote</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Notes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sellLeadsLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>
-                    ) : sellLeads?.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No sell requests assigned to your stores yet.</TableCell></TableRow>
-                    ) : sellLeads?.map((lead) => (
-                      <TableRow key={lead.id}>
-                        <TableCell>
-                          <div className="flex flex-col text-xs">
-                            <span className="font-medium">{lead.customer_name || lead.name}</span>
-                            <span>{lead.customer_phone || lead.phone}</span>
-                            <span className="text-muted-foreground">{lead.customer_email}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col text-xs">
-                            <span className="font-medium">{lead.brand || lead.device_brand} {lead.model || lead.device_model}</span>
-                            <span className="text-muted-foreground">{lead.storage || "N/A"} · {lead.condition || "used"} · {lead.age_months || 0} months</span>
-                            {Array.isArray(lead.defects) && lead.defects.length > 0 ? (
-                              <span className="text-red-500">Issues: {lead.defects.join(", ")}</span>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs font-bold">
-                          Rs. {Number(lead.quoted_value || lead.asking_price || 0).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            defaultValue={lead.status || "new"}
-                            onValueChange={(val) => updateSellLeadMutation.mutate({ id: lead.id, status: val })}
-                          >
-                            <SelectTrigger className="h-8 w-36 text-[10px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="new">New</SelectItem>
-                              <SelectItem value="contacted">Contacted</SelectItem>
-                              <SelectItem value="inspection_booked">Inspection Booked</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            className="h-8 text-[10px]"
-                            placeholder="Add store notes..."
-                            defaultValue={lead.notes || ""}
-                            onBlur={(e) => {
-                              if (e.target.value !== (lead.notes || "")) {
-                                updateSellLeadMutation.mutate({ id: lead.id, notes: e.target.value });
-                              }
-                            }}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+          <LeadManager />
         </TabsContent>
 
         <TabsContent value="repairs" className="pt-6">
@@ -763,6 +811,36 @@ export default function StoreAdminDashboard() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="exchange" className="pt-6">
+          {primaryStore ? (
+             <div className="p-4 bg-muted/20 rounded-lg text-center border">
+               <RefreshCw className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
+               <h3 className="text-lg font-medium">Manage Exchanges</h3>
+               <p className="text-sm text-muted-foreground mb-4">View and process trade-in requests for your store.</p>
+               <Button asChild>
+                 <Link to="/storeadmin/exchange">Open Exchange Manager</Link>
+               </Button>
+             </div>
+          ) : (
+            <div className="p-12 text-center text-muted-foreground">Please select a store.</div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="repair-services" className="pt-6">
+          {primaryStore ? (
+             <div className="p-4 bg-muted/20 rounded-lg text-center border">
+               <Wrench className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
+               <h3 className="text-lg font-medium">Repair Catalog</h3>
+               <p className="text-sm text-muted-foreground mb-4">Manage your repair services and estimated pricing.</p>
+               <Button asChild>
+                 <Link to="/storeadmin/repair-services">Open Repair Service Manager</Link>
+               </Button>
+             </div>
+          ) : (
+            <div className="p-12 text-center text-muted-foreground">Please select a store.</div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

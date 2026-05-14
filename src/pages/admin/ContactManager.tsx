@@ -22,17 +22,23 @@ const ContactManager = () => {
   const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: messages, isLoading } = useQuery({
+  const { data: messages, isLoading, error: messagesError } = useQuery({
     queryKey: ["admin_contact_messages"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contact_messages")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from("contact_messages")
+          .select("*")
+          .order("created_at", { ascending: false });
+        
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        handleSupabaseError(err, "ContactManager: Failed to fetch messages");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const markAsReadMutation = useMutation({

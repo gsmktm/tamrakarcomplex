@@ -60,13 +60,19 @@ const PollManager = () => {
     options: [{ text: "" }, { text: "" }],
   });
 
-  const { data: polls, isLoading } = useQuery({
+  const { data: polls, isLoading, error: pollsError } = useQuery({
     queryKey: ["polls", "admin"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("polls").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as PollRow[];
+      try {
+        const { data, error } = await supabase.from("polls").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return (data ?? []) as PollRow[];
+      } catch (err) {
+        handleSupabaseError(err, "PollManager: Failed to fetch polls");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const filteredPolls = useMemo(() => {

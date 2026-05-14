@@ -503,7 +503,7 @@ export default function UnlockingHub() {
                     <h3 className="font-bold text-slate-900 mb-1">{feature.label}</h3>
                     <p className="text-xs text-slate-500 line-clamp-2 mb-3">{feature.description}</p>
                     <Badge variant="secondary" className="text-xs font-bold">
-                      {count} Models
+                      {feature.models} Models
                     </Badge>
                   </button>
                 );
@@ -617,7 +617,12 @@ export default function UnlockingHub() {
                       <h3 className="text-xl font-black text-slate-900 group-hover:text-primary transition-colors">
                         {item.model}
                       </h3>
-                      <span className="text-xs text-slate-400 font-medium">{item.release_year}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-slate-400 font-medium">{item.release_year}</span>
+                        <Link to={`/mobile/${item.brand.toLowerCase()}-${item.model.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="text-[10px] font-bold text-primary hover:underline flex items-center gap-0.5">
+                          View Full Specs <Info className="h-2.5 w-2.5" />
+                        </Link>
+                      </div>
                     </div>
                     <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center">
                       <Smartphone className="h-6 w-6 text-slate-400" />

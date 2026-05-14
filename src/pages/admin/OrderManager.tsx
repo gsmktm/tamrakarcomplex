@@ -11,11 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2, Search, Eye, Truck, CheckCircle, XCircle, RefreshCw,
-  DollarSign, Package, User, Store
+  DollarSign, Package, User, Store, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/lib/utils";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 
 interface OrderItem {
   id: string;
@@ -44,7 +45,9 @@ interface Order {
 }
 
 export default function OrderManager() {
-  const { role } = useAuth();
+  const { user, role } = useAuth();
+  const isPlatformAdmin = role === "suadmin" || role === "staffadmin";
+  const isStoreAdmin = role === "storeadmin";
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
   const [filters, setFilters] = useState({
@@ -55,32 +58,76 @@ export default function OrderManager() {
 
   const queryClient = useQueryClient();
 
-  const { data: orders, isLoading } = useQuery({
-    queryKey: ["orders", filters],
+  const { data: orders, isLoading, error: ordersError } = useQuery({
+    queryKey: ["orders", filters, user?.id, role],
     queryFn: async () => {
-      let query = supabase
-        .from("orders")
-        .select(`
-          *,
-          order_items(*),
-          store:stores(name)
-        `)
-        .order("created_at", { ascending: false });
+      try {
+        let query = supabase
+          .from("orders")
+          .select(`
+            *,
+            order_items(*),
+            store:stores(name)
+          `)
+          .order("created_at", { ascending: false });
 
-      if (filters.payment_status && filters.payment_status !== 'all') {
-        query = query.eq("payment_status", filters.payment_status);
-      }
-      if (filters.order_status && filters.order_status !== 'all') {
-        query = query.eq("order_status", filters.order_status);
-      }
-      if (filters.search) {
-        query = query.ilike("id", `%${filters.search}%`);
-      }
+        // Store admins can only see orders from their stores
+        if (isStoreAdmin && !isPlatformAdmin && user?.id) {
+          // Get store IDs from store_admins or owner_id
+          const { data: memberships } = await supabase
+            .from("store_admins")
+            .select("store_id")
+            .eq("user_id", user.id)
+            .eq("status", "active");
+          
+          const { data: ownedStores } = await supabase
+            .from("stores")
+            .select("id")
+            .eq("owner_id", user.id);
+          
+          const myStoreIds = Array.from(new Set([
+            ...(memberships || []).map(m => m.store_id),
+            ...(ownedStores || []).map(s => s.id)
+          ]));
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Order[];
+          if (myStoreIds.length === 0) {
+            // Store admin has no stores - return empty
+            return [];
+          }
+
+          // Filter orders where any order_item.store_id is in myStoreIds
+          const { data: relevantOrderIds, error: orderError } = await supabase
+            .from("order_items")
+            .select("distinct order_id")
+            .in("store_id", myStoreIds);
+
+          if (orderError || !relevantOrderIds?.length) {
+            return [];
+          }
+
+          const orderIds = relevantOrderIds.map(oi => oi.order_id);
+          query = query.in("id", orderIds);
+        }
+
+        if (filters.payment_status && filters.payment_status !== 'all') {
+          query = query.eq("payment_status", filters.payment_status);
+        }
+        if (filters.order_status && filters.order_status !== 'all') {
+          query = query.eq("order_status", filters.order_status);
+        }
+        if (filters.search) {
+          query = query.ilike("id", `%${filters.search}%`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data as Order[];
+      } catch (err) {
+        handleSupabaseError(err, "OrderManager: Failed to fetch orders list");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const updateOrderStatusMutation = useMutation({
@@ -135,6 +182,23 @@ export default function OrderManager() {
 
   if (isLoading) {
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+
+  if (ordersError || !orders) {
+    return (
+      <div className="p-8 text-center space-y-3">
+        <div className="flex justify-center">
+          <AlertCircle className="h-8 w-8 text-amber-500" />
+        </div>
+        <div>
+          <p className="font-medium text-sm">Unable to load orders</p>
+          <p className="text-xs text-muted-foreground mt-1">Database connection issue. Please try again.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
+      </div>
+    );
   }
 
   return (

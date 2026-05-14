@@ -9,6 +9,7 @@ import {
   FileText,
   Wrench,
   Unlock,
+  Smartphone,
   TrendingUp,
   AlertCircle,
   CheckCircle,
@@ -49,6 +50,7 @@ export default function StaffAdminDashboard() {
         supabase.from("articles").select("id", { count: "exact", head: true }),
         supabase.from("contact_messages").select("id", { count: "exact", head: true }),
         supabase.from("unlock_requests").select("id", { count: "exact", head: true }),
+        supabase.from("sell_phone_leads").select("id", { count: "exact", head: true }),
 
         // Pending items requiring attention
         supabase.from("orders").select("id", { count: "exact", head: true }).eq("order_status", "pending"),
@@ -56,6 +58,7 @@ export default function StaffAdminDashboard() {
         supabase.from("contact_messages").select("id", { count: "exact", head: true }).eq("status", "unread"),
         supabase.from("sell_listings").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("unlock_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("sell_phone_leads").select("id", { count: "exact", head: true }).eq("status", "new"),
       ]);
 
       const getCountOrError = (index: number): { value: number; error: boolean } => {
@@ -76,13 +79,15 @@ export default function StaffAdminDashboard() {
           { title: "Articles", ...getCountOrError(5), link: "/staffadmin/articles", icon: FileText },
           { title: "Messages", ...getCountOrError(6), link: "/staffadmin/messages", icon: Users },
           { title: "Unlocking", ...getCountOrError(7), link: "/staffadmin/unlocking", icon: Unlock },
+          { title: "Sell Leads", ...getCountOrError(8), link: "/staffadmin/leads", icon: Smartphone },
         ] satisfies DashboardMetric[],
         pendingItems: {
-          orders: getCountOrError(8).value,
-          repairs: getCountOrError(9).value,
-          messages: getCountOrError(10).value,
-          listings: getCountOrError(11).value,
-          unlocking: getCountOrError(12).value,
+          orders: getCountOrError(9).value,
+          repairs: getCountOrError(10).value,
+          messages: getCountOrError(11).value,
+          listings: getCountOrError(12).value,
+          unlocking: getCountOrError(13).value,
+          sellLeads: getCountOrError(14).value,
         },
       };
     },

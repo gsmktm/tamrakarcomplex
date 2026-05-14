@@ -14,6 +14,8 @@ const StoreSettings = lazy(() => import("@/pages/storeadmin/StoreSettings"));
 const StoreThemeBuilder = lazy(() => import("@/pages/storeadmin/StoreThemeBuilder"));
 const StoreManage = lazy(() => import("@/pages/StoreManage"));
 const StoreAnalytics = lazy(() => import("@/pages/storeadmin/StoreAnalytics"));
+const StoreMediaManager = lazy(() => import("@/pages/storeadmin/StoreMediaManager"));
+const ReviewManager = lazy(() => import("@/pages/storeadmin/ReviewManager"));
 
 // Team & Security
 const StoreTeamManager = lazy(() => import("@/pages/storeadmin/StoreTeamManager"));
@@ -27,7 +29,11 @@ const ListingManager = lazy(() => import("@/pages/admin/ListingManager"));
 const RepairManager = lazy(() => import("@/pages/admin/RepairManager"));
 const UnlockingManager = lazy(() => import("@/pages/admin/UnlockingManager"));
 const LeadManager = lazy(() => import("@/pages/admin/LeadManager"));
+const StoreLeadManager = lazy(() => import("@/pages/storeadmin/StoreLeadManager"));
 const ContactManager = lazy(() => import("@/pages/admin/ContactManager"));
+const AccessoryManager = lazy(() => import("@/pages/admin/AccessoryManager"));
+const RepairServiceManager = lazy(() => import("@/pages/storeadmin/RepairServiceManager"));
+const ExchangeManager = lazy(() => import("@/pages/storeadmin/ExchangeManager"));
 
 // Financials & Subscription
 const PayoutManager = lazy(() => import("@/pages/admin/PayoutManager"));
@@ -56,13 +62,19 @@ export const storeAdminRoutes = (
 
     {/* Store Operations */}
     <Route path="profile" element={<Suspense fallback={<RouteFallback />}><StoreProfilePage /></Suspense>} />
+    <Route path="media" element={<Suspense fallback={<RouteFallback />}><StoreMediaManager /></Suspense>} />
     <Route path="settings" element={<Suspense fallback={<RouteFallback />}><StoreSettings /></Suspense>} />
     <Route path="theme" element={<Suspense fallback={<RouteFallback />}><StoreThemeBuilder /></Suspense>} />
     <Route path="products" element={<Suspense fallback={<RouteFallback />}><ProductManager /></Suspense>} />
+    <Route path="accessories" element={<Suspense fallback={<RouteFallback />}><AccessoryManager /></Suspense>} />
     <Route path="listings" element={<Suspense fallback={<RouteFallback />}><ListingManager /></Suspense>} />
     <Route path="orders" element={<Suspense fallback={<RouteFallback />}><OrderManager /></Suspense>} />
     <Route path="leads" element={<Suspense fallback={<RouteFallback />}><LeadManager /></Suspense>} />
+    <Route path="store-leads" element={<Suspense fallback={<RouteFallback />}><StoreLeadManager /></Suspense>} />
+    <Route path="exchange" element={<Suspense fallback={<RouteFallback />}><ExchangeManager /></Suspense>} />
+    <Route path="reviews" element={<Suspense fallback={<RouteFallback />}><ReviewManager /></Suspense>} />
     <Route path="repairs" element={<Suspense fallback={<RouteFallback />}><RepairManager /></Suspense>} />
+    <Route path="repair-services" element={<Suspense fallback={<RouteFallback />}><RepairServiceManager /></Suspense>} />
     <Route path="unlocking" element={<Suspense fallback={<RouteFallback />}><UnlockingManager /></Suspense>} />
     <Route path="messages" element={<Suspense fallback={<RouteFallback />}><ContactManager /></Suspense>} />
     

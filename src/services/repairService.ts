@@ -115,7 +115,32 @@ export async function getEligibleRepairStores(): Promise<EligibleRepairStore[]> 
   const rpc = await supabase.rpc("get_eligible_repair_stores");
   if (!rpc.error) return (rpc.data ?? []) as EligibleRepairStore[];
 
+  // Fallback: Query stores with repair-enabled packages
+  // First try with package join (source of truth)
   const fallback = await supabase
+    .from("stores")
+    .select(`
+      id,
+      name,
+      package:store_packages(slug)
+    `)
+    .eq("status", "active")
+    .eq("subscription_status", "active")
+    .order("name", { ascending: true });
+
+  if (!fallback.error && fallback.data) {
+    // Filter to only stores with gold/diamond packages (or check repair_enabled flag if available)
+    return fallback.data
+      .filter((s: any) => s.package?.slug && ["gold", "diamond"].includes(s.package.slug))
+      .map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        package_slug: s.package?.slug || "free"
+      })) as EligibleRepairStore[];
+  }
+
+  // Final fallback: use denormalized package_slug column
+  const legacy = await supabase
     .from("stores")
     .select("id, name, package_slug")
     .eq("status", "active")
@@ -124,6 +149,6 @@ export async function getEligibleRepairStores(): Promise<EligibleRepairStore[]> 
     .order("package_slug", { ascending: true })
     .order("name", { ascending: true });
 
-  if (fallback.error) throw fallback.error;
-  return (fallback.data ?? []) as EligibleRepairStore[];
+  if (legacy.error) throw legacy.error;
+  return (legacy.data ?? []) as EligibleRepairStore[];
 }

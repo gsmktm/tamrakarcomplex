@@ -35,7 +35,8 @@ import {
   XCircle,
   MoreVertical,
   AlertTriangle,
-  Info
+  Info,
+  Check
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -46,7 +47,19 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { getStoreEntitlements, resolveEffectiveStorePackage } from "@/lib/storeEntitlements";
+import { Checkbox } from "@/components/ui/checkbox";
+
+type Permission = "manage_products" | "manage_accessories" | "manage_repairs" | "manage_exchange" | "manage_leads" | "view_analytics" | "edit_profile";
+
+const ALL_PERMISSIONS: { id: Permission; label: string }[] = [
+  { id: "manage_products", label: "Manage Products" },
+  { id: "manage_accessories", label: "Manage Accessories" },
+  { id: "manage_repairs", label: "Manage Repairs" },
+  { id: "manage_exchange", label: "Manage Exchanges" },
+  { id: "manage_leads", label: "Manage Leads" },
+  { id: "view_analytics", label: "View Analytics" },
+  { id: "edit_profile", label: "Edit Store Profile" },
+];
 
 export default function StoreTeamManager() {
   const { user } = useAuth();
@@ -55,21 +68,17 @@ export default function StoreTeamManager() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<"manager" | "staff">("staff");
+  const [selectedPermissions, setSelectedPermissions] = useState<Permission[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingPermissionsMember, setEditingPermissionsMember] = useState<any>(null);
 
   const { data: stores, isLoading: isStoresLoading } = useQuery({
     queryKey: ["my-stores-for-team", user?.id],
     queryFn: async () => {
-      const { data: memberships } = await supabase
-        .from("store_admins")
-        .select("store_id")
-        .eq("user_id", user?.id)
-        .eq("role", "owner");
-      
       const { data: stores } = await supabase
         .from("stores")
-        .select("id, name, package_slug, subscription_status, subscription_end_date")
-        .in("id", memberships?.map(m => m.store_id) || []);
+        .select("id, name, package_id, store_packages(name, staff_limit)")
+        .or(`owner_user_id.eq.${user?.id},owner_id.eq.${user?.id}`);
       
       if (stores && stores.length > 0 && !selectedStore) {
         setSelectedStore(stores[0].id);
@@ -82,20 +91,18 @@ export default function StoreTeamManager() {
     stores?.find(s => s.id === selectedStore), 
   [stores, selectedStore]);
 
-  const entitlements = useMemo(() => 
-    getStoreEntitlements(currentStore ? resolveEffectiveStorePackage(currentStore) : "free"),
-  [currentStore]);
+  const staffLimit = (currentStore?.store_packages as any)?.staff_limit || 0;
 
   const { data: team, isLoading: isTeamLoading } = useQuery({
     queryKey: ["store-team", selectedStore],
     queryFn: async () => {
       if (!selectedStore) return [];
       const { data, error } = await supabase
-        .from("store_admins")
+        .from("store_staff")
         .select(`
           *,
           profile:user_id (
-            display_name,
+            full_name,
             email
           )
         `)
@@ -105,20 +112,12 @@ export default function StoreTeamManager() {
       
       return data.map(member => ({
         ...member,
-        display_name: (member.profile as any)?.display_name || "Unknown",
+        display_name: (member.profile as any)?.full_name || "Unknown",
         email: (member.profile as any)?.email || "No email"
       }));
     },
     enabled: !!selectedStore,
   });
-
-  const stats = useMemo(() => {
-    if (!team) return { managers: 0, staff: 0 };
-    return {
-      managers: team.filter(m => m.role === "owner" || m.role === "manager").length,
-      staff: team.filter(m => m.role === "staff").length
-    };
-  }, [team]);
 
   const addMemberMutation = useMutation({
     mutationFn: async () => {
@@ -126,94 +125,66 @@ export default function StoreTeamManager() {
       setIsAdding(true);
 
       try {
-        // 1. Check limits first
-        if (newMemberRole === "manager" && stats.managers >= entitlements.adminUserLimit) {
-          throw new Error(`Admin limit reached for ${currentStore?.package_slug} package (${entitlements.adminUserLimit})`);
-        }
-        if (newMemberRole === "staff" && stats.staff >= entitlements.staffMemberLimit) {
-          throw new Error(`Staff limit reached for ${currentStore?.package_slug} package (${entitlements.staffMemberLimit})`);
+        // 1. Check limits
+        if (staffLimit >= 0 && (team?.length || 0) >= staffLimit) {
+          throw new Error(`Staff limit reached for your package (${staffLimit})`);
         }
 
-        // 2. Find user by email
-        const { data: profiles, error: profileError } = await supabase
+        // 2. Find user
+        const { data: profile } = await supabase
           .from("profiles")
-          .select("user_id")
+          .select("id")
           .eq("email", newMemberEmail.toLowerCase().trim())
           .maybeSingle();
 
-        if (profileError) throw profileError;
-        if (!profiles) throw new Error("User not found. They must have a Tamrakar account first.");
+        if (!profile) throw new Error("User not found. They must have an account first.");
 
-        // 3. Add to store_admins
-        const { error: insertError } = await supabase
-          .from("store_admins")
-          .insert({
-            store_id: selectedStore,
-            user_id: profiles.user_id,
-            role: newMemberRole,
-            status: "active"
-          });
+        // 3. Add
+        const { error } = await supabase.from("store_staff").insert({
+          store_id: selectedStore,
+          user_id: profile.id,
+          role: newMemberRole,
+          permissions: selectedPermissions,
+          status: "active"
+        });
 
-        if (insertError) {
-          if (insertError.code === "23505") {
-            throw new Error("This user is already a member of this store team.");
-          }
-          throw insertError;
-        }
+        if (error) throw error;
       } finally {
         setIsAdding(false);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["store-team", selectedStore] });
-      toast.success("Team member added successfully");
+      toast.success("Team member added");
       setIsAddDialogOpen(false);
       setNewMemberEmail("");
+      setSelectedPermissions([]);
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to add team member");
+      toast.error(error.message);
     }
   });
 
-  const updateMemberMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string, role?: string, status?: string }) => {
-      // If changing role, check limits
-      if (updates.role) {
-        if ((updates.role === "manager" || updates.role === "owner") && stats.managers >= entitlements.adminUserLimit) {
-           // Find if we are replacing a manager role or adding one
-           const member = team?.find(m => m.id === id);
-           if (member?.role === "staff") {
-             throw new Error(`Admin limit reached for ${currentStore?.package_slug} package`);
-           }
-        }
-        if (updates.role === "staff" && stats.staff >= entitlements.staffMemberLimit) {
-           const member = team?.find(m => m.id === id);
-           if (member?.role !== "staff") {
-             throw new Error(`Staff limit reached for ${currentStore?.package_slug} package`);
-           }
-        }
-      }
-
-      const { error } = await supabase.from("store_admins").update(updates).eq("id", id);
+  const updatePermissionsMutation = useMutation({
+    mutationFn: async ({ id, permissions }: { id: string, permissions: Permission[] }) => {
+      const { error } = await supabase.from("store_staff").update({ permissions }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["store-team", selectedStore] });
-      toast.success("Member updated successfully");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Failed to update member");
+      toast.success("Permissions updated");
+      setEditingPermissionsMember(null);
     }
   });
 
   const removeMemberMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("store_admins").delete().eq("id", id);
+      const { error } = await supabase.from("store_staff").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["store-team", selectedStore] });
-      toast.success("Member removed successfully");
+      toast.success("Member removed");
     },
   });
 
@@ -263,25 +234,37 @@ export default function StoreTeamManager() {
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="manager">Manager (Admin Access)</SelectItem>
-                    <SelectItem value="staff">Staff (Standard Access)</SelectItem>
+                    <SelectItem value="manager">Manager (Full Access)</SelectItem>
+                    <SelectItem value="staff">Staff (Limited Access)</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Managers can manage team, listings and settings. Staff can only manage listings.
-                </p>
               </div>
 
-              {newMemberRole === "manager" && stats.managers >= entitlements.adminUserLimit && (
-                <div className="bg-destructive/10 p-3 rounded-md flex items-start gap-2 text-destructive text-sm">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <p>Manager limit reached ({entitlements.adminUserLimit}). Upgrade your package to add more admins.</p>
+              <div className="space-y-3">
+                <Label>Permissions</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {ALL_PERMISSIONS.map((perm) => (
+                    <div key={perm.id} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`perm-${perm.id}`} 
+                        checked={selectedPermissions.includes(perm.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) setSelectedPermissions([...selectedPermissions, perm.id]);
+                          else setSelectedPermissions(selectedPermissions.filter(p => p !== perm.id));
+                        }}
+                      />
+                      <label htmlFor={`perm-${perm.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                        {perm.label}
+                      </label>
+                    </div>
+                  ))}
                 </div>
-              )}
-              {newMemberRole === "staff" && stats.staff >= entitlements.staffMemberLimit && (
+              </div>
+
+              {isLimitReached && (
                 <div className="bg-destructive/10 p-3 rounded-md flex items-start gap-2 text-destructive text-sm">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <p>Staff limit reached ({entitlements.staffMemberLimit}). Upgrade your package to add more staff.</p>
+                  <p>Staff limit reached ({staffLimit}). Upgrade your package to add more staff.</p>
                 </div>
               )}
             </div>
@@ -289,12 +272,7 @@ export default function StoreTeamManager() {
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
               <Button 
                 onClick={() => addMemberMutation.mutate()} 
-                disabled={
-                  !newMemberEmail || 
-                  isAdding || 
-                  (newMemberRole === "manager" && stats.managers >= entitlements.adminUserLimit) ||
-                  (newMemberRole === "staff" && stats.staff >= entitlements.staffMemberLimit)
-                }
+                disabled={!newMemberEmail || isAdding || isLimitReached}
               >
                 {isAdding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Add Member
@@ -313,7 +291,7 @@ export default function StoreTeamManager() {
                 Package Entitlements
               </CardTitle>
               <Badge variant="secondary" className="capitalize">
-                {currentStore?.package_slug || "free"} Plan
+                {currentStore?.store_packages?.name || "Free"} Plan
               </Badge>
             </div>
             <CardDescription>
@@ -323,17 +301,10 @@ export default function StoreTeamManager() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Admins/Managers</span>
-                <span className="font-medium">{stats.managers} / {entitlements.adminUserLimit}</span>
-              </div>
-              <Progress value={(stats.managers / entitlements.adminUserLimit) * 100} className="h-1.5" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Staff Members</span>
-                <span className="font-medium">{stats.staff} / {entitlements.staffMemberLimit}</span>
+                <span className="font-medium">{currentStaffCount} / {staffLimit < 0 ? "Unlimited" : staffLimit}</span>
               </div>
-              <Progress value={entitlements.staffMemberLimit > 0 ? (stats.staff / entitlements.staffMemberLimit) * 100 : 0} className="h-1.5" />
+              <Progress value={staffLimit > 0 ? (currentStaffCount / staffLimit) * 100 : staffLimit < 0 ? 100 : 0} className="h-1.5" />
             </div>
           </CardContent>
         </Card>
@@ -389,7 +360,7 @@ export default function StoreTeamManager() {
                 <TableRow>
                   <TableHead>Member</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Permissions</TableHead>
                   <TableHead>Added On</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -409,18 +380,20 @@ export default function StoreTeamManager() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={member.role === 'owner' ? 'default' : member.role === 'manager' ? 'secondary' : 'outline'} className="capitalize">
+                      <Badge variant={member.role === 'manager' ? 'default' : 'outline'} className="capitalize">
                         {member.role}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        {member.status === 'active' ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                        ) : (
-                          <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                        {(member.permissions as Permission[])?.map(p => (
+                          <Badge key={p} variant="secondary" className="text-[9px] h-4">
+                            {ALL_PERMISSIONS.find(ap => ap.id === p)?.label || p}
+                          </Badge>
+                        ))}
+                        {(!member.permissions || member.permissions.length === 0) && (
+                          <span className="text-xs text-muted-foreground italic">None</span>
                         )}
-                        <span className="text-sm capitalize">{member.status}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -435,16 +408,11 @@ export default function StoreTeamManager() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => updateMemberMutation.mutate({ id: member.id, role: 'manager' })}>
-                              Promote to Manager
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateMemberMutation.mutate({ id: member.id, role: 'staff' })}>
-                              Demote to Staff
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => updateMemberMutation.mutate({ id: member.id, status: member.status === 'active' ? 'inactive' : 'active' })}
-                            >
-                              {member.status === 'active' ? "Deactivate" : "Reactivate"}
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedPermissions(member.permissions || []);
+                              setEditingPermissionsMember(member);
+                            }}>
+                              Edit Permissions
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               className="text-destructive"
@@ -474,6 +442,49 @@ export default function StoreTeamManager() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editingPermissionsMember} onOpenChange={(open) => !open && setEditingPermissionsMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Permissions</DialogTitle>
+            <DialogDescription>
+              Update access levels for {editingPermissionsMember?.display_name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-1 gap-3">
+              {ALL_PERMISSIONS.map((perm) => (
+                <div key={perm.id} className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={`edit-perm-${perm.id}`} 
+                    checked={selectedPermissions.includes(perm.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) setSelectedPermissions([...selectedPermissions, perm.id]);
+                      else setSelectedPermissions(selectedPermissions.filter(p => p !== perm.id));
+                    }}
+                  />
+                  <label htmlFor={`edit-perm-${perm.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                    {perm.label}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPermissionsMember(null)}>Cancel</Button>
+            <Button 
+              onClick={() => updatePermissionsMutation.mutate({ 
+                id: editingPermissionsMember.id, 
+                permissions: selectedPermissions 
+              })}
+              disabled={updatePermissionsMutation.isPending}
+            >
+              {updatePermissionsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

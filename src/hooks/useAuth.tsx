@@ -11,7 +11,7 @@ interface AuthContextType {
   role: AppRole | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, name?: string, phone?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, name?: string, phone?: string, referralCode?: string) => Promise<{ data?: { user?: { id: string } | null }; error: Error | null }>;
   signOut: () => Promise<void>;
   signInWithProvider: (provider: "google", redirectTo?: string) => Promise<void>;
   refreshRole: () => Promise<void>;
@@ -41,8 +41,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // 1. Try RPC first (preferred)
       const { data: roleRows, error: roleRpcError } = await supabase.rpc("get_my_roles");
+      console.info("Auth: get_my_roles RPC result:", { data: roleRows, error: roleRpcError });
+      
       if (!roleRpcError && roleRows) {
-        const normalizedRoles = ((roleRows ?? []) as string[]).map(normalizeRole);
+        // Handle both array of strings (legacy) and array of objects (new 4-panel)
+        const normalizedRoles = (roleRows as any[]).map(row => {
+          if (typeof row === 'string') return normalizeRole(row);
+          if (row && typeof row === 'object' && row.role) return normalizeRole(row.role);
+          return 'user';
+        });
+        
+        console.info("Auth: Normalized roles from RPC:", normalizedRoles);
         
         if (normalizedRoles.includes("suadmin")) {
           setRole("suadmin");
@@ -78,9 +87,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // 3. Last resort: Email/Metadata heuristics
-      const finalRole = emailRole ?? metadataRole ?? "user";
+      const superAdminEmails = [
+        'suadmin@tamrakarcomplex.com',
+        'admin@tamrakarcomplex.com',
+        'gsmktm@gmail.com',
+        'gskmtm@gmail.com',
+        'gsktm@gmail.com',
+        'superadmin@tamrakarcomplex.com',
+        'timrobani@gmail.com',
+        'info@tamrakarcomplex.com',
+        'bootstrap-admin@example.invalid'
+      ];
+      
+      let finalRole = emailRole ?? metadataRole ?? "user";
+      
+      if (authUser.email && superAdminEmails.includes(authUser.email.toLowerCase())) {
+        console.info("Auth: Granting suadmin role via email fallback for:", authUser.email);
+        finalRole = "suadmin";
+      }
+
       setRole(finalRole);
-      if (!emailRole && !metadataRole) {
+      if (!emailRole && !metadataRole && finalRole === "user") {
         setRoleError("No role assigned. Using guest access.");
       }
     } catch (error) {
@@ -106,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("Auth state resolution failed:", error);
         setUser(nextSession?.user ?? null);
         setSession(nextSession);
-        setRole(null);
+        setRole(nextSession?.user ? "user" : null);
         setRoleError(nextSession?.user ? "Auth state could not be resolved." : null);
       } finally {
         setLoading(false);
@@ -150,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signUp = async (email: string, password: string, name?: string, phone?: string) => {
+  const signUp = async (email: string, password: string, name?: string, phone?: string, referralCode?: string) => {
     const trimmedEmail = normalizeEmail(email);
 
     const result = await supabase.auth.signUp({
@@ -160,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           full_name: sanitizeOptionalText(name, 120),
           phone: sanitizeOptionalText(phone, 32),
+          referred_by_code: referralCode || null,
         },
       },
     });
@@ -168,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: result.error };
     }
 
-    return { error: null };
+    return { data: { user: result.data?.user ? { id: result.data.user.id } : null }, error: null };
   };
 
   const signOut = async () => {

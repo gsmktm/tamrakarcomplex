@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Facebook, Instagram, Linkedin, Mail, MapPin, Phone, Send, Twitter, Users, Youtube } from "lucide-react";
+import { Facebook, Instagram, Linkedin, Mail, MapPin, Phone, Send, Twitter, Users, Youtube, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -250,6 +250,15 @@ export function Footer() {
               <li className="flex items-center gap-2 text-sm text-primary-foreground/70">
                 <Phone className="h-4 w-4 shrink-0" />
                 <span>{contactInfo.phone}</span>
+                <a
+                  href={`https://api.whatsapp.com/send?phone=${contactInfo.whatsapp}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[#25D366] hover:text-[#128C7E] transition-colors ml-2"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline">Chat</span>
+                </a>
               </li>
               <li className="flex items-center gap-2 text-sm text-primary-foreground/70">
                 <Mail className="h-4 w-4 shrink-0" />

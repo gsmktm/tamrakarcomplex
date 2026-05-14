@@ -63,13 +63,19 @@ export default function GuideManager() {
   const { role } = useAuth();
   const isPlatformAdmin = role === "suadmin" || role === "staffadmin";
 
-  const { data: guides, isLoading } = useQuery<Guide[]>({
+  const { data: guides, isLoading, error: guidesError } = useQuery<Guide[]>({
     queryKey: ["guides", "admin"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("guides").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as Guide[];
+      try {
+        const { data, error } = await supabase.from("guides").select("*").order("created_at", { ascending: false });
+        if (error) throw error;
+        return data as Guide[];
+      } catch (err) {
+        handleSupabaseError(err, "GuideManager: Failed to fetch guides");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const createMutation = useMutation({

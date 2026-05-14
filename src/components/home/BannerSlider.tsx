@@ -6,10 +6,30 @@ import { ChevronLeft, ChevronRight, ArrowRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 
+type HomeBanner = {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  image_url: string;
+  link_url: string | null;
+  button_text: string | null;
+};
+
+const fallbackBanners: HomeBanner[] = [
+  {
+    id: "fallback-hero",
+    title: "Latest phones, repairs and verified stores",
+    subtitle: "Shop new arrivals, compare prices, request repair support and connect with Tamrakar stores.",
+    image_url: "/og-image.png",
+    link_url: "/products",
+    button_text: "Shop Now",
+  },
+];
+
 export function BannerSlider() {
   const [current, setCurrent] = useState(0);
 
-  const { data: banners, isLoading } = useQuery({
+  const { data: banners = fallbackBanners, isLoading } = useQuery({
     queryKey: ["active-banners"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -18,9 +38,14 @@ export function BannerSlider() {
         .eq("is_active", true)
         .eq("placement", "home_hero")
         .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.warn("Marketing banners unavailable, using fallback banner:", error.message);
+        return fallbackBanners;
+      }
+      return (data?.length ? data : fallbackBanners) as HomeBanner[];
     },
+    retry: false,
+    staleTime: 1000 * 60 * 5,
   });
 
   useEffect(() => {
@@ -68,7 +93,7 @@ export function BannerSlider() {
             <div className="flex gap-4 animate-in slide-in-from-left-16 duration-1000">
               <Button size="lg" className="hero-gradient rounded-xl px-8 font-bold gap-2" asChild>
                 <Link to={banner.link_url || "/buy"}>
-                  {banner.button_text} <ArrowRight className="h-5 w-5" />
+                {banner.button_text || "Explore"} <ArrowRight className="h-5 w-5" />
                 </Link>
               </Button>
             </div>

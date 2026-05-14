@@ -9,13 +9,12 @@ Use these docs before editing:
 3. `docs/AI_DATA_MODEL.md` - Supabase tables, feature areas, RPCs, storage buckets, and migrations.
 4. `docs/AI_BUILD_GUIDE.md` - how to run, test, edit safely, and add new features.
 
-Existing human docs that may still matter:
+## Other Current Documentation
 
-- `README.md` - original Lovable/Vite quickstart.
-- `DEPLOYMENT.md` and `PRODUCTION_DEPLOYMENT_NOTES.md` - deployment notes.
-- `TESTING_CHECKLIST.md` and `FINAL_TESTING_CHECKLIST.md` - manual QA flows.
-- `STORE_DIRECTORY_MODULE.md` and `STORE_DIRECTORY_IMPLEMENTATION.md` - store directory details.
-- `ADMIN_LOGIN.md` - admin login notes.
+- `README.md` - Main project overview, tech stack, quick start guide, and project status.
+- `DEPLOYMENT.md` - Comprehensive deployment instructions for Vercel, Netlify, and cPanel.
+- `CHANGELOG.md` - Complete project status, feature checklist, and system status.
+- `public/pricing.md` - Machine-readable store subscription pricing data.
 
 ## Fast Orientation
 

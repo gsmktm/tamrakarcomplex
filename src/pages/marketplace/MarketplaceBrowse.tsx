@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useSearchParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import { CheckCircle2, Loader2, MapPin, Search, Filter, X, Edit, Trash2, Store, ShieldCheck, ArrowRight, Tag, Clock } from "lucide-react";
+import { CheckCircle2, MapPin, Search, Filter, X, Edit, Trash2, Store, ShieldCheck, ArrowRight, Tag, Clock } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -21,7 +20,8 @@ import { SEO } from "@/components/common/SEO";
 import { SafeImage } from "@/components/common/SafeImage";
 import type { SellListingRow } from "@/types/app";
 import { decodeListingDescription, formatCondition } from "@/lib/listingMeta";
-import { getFallbackMarketplaceListings, getFallbackStoreCards } from "@/services/publicFallbackData";
+import { getPublicStorePath } from "@/lib/storeRoutes";
+import { getFallbackStoreCards } from "@/services/publicFallbackData";
 
 import {
   Select,
@@ -40,13 +40,29 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
+import { useMarketplaceListings } from "@/hooks/useMarketplaceListings";
+
 export default function MarketplaceBrowse() {
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 500);
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
-  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 300000]);
-  const [sortBy, setSortBy] = useState<string>("newest");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const categoryParam = searchParams.get("category");
+  const conditionParam = searchParams.get("condition");
+  const minPriceParam = searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : undefined;
+  const maxPriceParam = searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : undefined;
+  const searchParam = searchParams.get("q") || searchParams.get("search") || "";
+
+  const storeIdParam = searchParams.get("store") || searchParams.get("storeId");
+
+  const [activeCategory, setActiveCategory] = useState<string>((categoryParam || "all").toLowerCase());
+  const [activeCondition, setActiveCondition] = useState<string>((conditionParam || "all").toLowerCase());
+  const [priceRange, setPriceRange] = useState<[number, number]>([minPriceParam ?? 0, maxPriceParam ?? 500000]);
+  const [search, setSearch] = useState(searchParam);
+  const debouncedSearch = useDebounce(search, 400);
+
+  const [selectedBrands, setSelectedBrands] = useState<string[]>(searchParams.get("brands")?.split(",").filter(Boolean) || []);
+  const [selectedConditions, setSelectedConditions] = useState<string[]>(searchParams.get("conditions")?.split(",").filter(Boolean) || []);
+  const [sortBy, setSortBy] = useState<string>(searchParams.get("sort") || "newest");
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
+  const ITEMS_PER_PAGE = 12;
 
   const categories = [
     { key: "all", label: "All Categories" },
@@ -58,26 +74,44 @@ export default function MarketplaceBrowse() {
     { key: "accessories", label: "Accessories" },
     { key: "smartwatch", label: "Smartwatches" },
     { key: "audio", label: "Earbuds & Audio" },
-    { key: "drone", label: "Drones & Cameras" },
-    { key: "gaming", label: "Gaming Gadgets" },
+    { key: "drone", label: "Drones" },
+    { key: "camera", label: "Cameras" },
+    { key: "gaming", label: "Gaming & Consoles" },
+    { key: "monitor", label: "Monitors" },
+    { key: "desktop", label: "Desktops" },
+    { key: "tv", label: "TV & Appliances" },
   ];
-  const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [storeFilterId, setStoreFilterId] = useState<string | null>(null);
+
+  const [storeFilterId, setStoreFilterId] = useState<string | null>(storeIdParam || null);
+  const [resolvedStoreId, setResolvedStoreId] = useState<string | null>(null);
   const [storeFilterName, setStoreFilterName] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const ITEMS_PER_PAGE = 12;
   
-  const { user, role } = useAuth();
+  const { user, role, isLoading: isAuthLoading } = useAuth();
   const isAdmin = isAdminRole(role);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
 
+  const updateSearchParams = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null) params.delete(key);
+      else params.set(key, value);
+    });
+    setSearchParams(params);
+  };
   type ListingWithShop = SellListingRow & {
+    source_type?: "store_product" | "user_listing";
+    owner_user_id?: string | null;
+    created_by?: string | null;
+    catalog_product_id?: string | null;
+    stock?: number | null;
     shop_name?: string;
     store?: {
       id: string;
       name: string;
+      slug?: string | null;
+      seo_slug?: string | null;
       location: string;
       logo_url: string | null;
       is_verified: boolean | null;
@@ -88,6 +122,8 @@ export default function MarketplaceBrowse() {
   type StoreCard = {
     id: string;
     name: string;
+    slug?: string | null;
+    seo_slug?: string | null;
     location: string;
     logo_url: string | null;
     is_verified: boolean | null;
@@ -102,7 +138,7 @@ export default function MarketplaceBrowse() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stores")
-        .select("id,name,location,logo_url,is_verified,services,subscription_status")
+        .select("id,name,slug,seo_slug,location,logo_url,is_verified,services,subscription_status")
         .order("is_verified", { ascending: false })
         .limit(12);
 
@@ -115,175 +151,68 @@ export default function MarketplaceBrowse() {
     staleTime: 60_000,
   });
 
-  const { data: listingsData, isLoading } = useQuery({
-    queryKey: ["sell_listings", debouncedSearch, selectedBrands, selectedConditions, priceRange, activeCategory, sortBy, page, storeFilterId],
-    queryFn: async () => {
-      let query = supabase
-        .from("sell_listings")
-        .select(`*`, { count: 'exact' });
-
-      if (!isAdmin) {
-        query = query.eq("status", "active");
-      }
-
-      // Optional store filter: show only listings from a specific store
-      if (storeFilterId) {
-        query = query.eq("store_id", storeFilterId);
-      }
-
-      switch(sortBy) {
-        case "price_asc":
-          query = query.order("price", { ascending: true });
-          break;
-        case "price_desc":
-          query = query.order("price", { ascending: false });
-          break;
-        case "oldest":
-          query = query.order("created_at", { ascending: true });
-          break;
-        case "newest":
-        default:
-          query = query.order("created_at", { ascending: false });
-      }
-
-      if (debouncedSearch) {
-        query = query.or(`title.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%,brand.ilike.%${debouncedSearch}%,model.ilike.%${debouncedSearch}%`);
-      }
-
-      if (selectedBrands.length > 0) {
-        query = query.in("brand", selectedBrands);
-      }
-
-      if (selectedConditions.length > 0) {
-        query = query.in("condition", selectedConditions);
-      }
-
-      if (priceRange[0] > 0) {
-        query = query.gte("price", priceRange[0]);
-      }
-      
-      if (priceRange[1] < 300000) {
-        query = query.lte("price", priceRange[1]);
-      }
-      
-      if (activeCategory && activeCategory !== "all") {
-        query = query.ilike("category", `%${activeCategory}%`);
-      }
-      
-      const from = (page - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
-      query = query.range(from, to);
-      
-      const { data, error, count } = await query;
-
-      if (error || !data?.length) {
-        const fallback = getFallbackMarketplaceListings();
-        const filteredFallback = fallback.filter((listing) => {
-          const haystack = [
-            listing.title,
-            listing.description,
-            listing.brand,
-            listing.model,
-            listing.category,
-            listing.condition,
-            listing.location,
-          ].filter(Boolean).join(" ").toLowerCase();
-          const matchesSearch = !debouncedSearch || haystack.includes(debouncedSearch.toLowerCase());
-          const matchesBrand = selectedBrands.length === 0 || selectedBrands.includes(String(listing.brand));
-          const matchesCondition = selectedConditions.length === 0 || selectedConditions.includes(String(listing.condition));
-          const matchesPrice = Number(listing.price || 0) >= priceRange[0] && Number(listing.price || 0) <= priceRange[1];
-          const matchesCategory = !activeCategory || activeCategory === "all" || String(listing.category || "").toLowerCase().includes(activeCategory.toLowerCase());
-          const matchesStore = !storeFilterId || String(listing.store_id || "") === storeFilterId;
-          return matchesSearch && matchesBrand && matchesCondition && matchesPrice && matchesCategory && matchesStore;
-        });
-        const sortedFallback = [...filteredFallback].sort((a, b) => {
-          if (sortBy === "price_asc") return Number(a.price || 0) - Number(b.price || 0);
-          if (sortBy === "price_desc") return Number(b.price || 0) - Number(a.price || 0);
-          if (sortBy === "oldest") return String(a.created_at || "").localeCompare(String(b.created_at || ""));
-          return String(b.created_at || "").localeCompare(String(a.created_at || ""));
-        });
-        const from = (page - 1) * ITEMS_PER_PAGE;
-        const fallbackPage = sortedFallback.slice(from, from + ITEMS_PER_PAGE).map((listing) => ({
-          ...(listing as ListingWithShop),
-          shop_name: "Tamrakar Store",
-        }));
-        return { listings: fallbackPage, total: sortedFallback.length };
-      }
-
-      const storeIds = Array.from(new Set((data || []).map((l) => l.store_id).filter(Boolean)));
-      const ownerIds = Array.from(new Set((data || []).map((l) => l.user_id).filter((id) => !data.find(listing => listing.user_id === id && listing.store_id))));
-      
-      const storesMap = new Map<string, ListingWithShop["store"]>();
-      const sellersMap = new Map<string, string>();
-
-      if (storeIds.length) {
-        const { data: storesData } = await supabase
-          .from("stores")
-          .select("id,name,location,logo_url,is_verified,subscription_status")
-          .in("id", storeIds);
-
-        (storesData || []).forEach((s) => {
-          storesMap.set(String(s.id), {
-            id: String(s.id),
-            name: String(s.name),
-            location: String(s.location || ""),
-            logo_url: (s.logo_url ?? null) as string | null,
-            is_verified: (s.is_verified ?? null) as boolean | null,
-            subscription_status: (s.subscription_status ?? null) as string | null,
-          });
-        });
-      }
-
-      if (ownerIds.length) {
-        const { data: profilesData } = await supabase
-          .from("profiles")
-          .select("id,display_name")
-          .in("id", ownerIds);
-        
-        (profilesData || []).forEach(p => {
-          sellersMap.set(p.id, p.display_name || "Individual Seller");
-        });
-      }
-
-      const listingsWithMeta = (data || []).map((l: Record<string, unknown>) => {
-        const store = l.store_id ? (storesMap.get(String(l.store_id)) ?? null) : null;
-        const sellerName = !l.store_id ? (sellersMap.get(String(l.user_id)) ?? "Individual Seller") : null;
-        
-        return { 
-          ...(l as ListingWithShop), 
-          store,
-          shop_name: store?.name || sellerName || "Official Store"
-        };
-      });
-
-      return { listings: listingsWithMeta, total: count || 0 };
-    },
+  const { data: listingsData, isLoading: isListingsLoading } = useMarketplaceListings({
+    category: activeCategory !== "all" ? activeCategory : undefined,
+    condition: activeCondition !== "all" ? activeCondition : undefined,
+    min_price: priceRange[0],
+    max_price: priceRange[1],
+    search: debouncedSearch,
+    store_id: resolvedStoreId || (storeFilterId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storeFilterId) ? storeFilterId : undefined),
+    brands: selectedBrands.length > 0 ? selectedBrands : undefined,
+    conditions: selectedConditions.length > 0 ? selectedConditions : undefined,
+    limit: ITEMS_PER_PAGE,
+    offset: (page - 1) * ITEMS_PER_PAGE,
+    sort_by: sortBy,
   });
 
-  const listings: ListingWithShop[] = listingsData?.listings || [];
+  const listings: ListingWithShop[] = (listingsData?.listings || [])
+    .map(l => ({
+      ...l,
+      title: l.title || "Untitled",
+      price: l.price || 0,
+      condition: l.condition || "used",
+      images: l.images || [],
+      user_id: l.user_id || l.owner_user_id || "",
+      created_at: l.created_at || new Date().toISOString(),
+      status: l.status || "active",
+      brand: l.brand || null,
+      model: l.model || null,
+      category: l.category || null,
+      description: l.description || null,
+      location: l.location || null,
+      verified: l.verified || false,
+      featured: l.featured || false,
+      updated_at: l.updated_at || new Date().toISOString(),
+    } as unknown as ListingWithShop)) as ListingWithShop[];
   const totalPages = Math.ceil((listingsData?.total || 0) / ITEMS_PER_PAGE);
+  const paginatedListings = listings;
   const verifiedStoresCount = (featuredStores || []).filter((s) => s.is_verified).length;
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (listing: ListingWithShop) => {
     if (!confirm("Are you sure you want to delete this listing?")) return;
+
+    const table = listing.source_type === "store_product" ? "store_products" : "sell_listings";
     
-    const { error } = await supabase
-      .from("sell_listings")
+    const { error } = await (supabase as any)
+      .from(table)
       .delete()
-      .eq("id", id);
+      .eq("id", listing.id);
       
     if (error) {
       toast.error("Failed to delete listing");
     } else {
       toast.success("Listing deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["sell_listings"] });
+      queryClient.invalidateQueries({ queryKey: ["store_products"] });
+      queryClient.invalidateQueries({ queryKey: ["marketplace-listings"] });
     }
   };
 
-  const brands = ["Apple", "Samsung", "Xiaomi", "OnePlus", "Google", "Oppo", "Vivo", "Realme", "Sony", "Asus", "Lenovo", "Dell", "HP", "Acer", "MSI"];
+  const brands = ["Acer", "Apple", "Asus", "Dell", "Google", "Honor", "HP", "Huawei", "Lenovo", "Motorola", "MSI", "Nokia", "Nothing", "OnePlus", "Oppo", "Realme", "Samsung", "Sony", "Vivo", "Xiaomi"];
   const conditions = [
     { id: "new", label: "Brand New" },
     { id: "like_new", label: "Like New" },
+    { id: "refurbished", label: "Refurbished" },
     { id: "used", label: "Used / Good" },
     { id: "fair", label: "Fair" }
   ];
@@ -292,41 +221,78 @@ export default function MarketplaceBrowse() {
     const params = new URLSearchParams(location.search);
     const cat = (params.get("category") || "all").toLowerCase();
     setActiveCategory(cat);
+
+    const cond = (params.get("condition") || "all").toLowerCase();
+    setActiveCondition(cond);
+
     const store = params.get("store") || params.get("storeId");
-    setStoreFilterId(store ? String(store) : null);
-    setPage(1);
+    if (store !== storeFilterId) {
+      setStoreFilterId(store ? String(store) : null);
+      if (!store) {
+        setResolvedStoreId(null);
+        setStoreFilterName(null);
+      }
+    }
+    const p = Number(params.get("page")) || 1;
+    setPage(p);
+
+    const s = params.get("q") || params.get("search") || "";
+    setSearch(s);
+    
+    const sort = params.get("sort") || "newest";
+    setSortBy(sort);
+
+    const brands = params.get("brands")?.split(",").filter(Boolean) || [];
+    setSelectedBrands(brands);
+
+    const conditions = params.get("conditions")?.split(",").filter(Boolean) || [];
+    setSelectedConditions(conditions);
   }, [location.search]);
 
   useEffect(() => {
     if (!storeFilterId) {
       setStoreFilterName(null);
+      setResolvedStoreId(null);
       return;
     }
 
     void (async () => {
       try {
-        const { data } = await supabase
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storeFilterId);
+        const query = supabase
           .from("stores")
-          .select("name")
-          .eq("id", storeFilterId)
+          .select("id,name");
+        const { data } = await (isUuid
+          ? query.or(`id.eq.${storeFilterId},slug.eq.${storeFilterId},seo_slug.eq.${storeFilterId}`)
+          : query.or(`slug.eq.${storeFilterId},seo_slug.eq.${storeFilterId}`))
           .maybeSingle();
+        
         setStoreFilterName(data?.name ?? null);
+        setResolvedStoreId(data?.id ?? null);
       } catch {
         setStoreFilterName(null);
+        setResolvedStoreId(null);
       }
     })();
   }, [storeFilterId]);
 
+  useEffect(() => {
+    setPriceRange([minPriceParam ?? 0, maxPriceParam ?? 500000]);
+  }, [minPriceParam, maxPriceParam]);
   const toggleBrand = (brand: string) => {
-    setSelectedBrands(prev => 
-      prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
-    );
+    const next = selectedBrands.includes(brand) 
+      ? selectedBrands.filter(b => b !== brand) 
+      : [...selectedBrands, brand];
+    setSelectedBrands(next);
+    updateSearchParams({ brands: next.length > 0 ? next.join(",") : null, page: "1" });
   };
 
   const toggleCondition = (condition: string) => {
-    setSelectedConditions(prev => 
-      prev.includes(condition) ? prev.filter(c => c !== condition) : [...prev, condition]
-    );
+    const next = selectedConditions.includes(condition) 
+      ? selectedConditions.filter(c => c !== condition) 
+      : [...selectedConditions, condition];
+    setSelectedConditions(next);
+    updateSearchParams({ conditions: next.length > 0 ? next.join(",") : null, page: "1" });
   };
 
   const FilterContent = () => (
@@ -373,8 +339,8 @@ export default function MarketplaceBrowse() {
         <h3 className="font-semibold mb-4 text-base">Price Range</h3>
         <div className="px-2">
           <Slider
-            defaultValue={[0, 300000]}
-            max={300000}
+            defaultValue={[0, 500000]}
+            max={500000}
             step={5000}
             value={priceRange}
             onValueChange={(value) => setPriceRange(value as [number, number])}
@@ -394,7 +360,7 @@ export default function MarketplaceBrowse() {
         onClick={() => {
           setSelectedBrands([]);
           setSelectedConditions([]);
-          setPriceRange([0, 300000]);
+          setPriceRange([0, 500000]);
           setSearch("");
         }}
       >
@@ -460,11 +426,17 @@ export default function MarketplaceBrowse() {
                   placeholder="Search iPhones, MacBooks, Samsung..."
                   className="pl-12 h-14 border-0 focus-visible:ring-0 text-base bg-transparent text-white placeholder:text-white/40"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    updateSearchParams({ q: e.target.value || null, page: "1" });
+                  }}
                 />
                 {search && (
                   <button
-                    onClick={() => setSearch("")}
+                    onClick={() => {
+                      setSearch("");
+                      updateSearchParams({ q: null, page: "1" });
+                    }}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
                   >
                     <X className="h-5 w-5" />
@@ -486,24 +458,27 @@ export default function MarketplaceBrowse() {
             </div>
           </div>
 
-          <div className="mt-10 flex flex-wrap justify-center gap-2.5">
-            {categories.map((c) => {
-              const active = activeCategory === c.key;
-              return (
-                <button
-                  key={c.key}
-                  onClick={() => setActiveCategory(c.key)}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 border ${
-                    active
-                      ? "bg-primary text-white border-primary shadow-glow"
-                      : "bg-white/8 text-white/70 border-white/15 hover:border-white/40 hover:bg-white/15 hover:text-white"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
+                  <div className="mt-10 flex flex-wrap justify-center gap-2.5">
+                    {categories.map((c) => {
+                      const active = activeCategory === c.key;
+                      return (
+                        <div 
+                          key={c.key}
+                          className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 border cursor-pointer ${
+                            active
+                              ? "bg-primary text-white border-primary shadow-glow"
+                              : "bg-white/8 text-white/70 border-white/15 hover:border-white/40 hover:bg-white/15 hover:text-white"
+                          }`}
+                          onClick={() => {
+                            setActiveCategory(c.key);
+                            updateSearchParams({ category: c.key === "all" ? null : c.key, page: "1" });
+                          }}
+                        >
+                          {c.label}
+                        </div>
+                      );
+                    })}
+                  </div>
         </div>
       </section>
 
@@ -518,11 +493,7 @@ export default function MarketplaceBrowse() {
               variant="outline"
               size="sm"
               onClick={() => {
-                const params = new URLSearchParams(location.search);
-                params.delete("store");
-                params.delete("storeId");
-                const nextSearch = params.toString();
-                navigate({ pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : "" });
+                updateSearchParams({ store: null, storeId: null, page: "1" });
               }}
             >
               Clear Store Filter
@@ -554,7 +525,7 @@ export default function MarketplaceBrowse() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {(featuredStores || []).slice(0, 4).map((store) => (
-                <Link to={`/stores/${store.id}`} key={store.id}>
+                <Link to={getPublicStorePath(store)} key={store.id}>
                   <Card className="hover:shadow-md transition-all hover:border-primary/30 group bg-white dark:bg-slate-900 border-border/60">
                     <CardContent className="p-4 flex items-center gap-4">
                       {store.logo_url ? (
@@ -633,7 +604,10 @@ export default function MarketplaceBrowse() {
                 <p className="text-sm font-medium text-muted-foreground px-2">
                   Showing <span className="text-foreground">{listings.length}</span> results
                 </p>
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <Select value={sortBy} onValueChange={(val) => {
+                  setSortBy(val);
+                  updateSearchParams({ sort: val });
+                }}>
                   <SelectTrigger className="w-full sm:w-[200px] border-0 bg-secondary/50 focus:ring-0 mt-3 sm:mt-0">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
@@ -646,20 +620,15 @@ export default function MarketplaceBrowse() {
                 </Select>
               </div>
 
-              {isLoading ? (
+              {isListingsLoading ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                   {[...Array(6)].map((_, i) => (
-                    <div key={i} className="rounded-2xl border bg-white p-4 space-y-4">
-                      <div className="aspect-square bg-muted rounded-xl animate-pulse" />
-                      <div className="h-4 w-1/3 bg-muted rounded animate-pulse" />
-                      <div className="h-6 w-2/3 bg-muted rounded animate-pulse" />
-                      <div className="h-4 w-1/2 bg-muted rounded animate-pulse" />
-                    </div>
+                    <div key={i} className="h-[400px] rounded-2xl border bg-muted/20 animate-pulse" />
                   ))}
                 </div>
               ) : listings?.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {listings.map((listing) => {
+                  {paginatedListings.map((listing) => {
                     const { meta } = decodeListingDescription(listing.description);
                     const conditionLabel = formatCondition(listing.condition);
                     const showBrand = listing.brand ? String(listing.brand) : "";
@@ -704,16 +673,16 @@ export default function MarketplaceBrowse() {
                             </div>
 
                             {/* Admin/Owner Actions */}
-                            {(isAdmin || user?.id === listing.user_id) && (
+                            {(isAdmin || user?.id === (listing.user_id || listing.owner_user_id)) && (
                               <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button size="icon" variant="secondary" asChild className="h-8 w-8 rounded-full shadow-sm bg-black/60 backdrop-blur hover:bg-black/80 text-white">
-                                  <Link to={`/marketplace/edit/${listing.id}`} onClick={(e) => e.stopPropagation()}>
+                                  <Link to={listing.source_type === "store_product" ? "/storeadmin/products" : `/marketplace/edit/${listing.id}`} onClick={(e) => e.stopPropagation()}>
                                     <Edit className="h-4 w-4" />
                                   </Link>
                                 </Button>
                                 <Button size="icon" variant="destructive" className="h-8 w-8 rounded-full shadow-sm" onClick={(e) => {
                                   e.preventDefault();
-                                  handleDelete(listing.id);
+                                  handleDelete(listing);
                                 }}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -803,7 +772,12 @@ export default function MarketplaceBrowse() {
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious 
-                          onClick={() => setPage(p => Math.max(1, p - 1))}
+                          onClick={() => {
+                            const newPage = Math.max(1, page - 1);
+                            setPage(newPage);
+                            updateSearchParams({ page: newPage.toString() });
+                            window.scrollTo({ top: 400, behavior: "smooth" });
+                          }}
                           className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                         />
                       </PaginationItem>
@@ -820,7 +794,11 @@ export default function MarketplaceBrowse() {
                             <PaginationItem key={i}>
                               <PaginationLink 
                                 isActive={page === pageNum}
-                                onClick={() => setPage(pageNum)}
+                                onClick={() => {
+                                  setPage(pageNum);
+                                  updateSearchParams({ page: pageNum.toString() });
+                                  window.scrollTo({ top: 400, behavior: "smooth" });
+                                }}
                                 className="cursor-pointer"
                               >
                                 {pageNum}
@@ -838,7 +816,12 @@ export default function MarketplaceBrowse() {
 
                       <PaginationItem>
                         <PaginationNext 
-                          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                          onClick={() => {
+                            const newPage = Math.min(totalPages, page + 1);
+                            setPage(newPage);
+                            updateSearchParams({ page: newPage.toString() });
+                            window.scrollTo({ top: 400, behavior: "smooth" });
+                          }}
                           className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                         />
                       </PaginationItem>

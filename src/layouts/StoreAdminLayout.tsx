@@ -41,9 +41,10 @@ export default function StoreAdminLayout() {
   const { permissions } = usePermissions();
   const [navQuery, setNavQuery] = useState("");
 
+  const panelRole: AppRole = location.pathname.startsWith("/staff") ? "staffadmin" : "storeadmin";
   const menuGroups = useMemo(
-    () => getFilteredMenu((role as AppRole) || "storeadmin", permissions),
-    [role, permissions]
+    () => getFilteredMenu(panelRole, panelRole === "staffadmin" && role === "staffadmin" ? permissions : null),
+    [panelRole, role, permissions]
   );
 
   const filteredGroups = useMemo(() => {

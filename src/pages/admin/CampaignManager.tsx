@@ -30,15 +30,22 @@ export default function CampaignManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBanner, setEditingBanner] = useState<any>(null);
 
-  const { data: banners, isLoading } = useQuery({
+  const { data: banners, isLoading, error: bannersError } = useQuery({
     queryKey: ["marketing-banners"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("marketing_banners")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from("marketing_banners")
+          .select("*")
+          .order("sort_order", { ascending: true });
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        handleSupabaseError(err, "CampaignManager: Failed to fetch banners");
+        return [];
+      }
+    },
+    retry: 1,
     },
   });
 

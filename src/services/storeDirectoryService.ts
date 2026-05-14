@@ -2,6 +2,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { STORES } from "@/data/storeData";
+import { BASIC_TAMRAKAR_STORES } from "@/data/basicStoreData";
 import { getStoreEntitlements, getStoreSortOrder, validateStoreAgainstPackage } from "@/lib/storePackages";
 import { resolveEffectiveStorePackage } from "@/lib/storeEntitlements";
 import { slugify } from "@/lib/utils";
@@ -10,9 +11,17 @@ export interface StoreDirectoryItem {
   id: string;
   name: string;
   slug?: string;
+  seo_slug?: string;
+  seo_title?: string;
+  seo_description?: string;
+  meta_keywords?: string;
+  canonical_url?: string;
+  public_status?: string;
   shop_no?: string;
+  shop_number?: string;
   complex_zone?: string;
   floor?: string;
+  block?: string;
   location: string;
   address?: string;
   description?: string;
@@ -23,6 +32,7 @@ export interface StoreDirectoryItem {
   map_url?: string;
   logo_url?: string;
   cover_image_url?: string;
+  banner_url?: string;
   is_verified: boolean;
   is_featured: boolean;
   package_slug: string;
@@ -40,21 +50,45 @@ export interface StoreDirectoryItem {
   entitlements: Record<string, unknown>; // From getStoreEntitlements
 }
 
+export type StoreDirectoryFilters = {
+  package_slug?: string;
+  complex_zone?: string;
+  service?: string;
+  floor?: string;
+  block?: string;
+  is_verified?: boolean;
+  is_featured?: boolean;
+  search?: string;
+  limit?: number;
+  offset?: number;
+};
+
 function normalizeServices(store: Partial<StoreDirectoryItem> & { services?: unknown; services_json?: unknown }) {
   if (Array.isArray(store.services)) return store.services.map(String);
   if (Array.isArray(store.services_json)) return store.services_json.map(String);
   return [];
 }
 
-function normalizeStore(store: Partial<StoreDirectoryItem>): StoreDirectoryItem & { sort_order: number } {
+async function withStoreQueryTimeout<T>(promise: PromiseLike<T>, timeoutMs = 3000): Promise<T | { data: null; error: Error; count?: null }> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<{ data: null; error: Error; count: null }>((resolve) => {
+      globalThis.setTimeout(() => resolve({ data: null, error: new Error("store_directory_timeout"), count: null }), timeoutMs);
+    }),
+  ]);
+}
+
+function normalizeStore(store: Partial<StoreDirectoryItem> & { package?: { slug: string } | null }): StoreDirectoryItem & { sort_order: number } {
   const legacyStore = store as Partial<StoreDirectoryItem> & {
     plan_slug?: string;
     subscription_tier?: string;
     subscription_status?: string;
   };
-  const rawPackageSlug = store.package_slug || legacyStore.plan_slug || legacyStore.subscription_tier;
+  
+  // Prefer package.slug from join (source of truth), fall back to package_slug column, then subscription_tier
+  const sourceSlug = store.package?.slug || store.package_slug || legacyStore.plan_slug || legacyStore.subscription_tier;
   const packageSlug = resolveEffectiveStorePackage({
-    package_slug: rawPackageSlug,
+    package_slug: sourceSlug,
     subscription_status: store.subscription_status,
     subscription_end_date: store.subscription_end_date,
   });
@@ -65,8 +99,15 @@ function normalizeStore(store: Partial<StoreDirectoryItem>): StoreDirectoryItem 
   return {
     id: String(store.id),
     name: normalizedName,
-    slug: store.slug || fallbackSlug,
-    shop_no: store.shop_no || undefined,
+    slug: store.seo_slug || store.slug || fallbackSlug,
+    seo_slug: store.seo_slug || store.slug || fallbackSlug,
+    seo_title: store.seo_title,
+    seo_description: store.seo_description,
+    meta_keywords: store.meta_keywords,
+    canonical_url: store.canonical_url,
+    public_status: store.public_status || "draft",
+    shop_no: store.shop_number || store.shop_no || undefined,
+    shop_number: store.shop_number || store.shop_no || undefined,
     complex_zone: store.complex_zone || "inside",
     floor: store.floor || undefined,
     location: store.location || "New Road, Kathmandu",
@@ -78,7 +119,8 @@ function normalizeStore(store: Partial<StoreDirectoryItem>): StoreDirectoryItem 
     website: store.website,
     map_url: store.map_url,
     logo_url: store.logo_url,
-    cover_image_url: store.cover_image_url,
+    cover_image_url: store.banner_url || store.cover_image_url,
+    banner_url: store.banner_url || store.cover_image_url,
     is_verified: Boolean(store.is_verified),
     is_featured: Boolean(store.is_featured),
     package_slug: packageSlug,
@@ -98,7 +140,7 @@ function normalizeStore(store: Partial<StoreDirectoryItem>): StoreDirectoryItem 
   };
 }
 
-const SEEDED_FALLBACK_STORES: Partial<StoreDirectoryItem>[] = [
+export const SEEDED_FALLBACK_STORES: Partial<StoreDirectoryItem>[] = [
   { name: "Suryabinayak Mobile And IT Solutions", phone: "9861909398", address: "Suryabinayak, Bhaktapur", location: "Bhaktapur", complex_zone: "outside" },
   { name: "Mobile World Capital Naxal", phone: "9851151198", address: "Naxal-01, Kathmandu", location: "Kathmandu", complex_zone: "outside" },
   { name: "Mobile World Capital Dillibazar", phone: "9841219587", address: "Dillibazar-29, Kathmandu", location: "Kathmandu", complex_zone: "outside" },
@@ -143,7 +185,7 @@ function mergeRepairPartnerStores(stores: StoreDirectoryItem[]) {
     store.phone,
   ].filter(Boolean)));
 
-  const localStores = [...STORES, ...SEEDED_FALLBACK_STORES];
+  const localStores = [...STORES, ...SEEDED_FALLBACK_STORES, ...BASIC_TAMRAKAR_STORES];
   const additions = localStores
     .filter((store) => !seen.has(store.id) && !seen.has(store.slug) && !seen.has(store.name.toLowerCase()) && !seen.has(store.phone))
     .map((store) => normalizeStore(store));
@@ -163,18 +205,16 @@ function sortStoresByPackage(stores: Array<StoreDirectoryItem & { sort_order?: n
   return stores;
 }
 
-function applyLegacyStoreFilters(stores: Array<StoreDirectoryItem & { sort_order?: number }>, filters?: {
-  package_slug?: string;
-  complex_zone?: string;
-  is_verified?: boolean;
-  is_featured?: boolean;
-  search?: string;
-  limit?: number;
-  offset?: number;
-}) {
+function applyLegacyStoreFilters(stores: Array<StoreDirectoryItem & { sort_order?: number }>, filters?: StoreDirectoryFilters) {
   let list = stores;
   if (filters?.package_slug) list = list.filter((store) => store.package_slug === filters.package_slug);
   if (filters?.complex_zone) list = list.filter((store) => store.complex_zone === filters.complex_zone);
+  if (filters?.floor) list = list.filter((store) => store.floor === filters.floor);
+  if (filters?.block) list = list.filter((store) => store.block === filters.block);
+  if (filters?.service) {
+    const requested = filters.service.toLowerCase();
+    list = list.filter((store) => store.services?.some((service) => service.toLowerCase().includes(requested)));
+  }
   if (filters?.is_verified !== undefined) list = list.filter((store) => store.is_verified === filters.is_verified);
   if (filters?.is_featured !== undefined) list = list.filter((store) => store.is_featured === filters.is_featured);
   if (filters?.search) {
@@ -196,29 +236,47 @@ function applyLegacyStoreFilters(stores: Array<StoreDirectoryItem & { sort_order
   return list;
 }
 
+function findLocalStoreFallback(identifier: { type: 'id' | 'slug' | 'shop_no'; value: string; complex_zone?: string }) {
+  const value = identifier.value.toLowerCase();
+  return [...STORES, ...SEEDED_FALLBACK_STORES, ...BASIC_TAMRAKAR_STORES].find((store) => {
+    const normalized = normalizeStore(store);
+    if (identifier.complex_zone && normalized.complex_zone !== identifier.complex_zone) return false;
+    if (identifier.type === "shop_no") return String(normalized.shop_no || "").toLowerCase() === value;
+    return (
+      normalized.id.toLowerCase() === value ||
+      String(normalized.slug || "").toLowerCase() === value ||
+      String(normalized.seo_slug || "").toLowerCase() === value ||
+      slugify(normalized.name) === value
+    );
+  });
+}
+
 export const storeDirectoryService = {
   // Get all stores for directory with entitlements
-  async getStoresForDirectory(filters?: {
-    package_slug?: string;
-    complex_zone?: string;
-    is_verified?: boolean;
-    is_featured?: boolean;
-    search?: string;
-    limit?: number;
-    offset?: number;
-  }) {
+  async getStoresForDirectory(filters?: StoreDirectoryFilters) {
     let query = supabase
       .from("stores")
-      .select("*")
+      .select(`
+        *,
+        package:store_packages(slug)
+      `)
       .eq("status", "active")
+      .eq("public_status", "published")
       .order("is_featured", { ascending: false })
       .order("is_verified", { ascending: false });
 
     if (filters?.package_slug) {
-      query = query.eq("package_slug", filters.package_slug);
+      // Filter by package slug using the joined package data, with fallback to package_slug column
+      query = query.or(`package.slug.eq.${filters.package_slug},package_slug.eq.${filters.package_slug}`);
     }
     if (filters?.complex_zone) {
       query = query.eq("complex_zone", filters.complex_zone);
+    }
+    if (filters?.floor) {
+      query = query.eq("floor", filters.floor);
+    }
+    if (filters?.block) {
+      query = query.eq("block", filters.block);
     }
     if (filters?.is_verified !== undefined) {
       query = query.eq("is_verified", filters.is_verified);
@@ -236,7 +294,7 @@ export const storeDirectoryService = {
       query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
     }
 
-    const { data, error, count } = await query;
+    const { data, error, count } = await withStoreQueryTimeout(query);
     if (error) {
       let legacyQuery = supabase
         .from("stores")
@@ -248,7 +306,7 @@ export const storeDirectoryService = {
         legacyQuery = legacyQuery.ilike("name", `%${filters.search}%`);
       }
 
-      const legacy = await legacyQuery;
+      const legacy = await withStoreQueryTimeout(legacyQuery);
       if (!legacy.error && legacy.data && legacy.data.length > 0) {
         const normalizedLegacyStores = mergeRepairPartnerStores((legacy.data || []).map((store) => normalizeStore(store)));
         const filteredLegacyStores = applyLegacyStoreFilters(sortStoresByPackage(normalizedLegacyStores), filters);
@@ -268,6 +326,34 @@ export const storeDirectoryService = {
     return { data: storesWithEntitlements, count };
   },
 
+  async getStoresList(filters?: StoreDirectoryFilters) {
+    return this.getStoresForDirectory(filters);
+  },
+
+  async getPublicStoreBySlug(slug: string) {
+    const { data, error } = await supabase
+      .from("stores")
+      .select(`
+        *,
+        store_packages(*),
+        store_accessories(*),
+        store_repair_services(*),
+        store_reviews(*)
+      `)
+      .or(`seo_slug.eq.${slug},slug.eq.${slug}`)
+      .eq("status", "active")
+      .eq("public_status", "published")
+      .maybeSingle();
+
+    if (error && !String(error.message || "").includes("Could not find a relationship")) throw error;
+    if (data) return { ...data, entitlements: getStoreEntitlements(resolveEffectiveStorePackage(data)) };
+
+    const local = findLocalStoreFallback({ type: "slug", value: slug });
+    if (local) return normalizeStore(local);
+
+    return this.getStoreByIdentifier({ type: "slug", value: slug });
+  },
+
   // Get store by various identifiers
   async getStoreByIdentifier(identifier: { type: 'id' | 'slug' | 'shop_no'; value: string; complex_zone?: string }) {
     let query = supabase.from("stores");
@@ -278,7 +364,7 @@ export const storeDirectoryService = {
         query = query.eq("complex_zone", identifier.complex_zone);
       }
     } else if (identifier.type === 'slug') {
-      query = query.eq("slug", identifier.value);
+      query = query.or(`seo_slug.eq.${identifier.value},slug.eq.${identifier.value}`);
       if (identifier.complex_zone) {
         query = query.eq("complex_zone", identifier.complex_zone);
       }
@@ -299,7 +385,11 @@ export const storeDirectoryService = {
       `)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      const local = findLocalStoreFallback(identifier);
+      if (local) return normalizeStore(local);
+      throw error;
+    }
 
     return {
       ...data,
@@ -316,14 +406,12 @@ export const storeDirectoryService = {
     }
 
     const { data, error } = await supabase
-      .from("store_inventory")
-      .select(`
-        *,
-        catalog_product: catalog_products(*)
-      `)
+      .from("store_products")
+      .select("*")
       .eq("store_id", storeId)
       .eq("status", "active")
-      .gt("stock_qty", 0);
+      .gt("stock_quantity", 0)
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
     return data || [];
@@ -368,5 +456,79 @@ export const storeDirectoryService = {
 
     if (error) throw error;
     return data;
+  },
+
+  async getStoreAdminProfile(userId: string) {
+    const { data, error } = await supabase
+      .from("stores")
+      .select("*, store_packages(*)")
+      .or(`owner_user_id.eq.${userId},owner_id.eq.${userId}`)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateStoreProfile(storeId: string, payload: Record<string, unknown>) {
+    return this.updateStore(storeId, payload as Partial<StoreDirectoryItem>);
+  },
+
+  async createStoreProduct(storeId: string, payload: Record<string, unknown>) {
+    const slug = String(payload.slug || slugify(String(payload.title || "product")));
+    const { data, error } = await supabase
+      .from("store_products")
+      .insert({ ...payload, store_id: storeId, slug })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async createStoreAccessory(storeId: string, payload: Record<string, unknown>) {
+    const slug = String(payload.slug || slugify(String(payload.title || "accessory")));
+    const { data, error } = await supabase
+      .from("store_accessories")
+      .insert({ ...payload, store_id: storeId, slug })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async createRepairService(storeId: string, payload: Record<string, unknown>) {
+    const { data, error } = await supabase.from("store_repair_services").insert({ ...payload, store_id: storeId }).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async createExchangeRequest(storeId: string, payload: Record<string, unknown>) {
+    // Use consolidated exchange_requests table with store_id
+    const { data, error } = await supabase.from("exchange_requests").insert({ ...payload, store_id: storeId }).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async createRepairRequest(storeId: string, payload: Record<string, unknown>) {
+    const { data, error } = await supabase.from("store_repair_requests").insert({ ...payload, store_id: storeId }).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async createStoreLead(storeId: string, payload: Record<string, unknown>) {
+    const { data, error } = await supabase.from("store_leads").insert({ ...payload, store_id: storeId }).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async assignStorePackage(storeId: string, packageId: string) {
+    const { data, error } = await supabase.from("stores").update({ package_id: packageId }).eq("id", storeId).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async enforcePackageLimit(storeId: string, featureName: string) {
+    const { data, error } = await supabase.rpc("enforcePackageLimit", { store_id: storeId, featurename: featureName });
+    if (error) throw error;
+    return Boolean(data);
   }
 };

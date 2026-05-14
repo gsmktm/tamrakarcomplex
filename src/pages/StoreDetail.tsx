@@ -1,6 +1,8 @@
+import { format } from "date-fns";
 import DOMPurify from "dompurify";
+import { useState } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -10,10 +12,12 @@ import {
   Award,
   BatteryCharging,
   CheckCircle2,
+  Clock,
   Clock3,
   ExternalLink,
   Globe2,
   HardDrive,
+  Info,
   Loader2,
   Lock,
   Plus,
@@ -21,6 +25,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  RefreshCw,
   ShoppingBag,
   Settings,
   ShieldCheck,
@@ -39,14 +44,27 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { STORES } from "@/data/storeData";
-import { storeDirectoryService } from "@/services/storeDirectoryService";
+import { BASIC_TAMRAKAR_STORES } from "@/data/basicStoreData";
+import { SEEDED_FALLBACK_STORES, storeDirectoryService, type StoreDirectoryItem } from "@/services/storeDirectoryService";
 import { SEO } from "@/components/common/SEO";
 import { isAdminRole } from "@/lib/roles";
 import { fetchStoreTierOverrides, resolveTierForStore } from "@/lib/storeTier";
-import { cn, slugify } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { SellListingRow, StorePageRow, StoreRow } from "@/types/app";
 import { sanitizeThemeForPackage } from "@/lib/storeThemeBuilder";
 import { absoluteUrl, breadcrumbSchema } from "@/lib/seo";
+import { getPublicStoreSlug } from "@/lib/storeRoutes";
+
+type StoreDetailRow = StoreRow & {
+  subscription_tier?: string;
+  services?: string[];
+  services_json?: string[];
+  shop_number?: string | null;
+  banner_url?: string | null;
+  cover_image_url?: string | null;
+  seo_slug?: string | null;
+  public_status?: string | null;
+};
 
 function isMissingRelationshipError(error: unknown) {
   const message = (error as { message?: string })?.message;
@@ -99,16 +117,18 @@ function StoreQuickActions({
   storeId,
   isPremiumTheme,
   showOwnerActions,
+  reviewCount,
 }: {
   storeId: string;
   isPremiumTheme: boolean;
   showOwnerActions?: boolean;
+  reviewCount?: number;
 }) {
   return (
     <div
       className={cn(
         "mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2",
-        showOwnerActions ? "lg:grid-cols-5" : "lg:grid-cols-4",
+        showOwnerActions ? "lg:grid-cols-6" : "lg:grid-cols-5",
         isPremiumTheme ? "text-white" : "",
       )}
     >
@@ -195,9 +215,9 @@ function StoreQuickActions({
               <Star className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Sell</div>
+              <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Reviews</div>
               <div className={cn("text-xs leading-5", isPremiumTheme ? "text-white/55" : "text-muted-foreground")}>
-                Get an instant quote and sell.
+                {reviewCount ? `${reviewCount} customer reviews` : "See what others say"}
               </div>
             </div>
           </div>
@@ -210,7 +230,44 @@ function StoreQuickActions({
               isPremiumTheme ? "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white" : "",
             )}
           >
-            <Link to={`/sell-your-phone?store=${storeId}`}>Sell Phone</Link>
+            <a href="#reviews">View Reviews</a>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card
+        className={cn(
+          "rounded-2xl border transition-colors",
+          isPremiumTheme ? "border-white/10 bg-white/5 hover:bg-white/8" : "border-border/60 bg-background/70 hover:bg-muted/30",
+        )}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
+                isPremiumTheme ? "bg-rose-500/15 text-rose-300" : "bg-rose-500/10 text-rose-600",
+              )}
+            >
+              <Smartphone className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Inventory</div>
+              <div className={cn("text-xs leading-5", isPremiumTheme ? "text-white/55" : "text-muted-foreground")}>
+                Browse live stock & prices.
+              </div>
+            </div>
+          </div>
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className={cn(
+              "mt-3 w-full rounded-xl",
+              isPremiumTheme ? "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white" : "",
+            )}
+          >
+            <a href="#inventory">Check Stock</a>
           </Button>
         </CardContent>
       </Card>
@@ -234,7 +291,7 @@ function StoreQuickActions({
             <div className="min-w-0">
               <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Repair</div>
               <div className={cn("text-xs leading-5", isPremiumTheme ? "text-white/55" : "text-muted-foreground")}>
-                Book a repair request in minutes.
+                Book a repair request.
               </div>
             </div>
           </div>
@@ -294,12 +351,52 @@ function StoreQuickActions({
   );
 }
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+
 export default function StoreDetail() {
   const params = useParams();
   const id = params.id ?? params.slug ?? params.shop_no;
   const location = useLocation();
   const { user, role } = useAuth();
   const isAdmin = isAdminRole(role);
+  const queryClient = useQueryClient();
+  
+  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
+  const [exchangeDialogOpen, setExchangeDialogOpen] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [inquiryDialogOpen, setInquiryDialogOpen] = useState(false);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<any>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [purchaseNote, setPurchaseRequestNote] = useState("");
+
+  const handlePurchaseRequest = async () => {
+    if (!selectedInventoryItem) return;
+    
+    // In a real app, this would insert into a 'purchase_requests' table
+    toast.success(`Request sent to ${store?.name} for ${selectedInventoryItem.title}!`);
+    setPurchaseDialogOpen(false);
+    setSelectedInventoryItem(null);
+    setPurchaseRequestNote("");
+  };
 
   // Determine lookup type based on route
   const isInsideRoute = location.pathname.startsWith('/stores/inside/');
@@ -308,43 +405,86 @@ export default function StoreDetail() {
   const lookupType = isInsideRoute ? 'shop_no' : isOutsideRoute ? 'slug' : 'id_or_slug';
   const isUuid = id ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) : false;
 
-  const repairPartnerFallback = STORES.find((item) =>
+  const localStoreFallback = [...STORES, ...SEEDED_FALLBACK_STORES, ...BASIC_TAMRAKAR_STORES].find((item) =>
     item.id === id ||
     item.slug === id ||
     (lookupType === "shop_no" && item.shop_no === id) ||
     item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === id
   );
 
-  const { data: store, isLoading: isStoreLoading, error: storeError } = useQuery<StoreRow & { subscription_tier?: string }>({
+  const toLocalStoreFallback = (
+    item: (typeof STORES)[number] | (typeof SEEDED_FALLBACK_STORES)[number] | (typeof BASIC_TAMRAKAR_STORES)[number],
+  ): StoreDetailRow => ({
+    ...(item as unknown as StoreRow),
+    slug: item.slug || item.id || "",
+    seo_slug: item.slug || item.id || "",
+    public_status: "published",
+    shop_number: item.shop_no || null,
+    banner_url: item.cover_image_url,
+    cover_image_url: item.cover_image_url,
+    subscription_tier: item.package_slug,
+    subscription_status: item.subscription_status,
+    subscription_end_date: null,
+  });
+
+  const toStoreDetailFallback = (item: StoreDirectoryItem): StoreDetailRow => ({
+    ...(item as unknown as StoreRow),
+    slug: item.slug || item.seo_slug || item.id,
+    seo_slug: item.seo_slug || item.slug || item.id,
+    public_status: item.public_status || "published",
+    shop_number: item.shop_number || item.shop_no || null,
+    banner_url: item.banner_url || item.cover_image_url || null,
+    cover_image_url: item.cover_image_url || item.banner_url || null,
+    subscription_status: item.subscription_status || "active",
+    subscription_end_date: item.subscription_end_date || null,
+    subscription_tier: item.subscription_tier || item.package_slug || "free",
+  });
+
+  const { data: store, isLoading: isStoreLoading, error: storeError } = useQuery<StoreDetailRow>({
     queryKey: ["store", lookupType, id],
     queryFn: async () => {
       if (!id) throw new Error("missing_store_id");
+      if (localStoreFallback) return toLocalStoreFallback(localStoreFallback);
 
       const buildStoreQuery = () => {
         const query = supabase.from("stores");
         if (lookupType === "shop_no") return query.eq("shop_no", id).eq("complex_zone", "inside");
-        if (lookupType === "slug") return query.eq("slug", id);
+        if (lookupType === "slug") return query.or(`seo_slug.eq.${id},slug.eq.${id}`);
         
         // id_or_slug logic
         if (isUuid) return query.eq("id", id);
-        return query.eq("slug", id);
+        return query.or(`seo_slug.eq.${id},slug.eq.${id}`);
       };
 
       const fromDirectoryFallback = async () => {
+        try {
+          const identifierType = lookupType === "shop_no" ? "shop_no" : "slug";
+          const serviceMatch = await storeDirectoryService.getStoreByIdentifier({
+            type: identifierType,
+            value: id,
+            complex_zone: lookupType === "shop_no" ? "inside" : undefined,
+          });
+
+          if (serviceMatch) {
+            return toStoreDetailFallback(serviceMatch);
+          }
+        } catch {
+          // Fall through to the full directory scan below.
+        }
+
         try {
           const directory = await storeDirectoryService.getStoresForDirectory();
           const match = directory.data.find((item) =>
             item.id === id ||
             item.slug === id ||
+            item.seo_slug === id ||
             item.shop_no === id ||
+            item.shop_number === id ||
             item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === id
           );
 
           if (match) {
-            return {
-              ...(match as unknown as StoreRow),
-              subscription_tier: match.subscription_tier || match.package_slug || "free",
-            };
+            return toStoreDetailFallback(match);
           }
         } catch {
           // Keep store profile URLs working even when optional detail joins fail.
@@ -372,12 +512,7 @@ export default function StoreDetail() {
         if (base.error) {
           const directoryStore = await fromDirectoryFallback();
           if (directoryStore) return directoryStore;
-          if (repairPartnerFallback) {
-            return {
-              ...(repairPartnerFallback as unknown as StoreRow),
-              subscription_tier: repairPartnerFallback.package_slug,
-            };
-          }
+          if (localStoreFallback) return toLocalStoreFallback(localStoreFallback);
           throw base.error;
         }
         data = base.data || await fromDirectoryFallback();
@@ -387,12 +522,7 @@ export default function StoreDetail() {
         if (base.error) {
           const directoryStore = await fromDirectoryFallback();
           if (directoryStore) return directoryStore;
-          if (repairPartnerFallback) {
-            return {
-              ...(repairPartnerFallback as unknown as StoreRow),
-              subscription_tier: repairPartnerFallback.package_slug,
-            };
-          }
+          if (localStoreFallback) return toLocalStoreFallback(localStoreFallback);
           throw joined.error;
         }
         data = base.data || await fromDirectoryFallback();
@@ -401,12 +531,7 @@ export default function StoreDetail() {
       if (!data) {
         const directoryStore = await fromDirectoryFallback();
         if (directoryStore) return directoryStore;
-        if (repairPartnerFallback) {
-          return {
-            ...(repairPartnerFallback as unknown as StoreRow),
-            subscription_tier: repairPartnerFallback.package_slug,
-          };
-        }
+        if (localStoreFallback) return toLocalStoreFallback(localStoreFallback);
         throw new Error("Store not found");
       }
 
@@ -434,6 +559,75 @@ export default function StoreDetail() {
         .eq("status", "active")
         .order("created_at", { ascending: false });
 
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!store?.id,
+  });
+
+  const { data: inventory, isLoading: isInventoryLoading } = useQuery({
+    queryKey: ["store_inventory", store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const { data, error } = await supabase
+        .from("store_products")
+        .select("*")
+        .eq("store_id", store.id)
+        .eq("status", "active")
+        .gt("stock_quantity", 0)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!store?.id,
+  });
+
+  const { data: storeReviews } = useQuery({
+    queryKey: ["store_reviews", store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const { data, error } = await supabase
+        .from("store_reviews")
+        .select("*")
+        .eq("store_id", store.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!store?.id,
+  });
+
+  const averageRating = storeReviews?.length 
+    ? (storeReviews.reduce((acc, r) => acc + r.rating, 0) / storeReviews.length).toFixed(1)
+    : null;
+
+  const { data: storeAccessories } = useQuery({
+    queryKey: ["store_accessories", store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const { data, error } = await supabase
+        .from("store_accessories")
+        .select("*")
+        .eq("store_id", store.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!store?.id,
+  });
+
+  const { data: repairServices } = useQuery({
+    queryKey: ["store_repair_services", store?.id],
+    queryFn: async () => {
+      if (!store?.id) return [];
+      const { data, error } = await supabase
+        .from("store_repair_services")
+        .select("*")
+        .eq("store_id", store.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -499,12 +693,12 @@ export default function StoreDetail() {
   // - store owner can see their own store
   // - public can only see "active" stores
   const isAuthorized = 
-    store.status === "active" || 
+    (store.status === "active" && (!store.public_status || store.public_status === "published")) || 
     role === "suadmin" || 
     role === "staffadmin" || 
     (user?.id && store.owner_id === user.id) ||
-    isAdmin ||
-    lookupType === "slug"; // Allow public access to slug-based SEO routes even if they'd normally be filtered
+    (user?.id && store.owner_user_id === user.id) ||
+    isAdmin;
 
   if (!isAuthorized) {
     return (
@@ -528,7 +722,7 @@ export default function StoreDetail() {
   }
 
   const tier = store?.subscription_tier || "free";
-  const publicStoreSlug = store.slug || slugify(store.name) || store.id;
+  const publicStoreSlug = getPublicStoreSlug(store);
   const isDiamond = tier === "diamond";
   const isGold = tier === "gold";
   const isSilver = tier === "silver";
@@ -686,7 +880,7 @@ export default function StoreDetail() {
   if (isBasic && !isAdmin) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
-        <SEO title={`${store.name} — Store`} description={store.description ?? undefined} />
+        <SEO title={store.seo_title || `${store.name} — Store`} description={store.seo_description || store.description || undefined} />
         <Header />
         <main className="container flex-1 py-10">
           <Button variant="ghost" asChild className="pl-0 text-muted-foreground hover:bg-transparent">
@@ -786,7 +980,7 @@ export default function StoreDetail() {
 	                      ) : null}
 	                    </div>
 
-                    <StoreQuickActions storeId={store.id} isPremiumTheme={false} showOwnerActions={showOwnerActions} />
+                    <StoreQuickActions storeId={store.id} isPremiumTheme={false} showOwnerActions={showOwnerActions} reviewCount={storeReviews?.length} />
                   </div>
                 </div>
               </CardContent>
@@ -801,7 +995,7 @@ export default function StoreDetail() {
   if (isSilver && !user && !isAdmin) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
-        <SEO title={`${store.name} — Store`} description={store.description ?? undefined} />
+        <SEO title={store.seo_title || `${store.name} — Store`} description={store.seo_description || store.description || undefined} />
         <Header />
         <main className="container flex-1 py-10">
           <Button variant="ghost" asChild className="pl-0 text-muted-foreground hover:bg-transparent">
@@ -899,7 +1093,7 @@ export default function StoreDetail() {
                       </div>
                     </div>
 
-                    <StoreQuickActions storeId={store.id} isPremiumTheme={false} />
+                    <StoreQuickActions storeId={store.id} isPremiumTheme={false} reviewCount={storeReviews?.length} />
                   </div>
                 </div>
               </CardContent>
@@ -1023,6 +1217,12 @@ export default function StoreDetail() {
   ];
   const openingHours = ((store as StoreRow & { opening_hours?: Record<string, string> }).opening_hours ?? {}) as Record<string, string>;
   const socialLinks = ((store as StoreRow & { social_links_json?: Record<string, string> }).social_links_json ?? {}) as Record<string, string>;
+  const socialLinkEntries = Object.entries(socialLinks)
+    .map(([label, value]) => [label, String(value || "").trim()] as const)
+    .filter(([, value]) => Boolean(value));
+  const publicSocialUrls = socialLinkEntries
+    .map(([, value]) => value)
+    .filter((value) => /^https?:\/\//i.test(value));
   const banner = ((store as StoreRow & { banner_json?: { title?: string; subtitle?: string; cta_label?: string; cta_url?: string } }).banner_json ?? {}) as {
     title?: string;
     subtitle?: string;
@@ -1031,17 +1231,30 @@ export default function StoreDetail() {
   };
   const coverImageUrl = (store as StoreRow & { cover_image_url?: string }).cover_image_url;
 
+  const whatsapp = (store as any).whatsapp || store.phone;
+  const whatsappUrl = whatsapp ? `https://wa.me/${whatsapp.replace(/[^0-9]/g, "")}` : null;
+  const floor = (store as any).floor;
+  const block = (store as any).block;
+  const shopNumber = (store as any).shop_number || store.shop_no;
+  const openingHoursText = (store as any).opening_hours_text || "10:00 AM - 8:00 PM (Sun-Fri)";
+
   return (
     <div
       className={`flex min-h-screen flex-col ${isPremiumTheme ? currentTheme.bg : "bg-background"}`}
       style={{ "--store-theme-color": (store as StoreRow & { theme_color?: string }).theme_color || "#2563eb" } as React.CSSProperties}
     >
       <SEO
-        title={store.name}
-        description={store.description || `${store.name} — premium device service page with support, repairs, and direct contact.`}
+        title={store.seo_title || store.name}
+        description={store.seo_description || store.description || `${store.name} — premium device service page with support, repairs, and direct contact.`}
         image={store.logo_url || coverImageUrl || undefined}
         url={`/stores/${publicStoreSlug}`}
-        keywords={[store.name, "device repair", "store profile", "premium service center"]}
+        keywords={[
+          store.name,
+          ...String(store.meta_keywords || "device repair, store profile, premium service center")
+            .split(",")
+            .map((keyword) => keyword.trim())
+            .filter(Boolean),
+        ]}
         structuredData={[
           breadcrumbSchema([
             { name: "Home", url: "/" },
@@ -1057,7 +1270,7 @@ export default function StoreDetail() {
             telephone: store.phone,
             email: store.email,
             url: absoluteUrl(`/stores/${publicStoreSlug}`),
-            sameAs: Object.values(socialLinks).filter(Boolean),
+            sameAs: publicSocialUrls,
             address: { "@type": "PostalAddress", streetAddress: store.location, addressLocality: "Kathmandu", addressCountry: "NP" },
             openingHoursSpecification: Object.entries(openingHours).map(([day, hours]) => ({
               "@type": "OpeningHoursSpecification",
@@ -1177,15 +1390,24 @@ export default function StoreDetail() {
                   </div>
 
                   <div className="max-w-2xl">
-                    {isPremiumTheme ? (
-                      <h1 className={`${currentTheme.accent} font-display text-5xl font-bold tracking-tight md:text-7xl`}>
-                        {store.name}
-                      </h1>
-                    ) : (
-                      <h1 className="font-display text-5xl font-bold tracking-tight md:text-7xl">
-                        {store.name}
-                      </h1>
-                    )}
+                    <div className="flex flex-col md:flex-row md:items-center gap-4">
+                      {isPremiumTheme ? (
+                        <h1 className={`${currentTheme.accent} font-display text-5xl font-bold tracking-tight md:text-7xl`}>
+                          {store.name}
+                        </h1>
+                      ) : (
+                        <h1 className="font-display text-5xl font-bold tracking-tight md:text-7xl">
+                          {store.name}
+                        </h1>
+                      )}
+                      {averageRating && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 text-amber-500 border border-amber-400/20 w-fit">
+                          <Star className="h-4 w-4 fill-current" />
+                          <span className="text-sm font-bold">{averageRating}</span>
+                          <span className="text-[10px] text-amber-500/60 font-medium">({storeReviews?.length})</span>
+                        </div>
+                      )}
+                    </div>
                     <p className={`mt-5 max-w-xl text-[1.05rem] leading-8 ${isPremiumTheme ? "text-white/58" : "text-muted-foreground"}`}>
                       {store.description ||
                         (isPremiumTheme
@@ -1217,10 +1439,16 @@ export default function StoreDetail() {
                       {store.location}
                     </div>
                   )}
-                  {store.shop_no && (
+                  {shopNumber && (
                     <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
                       <StoreIcon className={`h-3.5 w-3.5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
-                      Shop #{store.shop_no}
+                      Shop #{shopNumber} {floor ? `• Floor ${floor}` : ""} {block ? `• Block ${block}` : ""}
+                    </div>
+                  )}
+                  {openingHoursText && (
+                    <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
+                      <Clock3 className={`h-3.5 w-3.5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
+                      {openingHoursText}
                     </div>
                   )}
                   {store.email && (
@@ -1244,11 +1472,34 @@ export default function StoreDetail() {
                       }
                     >
                       <a href={`tel:${store.phone}`}>
-                        {isPremiumTheme ? "Book a Repair" : "Call Store"}
-                        <ArrowUpRight className="ml-2 h-4 w-4" />
+                        <Phone className="mr-2 h-4 w-4" />
+                        Call Store
                       </a>
                     </Button>
                   )}
+                  {whatsappUrl && (
+                    <Button
+                      size="lg"
+                      asChild
+                      className="rounded-full bg-[#25D366] px-8 text-white hover:bg-[#22c35e] shadow-[0_0_24px_rgba(37,211,102,0.3)]"
+                    >
+                      <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                        <svg className="mr-2 h-5 w-5 fill-current" viewBox="0 0 24 24">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                        WhatsApp
+                      </a>
+                    </Button>
+                  )}
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="rounded-full px-8"
+                    onClick={() => setExchangeDialogOpen(true)}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Exchange Phone
+                  </Button>
                   {store.map_url && (
                     <Button
                       size="lg"
@@ -1285,7 +1536,7 @@ export default function StoreDetail() {
                   )}
                 </div>
 
-                <StoreQuickActions storeId={store.id} isPremiumTheme={isPremiumTheme} showOwnerActions={showOwnerActions} />
+                <StoreQuickActions storeId={store.id} isPremiumTheme={isPremiumTheme} showOwnerActions={showOwnerActions} reviewCount={storeReviews?.length} />
 
                 {banner.title ? (
                   <div className={cn("mt-8 rounded-[28px] border p-6", isPremiumTheme ? "border-white/10 bg-white/5 text-white" : "bg-muted/30")}>
@@ -1625,6 +1876,447 @@ export default function StoreDetail() {
           </div>
         </section>
 
+        <Dialog open={inquiryDialogOpen} onOpenChange={setInquiryDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send Inquiry to {store?.name}</DialogTitle>
+              <DialogDescription>
+                Ask about availability, pricing, or services.
+              </DialogDescription>
+            </DialogHeader>
+            <form className="space-y-4 py-4" onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const { error } = await supabase.from("store_leads").insert({
+                store_id: store.id,
+                customer_name: formData.get("name"),
+                customer_phone: formData.get("phone"),
+                customer_email: formData.get("email"),
+                message: formData.get("message"),
+                lead_type: "inquiry",
+                status: "new",
+                source_page: window.location.pathname
+              });
+              if (error) {
+                toast.error(error.message);
+              } else {
+                toast.success("Inquiry sent! The store will contact you soon.");
+                setInquiryDialogOpen(false);
+              }
+            }}>
+              <div className="space-y-2">
+                <Label>Your Name</Label>
+                <Input name="name" placeholder="John Doe" required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Phone Number</Label>
+                  <Input name="phone" placeholder="98XXXXXXXX" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email (Optional)</Label>
+                  <Input name="email" type="email" placeholder="john@example.com" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Your Message</Label>
+                <Textarea name="message" placeholder="I am interested in..." required />
+              </div>
+              <DialogFooter>
+                <Button type="submit">Submit Inquiry</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={exchangeDialogOpen} onOpenChange={setExchangeDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Exchange Your Phone</DialogTitle>
+              <DialogDescription>
+                Get a valuation from {store?.name} for your old device.
+              </DialogDescription>
+            </DialogHeader>
+            <form className="space-y-4 py-4" onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const { error } = await supabase.from("exchange_requests").insert({
+                store_id: store.id,
+                customer_name: formData.get("name"),
+                customer_phone: formData.get("phone"),
+                old_device: {
+                  brand: formData.get("brand"),
+                  model: formData.get("model"),
+                  condition: formData.get("condition"),
+                  storage: "",
+                  defects: []
+                },
+                new_device: {},
+                trade_in_value: parseFloat(formData.get("expected_value") as string),
+                status: "pending",
+                notes: formData.get("notes")
+              });
+              if (error) {
+                toast.error(error.message);
+              } else {
+                toast.success("Exchange request sent!");
+                setExchangeDialogOpen(false);
+              }
+            }}>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Your Name</Label>
+                  <Input name="name" placeholder="John Doe" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone Number</Label>
+                  <Input name="phone" placeholder="98XXXXXXXX" required />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Device Brand</Label>
+                  <Input name="brand" placeholder="e.g. Samsung" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Model</Label>
+                  <Input name="model" placeholder="e.g. S24 Ultra" required />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Condition</Label>
+                <Select name="condition" defaultValue="good">
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="excellent">Excellent (Like New)</SelectItem>
+                    <SelectItem value="good">Good (Minor Scratches)</SelectItem>
+                    <SelectItem value="fair">Fair (Visible Wear)</SelectItem>
+                    <SelectItem value="damaged">Damaged (Broken Screen/etc)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Expected Value (NPR)</Label>
+                <Input name="expected_value" type="number" placeholder="50000" required />
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea name="notes" placeholder="Anything else we should know?" />
+              </div>
+              <DialogFooter>
+                <Button type="submit">Submit Request</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── LIVE INVENTORY ─── */}
+        {(inventory?.length ?? 0) > 0 && (
+          <section id="inventory" className={`py-20 ${isPremiumTheme ? "bg-[#080d1a]" : "bg-muted/30"}`}>
+            <div className="container">
+              <div className="mb-12 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <div className={`text-xs font-semibold uppercase tracking-[0.28em] ${isPremiumTheme ? currentTheme.accent : "text-muted-foreground"}`}>
+                    Live Mobile Shop
+                  </div>
+                  <h2 className={`mt-3 text-3xl font-bold tracking-tight md:text-5xl ${isPremiumTheme ? "text-white" : ""}`}>
+                    Available Stock & Live Prices
+                  </h2>
+                  <p className={`mt-4 max-w-xl ${isPremiumTheme ? "text-white/50" : "text-muted-foreground"}`}>
+                    Browse our real-time inventory. Prices are updated daily to give you the best deals.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge
+                    className={`rounded-full px-4 py-1.5 text-xs ${isPremiumTheme ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-300" : "bg-emerald-500 text-white"}`}
+                  >
+                    {inventory?.length} models in stock
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {inventory?.map((item: any) => (
+                  <Card
+                    key={item.id}
+                    className={`group relative flex flex-col overflow-hidden transition-all duration-500 hover:-translate-y-2 ${
+                      isPremiumTheme
+                        ? "rounded-[32px] border-white/8 bg-white/4 shadow-none hover:border-emerald-500/30 hover:shadow-[0_30px_70px_rgba(16,185,129,0.15)]"
+                        : "rounded-[32px] border-border/60 bg-card shadow-card hover:shadow-2xl"
+                    }`}
+                  >
+                    <div className={`relative aspect-[4/3] overflow-hidden ${isPremiumTheme ? "bg-white/3" : "bg-muted/30"}`}>
+                      {(Array.isArray(item.images) && item.images.length > 0) ? (
+                        <img
+                          src={item.images[0]}
+                          alt={item.title}
+                          className="h-full w-full object-contain p-8 transition-transform duration-700 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center">
+                          <Smartphone className={`h-16 w-16 ${isPremiumTheme ? "text-white/10" : "text-muted-foreground/20"}`} />
+                        </div>
+                      )}
+                      
+                      <div className="absolute left-4 top-4 flex flex-col gap-2">
+                        <Badge className="w-fit rounded-full bg-emerald-500/90 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-md border-none px-3 py-1">
+                          {item.condition === 'new' ? 'Brand New' : item.condition.replace('_', ' ')}
+                        </Badge>
+                        {item.stock_quantity <= 3 && (
+                          <Badge className="w-fit rounded-full bg-rose-500/90 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-md border-none px-3 py-1">
+                            Only {item.stock_quantity} Left
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Hover Overlay */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center justify-center backdrop-blur-[2px]">
+                         <Button 
+                          variant="secondary"
+                          className="rounded-full font-bold shadow-xl"
+                          onClick={() => {
+                            setSelectedInventoryItem(item);
+                            setPurchaseDialogOpen(true);
+                          }}
+                        >
+                          Quick Inquiry
+                        </Button>
+                      </div>
+                    </div>
+
+                    <CardContent className="flex flex-1 flex-col p-7">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <p className={`text-[10px] font-bold uppercase tracking-widest ${isPremiumTheme ? "text-white/40" : "text-muted-foreground"}`}>
+                            {item.product_type || "Store product"}
+                          </p>
+                          <h3 className={`mt-1 text-xl font-bold tracking-tight ${isPremiumTheme ? "text-white" : ""}`}>
+                            {item.title}
+                          </h3>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {item.storage && (
+                          <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-medium ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/60" : "bg-muted"}`}>
+                            <HardDrive className="h-3 w-3" />
+                            {item.storage}
+                          </div>
+                        )}
+                        {item.color && (
+                          <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-medium ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/60" : "bg-muted"}`}>
+                            <Zap className="h-3 w-3" />
+                            {item.color}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-auto pt-8 flex items-end justify-between">
+                        <div>
+                          <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${isPremiumTheme ? "text-emerald-400" : "text-emerald-600"}`}>
+                            Store Price
+                          </p>
+                          <div className={`text-3xl font-black tracking-tight ${isPremiumTheme ? "text-white" : "text-primary"}`}>
+                            Rs. {item.price.toLocaleString()}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          className={`rounded-2xl px-6 h-11 font-bold ${isPremiumTheme ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_10px_30px_rgba(16,185,129,0.3)]" : "bg-emerald-600 shadow-lg shadow-emerald-600/20"}`}
+                          onClick={() => {
+                            setSelectedInventoryItem(item);
+                            setPurchaseDialogOpen(true);
+                          }}
+                        >
+                          Check Stock
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Purchase Dialog */}
+        <Dialog open={purchaseDialogOpen} onOpenChange={setPurchaseDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Contact {store?.name}</DialogTitle>
+              <DialogDescription>
+                Request price and availability for {selectedInventoryItem?.title}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-2xl border">
+                <div className="h-16 w-16 bg-white rounded-xl border flex items-center justify-center overflow-hidden shrink-0">
+                  {Array.isArray(selectedInventoryItem?.images) && selectedInventoryItem.images.length > 0 ? (
+                    <img src={selectedInventoryItem.images[0]} className="h-full w-full object-contain" />
+                  ) : (
+                    <Smartphone className="h-8 w-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-bold">{selectedInventoryItem?.title}</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {[selectedInventoryItem?.storage, selectedInventoryItem?.color, selectedInventoryItem?.condition].filter(Boolean).join(" · ")}
+                  </p>
+                  <p className="text-lg font-black text-primary mt-1">Rs. {selectedInventoryItem?.price?.toLocaleString()}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Your Message (Optional)</Label>
+                <Textarea 
+                  placeholder="I'm interested in this model. Is it available in stock?"
+                  value={purchaseNote}
+                  onChange={(e) => setPurchaseRequestNote(e.target.value)}
+                />
+              </div>
+
+              <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex gap-3">
+                <Info className="h-5 w-5 text-amber-600 shrink-0" />
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  The store will contact you on your registered phone number/email to finalize the purchase.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPurchaseDialogOpen(false)}>Cancel</Button>
+              <Button className="bg-primary text-white" onClick={handlePurchaseRequest}>Send Request</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── REPAIR SERVICES ─── */}
+        {(repairServices?.length ?? 0) > 0 && (
+          <section className={`py-16 ${isPremiumTheme ? "bg-[#060b18]" : "bg-muted/10"}`}>
+            <div className="container">
+              <div className="mb-10">
+                <div className={`text-xs font-semibold uppercase tracking-[0.28em] ${isPremiumTheme ? currentTheme.accent : "text-muted-foreground"}`}>
+                  Store Services
+                </div>
+                <h2 className={`mt-3 text-3xl font-bold tracking-tight md:text-4xl ${isPremiumTheme ? "text-white" : ""}`}>
+                  Professional Repair Catalog
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {repairServices?.map((service: any) => (
+                  <Card key={service.id} className={`${isPremiumTheme ? "bg-white/5 border-white/10 text-white" : ""}`}>
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-xl font-bold">{service.service_name}</h3>
+                          <Badge variant="outline" className="mt-1">{service.device_type}</Badge>
+                        </div>
+                        <Wrench className="h-6 w-6 text-primary" />
+                      </div>
+                      <p className={`mt-4 text-sm ${isPremiumTheme ? "text-white/60" : "text-muted-foreground"}`}>
+                        {service.description || "Expert repair service provided by certified technicians."}
+                      </p>
+                      <div className="mt-6 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Clock className="h-4 w-4" />
+                          {service.estimated_time}
+                        </div>
+                        <div className="text-lg font-bold text-primary">
+                          {service.estimated_price ? `Rs. ${service.estimated_price.toLocaleString()}` : "Contact for Quote"}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ─── ACCESSORIES ─── */}
+        {(storeAccessories?.length ?? 0) > 0 && (
+          <section id="accessories" className={`py-20 ${isPremiumTheme ? "bg-[#050912]" : "bg-background"}`}>
+            <div className="container">
+              <div className="mb-12">
+                <div className={`text-xs font-semibold uppercase tracking-[0.28em] ${isPremiumTheme ? currentTheme.accent : "text-muted-foreground"}`}>
+                  Shop Accessories
+                </div>
+                <h2 className={`mt-3 text-3xl font-bold tracking-tight md:text-5xl ${isPremiumTheme ? "text-white" : ""}`}>
+                  Premium Add-ons & Gear
+                </h2>
+                <p className={`mt-4 max-w-xl ${isPremiumTheme ? "text-white/50" : "text-muted-foreground"}`}>
+                  From protective cases to high-speed chargers, find the perfect companion for your device.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {storeAccessories?.map((acc: any) => (
+                  <Card 
+                    key={acc.id} 
+                    className={`group relative flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
+                      isPremiumTheme 
+                        ? "bg-white/5 border-white/10 text-white hover:bg-white/8 hover:border-white/20" 
+                        : "border-border/60 hover:shadow-lg"
+                    }`}
+                  >
+                    <div className="relative aspect-square bg-muted/20 overflow-hidden">
+                      {acc.images?.[0] ? (
+                        <img 
+                          src={acc.images[0]} 
+                          alt={acc.title} 
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Plus className={`h-10 w-10 ${isPremiumTheme ? "text-white/10" : "text-muted-foreground/20"}`} />
+                        </div>
+                      )}
+                      
+                      <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center justify-center backdrop-blur-[1px]">
+                         <Button 
+                          size="sm"
+                          variant="secondary"
+                          className="rounded-full font-bold shadow-lg"
+                          onClick={() => {
+                            // Can add a specific accessory inquiry dialog here later
+                            setInquiryDialogOpen(true);
+                          }}
+                        >
+                          Inquire
+                        </Button>
+                      </div>
+                    </div>
+                    <CardContent className="flex flex-1 flex-col p-5">
+                      <p className={`text-[10px] font-bold uppercase tracking-widest ${isPremiumTheme ? "text-white/40" : "text-muted-foreground"}`}>
+                        {acc.category}
+                      </p>
+                      <h3 className={`mt-1 font-bold text-sm line-clamp-2 leading-snug ${isPremiumTheme ? "text-white" : ""}`}>
+                        {acc.title}
+                      </h3>
+                      <div className="mt-auto pt-4 flex items-center justify-between">
+                        <span className={`font-black text-lg ${isPremiumTheme ? currentTheme.accent : "text-primary"}`}>
+                          Rs. {acc.price?.toLocaleString()}
+                        </span>
+                        {acc.stock_quantity > 0 ? (
+                          <Badge variant="outline" className="text-[9px] font-bold uppercase bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                            In Stock
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[9px] font-bold uppercase bg-rose-500/10 text-rose-500 border-rose-500/20">
+                            Out of Stock
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* ─── PRODUCTS ─── */}
         <section className={`py-16 ${isPremiumTheme ? "bg-[#060b18]" : "bg-secondary/20"}`}>
           <div className="container">
@@ -1910,21 +2602,25 @@ export default function StoreDetail() {
                   </Card>
                 ) : null}
 
-                {Object.values(socialLinks).some(Boolean) ? (
+                {socialLinkEntries.length > 0 ? (
                   <Card className={isPremiumTheme ? "rounded-[28px] border-white/8 bg-white/5 text-white backdrop-blur-xl" : "rounded-[28px]"}>
                     <CardContent className="p-6">
-                      <div className="mb-4 font-semibold">Social Links</div>
+                      <div className="mb-4 font-semibold">More Contacts</div>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(socialLinks).map(([label, url]) => (
-                          url ? (
+                        {socialLinkEntries.map(([label, value]) => {
+                          const isUrl = /^https?:\/\//i.test(value);
+                          const isPhone = /phone|mobile|tel|whatsapp|viber/i.test(label) || /^[+\d\s()-]{7,}$/.test(value);
+                          const href = isUrl ? value : isPhone ? `tel:${value.replace(/[^+\d]/g, "")}` : value;
+
+                          return (
                             <Button key={label} asChild size="sm" variant="outline" className={isPremiumTheme ? "rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white" : "rounded-full"}>
-                              <a href={url} target="_blank" rel="noopener noreferrer">
-                                {label}
-                                <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                              <a href={href} target={isUrl ? "_blank" : undefined} rel={isUrl ? "noopener noreferrer" : undefined}>
+                                {label.replace(/_/g, " ")}
+                                {isUrl ? <ExternalLink className="ml-2 h-3.5 w-3.5" /> : null}
                               </a>
                             </Button>
-                          ) : null
-                        ))}
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
@@ -1979,6 +2675,155 @@ export default function StoreDetail() {
             </div>
           </section>
         )}
+
+        {/* ─── REVIEWS ─── */}
+        <section id="reviews" className={`py-20 ${isPremiumTheme ? "bg-[#040812]" : "bg-muted/5"}`}>
+          <div className="container">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+              <div>
+                <div className={`text-xs font-semibold uppercase tracking-[0.28em] ${isPremiumTheme ? currentTheme.accent : "text-muted-foreground"}`}>
+                  Customer Feedback
+                </div>
+                <h2 className={`mt-3 text-3xl font-bold tracking-tight md:text-5xl ${isPremiumTheme ? "text-white" : ""}`}>
+                  Store Reviews
+                </h2>
+                {averageRating && (
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star 
+                          key={star} 
+                          className={cn(
+                            "h-5 w-5", 
+                            star <= Math.round(Number(averageRating)) 
+                              ? "fill-amber-400 text-amber-400" 
+                              : "text-muted-foreground/30"
+                          )} 
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-2xl font-black ${isPremiumTheme ? "text-white" : ""}`}>{averageRating}</span>
+                      <span className="text-sm text-muted-foreground">based on {storeReviews?.length} reviews</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <Button 
+                onClick={() => setReviewDialogOpen(true)}
+                size="lg"
+                className={`rounded-full px-8 font-bold ${isPremiumTheme ? "bg-white/10 hover:bg-white/20 text-white border border-white/10" : ""}`}
+              >
+                <Star className="mr-2 h-4 w-4" /> Write a Review
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {storeReviews?.length === 0 ? (
+                <div className={`col-span-full py-20 text-center border-2 border-dashed rounded-[32px] ${isPremiumTheme ? "border-white/10 bg-white/2" : "bg-muted/30"}`}>
+                  <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                    <Star className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                  <h3 className={`text-xl font-bold ${isPremiumTheme ? "text-white" : ""}`}>No reviews yet</h3>
+                  <p className="text-muted-foreground mt-2 max-w-xs mx-auto">Be the first to share your experience with {store?.name}!</p>
+                  <Button 
+                    variant="link" 
+                    className="mt-4 text-primary font-bold"
+                    onClick={() => setReviewDialogOpen(true)}
+                  >
+                    Post the first review
+                  </Button>
+                </div>
+              ) : (
+                storeReviews?.map((review) => (
+                  <Card key={review.id} className={`group relative overflow-hidden transition-all duration-300 ${isPremiumTheme ? "bg-white/5 border-white/10 text-white hover:bg-white/8" : "hover:shadow-md"}`}>
+                    <CardContent className="p-8">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${isPremiumTheme ? "bg-white/10 text-white" : "bg-primary/10 text-primary"}`}>
+                            {review.customer_name?.[0]?.toUpperCase() || "C"}
+                          </div>
+                          <div>
+                            <div className="font-bold text-sm leading-none">{review.customer_name}</div>
+                            <div className="mt-1 text-[10px] uppercase tracking-widest opacity-40">
+                              {format(new Date(review.created_at), "MMM d, yyyy")}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-0.5 text-amber-400">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} className={`h-3 w-3 ${i < review.rating ? "fill-current" : "text-muted-foreground/30"}`} />
+                          ))}
+                        </div>
+                      </div>
+                      <p className={`text-sm leading-relaxed italic ${isPremiumTheme ? "text-white/70" : "text-muted-foreground"}`}>
+                        "{review.review_text}"
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+
+        <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Rate {store?.name}</DialogTitle>
+              <DialogDescription>
+                Share your experience with this store to help other customers.
+              </DialogDescription>
+            </DialogHeader>
+            <form className="space-y-4 py-4" onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const { error } = await supabase.from("store_reviews").insert({
+                store_id: store.id,
+                customer_name: formData.get("name"),
+                rating: reviewRating,
+                review_text: formData.get("review"),
+                status: "active" // auto-publish for now
+              });
+              if (error) {
+                toast.error(error.message);
+              } else {
+                toast.success("Thank you for your review!");
+                setReviewDialogOpen(false);
+                queryClient.invalidateQueries({ queryKey: ["store_reviews", store.id] });
+              }
+            }}>
+              <div className="space-y-2">
+                <Label>Your Name</Label>
+                <Input name="name" placeholder="John Doe" required />
+              </div>
+              <div className="space-y-2">
+                <Label>Rating</Label>
+                <div className="flex gap-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Button 
+                      key={i} 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setReviewRating(i + 1)}
+                      className={i < reviewRating ? "text-amber-400" : "text-muted-foreground"}
+                    >
+                      <Star className={`h-8 w-8 ${i < reviewRating ? "fill-current" : ""}`} />
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Your Review</Label>
+                <Textarea name="review" placeholder="Tell us about the service, products, or price..." required className="min-h-[120px]" />
+              </div>
+              <DialogFooter>
+                <Button type="submit" className="w-full">Post Review</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* ─── FINAL CTA ─── */}
         {isPremiumTheme && store.phone && (

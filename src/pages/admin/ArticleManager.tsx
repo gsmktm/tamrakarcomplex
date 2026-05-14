@@ -92,17 +92,23 @@ const ArticleManager = () => {
   const { role } = useAuth();
   const isPlatformAdmin = role === "suadmin" || role === "staffadmin";
 
-  const { data: articles, isLoading } = useQuery({
+  const { data: articles, isLoading, error: articlesError } = useQuery({
     queryKey: ["articles"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("articles")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from("articles")
+          .select("*")
+          .order("created_at", { ascending: false });
+        
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        handleSupabaseError(err, "ArticleManager: Failed to fetch articles");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const createMutation = useMutation({

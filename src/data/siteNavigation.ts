@@ -40,6 +40,7 @@ export const siteNavigationGroups: SiteNavGroup[] = [
       { name: "Stores", href: "/stores", description: "Verified stores, distributors, and repair partners" },
       { name: "Marketplace", href: "/marketplace", description: "Buy directly from community and store listings" },
       { name: "Unlocking Hub", href: "/unlocking", description: "Professional device unlocking and software services" },
+      { name: "Repair Hub", href: "/repair", description: "Expert repair guides and service booking" },
     ],
   },
   {
@@ -76,6 +77,7 @@ export const siteNavigationGroups: SiteNavGroup[] = [
       { name: "Reviews", href: "/reviews", description: "Hands-on opinions and verdicts before you spend" },
       { name: "Mobile Guides", href: "/mobile-guides", description: "Buying guides, tips, and explainers for phones" },
       { name: "Laptop Guides", href: "/laptop-guides", description: "Best picks and practical laptop advice" },
+      { name: "Device Diagnostics", href: "/repair#diagnostics-section", description: "Identify hardware problems and get cost estimates" },
     ],
   },
 ];

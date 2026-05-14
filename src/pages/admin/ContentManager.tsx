@@ -38,17 +38,23 @@ const ContentManager = () => {
   const queryClient = useQueryClient();
   const { register, handleSubmit, setValue, reset, watch } = useForm<ContentPageForm>();
 
-  const { data: pages, isLoading } = useQuery<ContentPage[]>({
+  const { data: pages, isLoading, error: pagesError } = useQuery<ContentPage[]>({
     queryKey: ["admin_content_pages"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("content_pages")
-        .select("*")
-        .order("title");
-      
-      if (error) throw error;
-      return data as ContentPage[];
+      try {
+        const { data, error } = await supabase
+          .from("content_pages")
+          .select("*")
+          .order("title");
+        
+        if (error) throw error;
+        return data as ContentPage[];
+      } catch (err) {
+        handleSupabaseError(err, "ContentManager: Failed to fetch content pages");
+        return [];
+      }
     },
+    retry: 1,
   });
 
   const saveMutation = useMutation({

@@ -222,12 +222,12 @@ export function useCreateListing() {
       if (input.store_id) {
         const { data: store } = await supabase
           .from("stores")
-          .select("owner_id, package_slug, subscription_status, subscription_end_date")
+          .select("owner_id, owner_user_id, package_slug, subscription_status, subscription_end_date")
           .eq("id", input.store_id)
           .single();
 
         if (!store) throw new Error("Store not found");
-        if (store.owner_id !== user.id) throw new Error("Not store owner");
+        if (store.owner_id !== user.id && store.owner_user_id !== user.id) throw new Error("Not store owner");
 
         const packageSlug = resolveEffectiveStorePackage(store);
         const entitlements = getStoreEntitlements(packageSlug);
@@ -236,13 +236,50 @@ export function useCreateListing() {
         }
 
         const { count } = await supabase
-          .from("sell_listings")
+          .from("store_products")
           .select("id", { count: "exact", head: true })
           .eq("store_id", input.store_id);
         const limit = checkPackageLimit(packageSlug, "product", count ?? 0);
         if (!limit.allowed) {
           throw new Error(limit.reason || "package_limit");
         }
+
+        const slug = input.title
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+
+        const { data, error } = await supabase
+          .from("store_products")
+          .insert({
+            store_id: input.store_id,
+            catalog_product_id: input.catalog_product_id || null,
+            created_by: user.id,
+            title: input.title,
+            slug: `${slug}-${Date.now()}`,
+            brand: input.brand || null,
+            model: input.model || null,
+            description: input.description || null,
+            condition: input.condition,
+            product_type: input.category || "mobile",
+            price: input.price,
+            stock_quantity: 1,
+            images: input.images || [],
+            status: "active",
+          } as any)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return {
+          ...data,
+          user_id: user.id,
+          listing_type: "store_product",
+          category: data.product_type,
+          currency: "NPR",
+          is_featured: false,
+          rejected_reason: null,
+        } as Listing;
       }
 
       const { data, error } = await supabase
@@ -261,9 +298,9 @@ export function useCreateListing() {
           location: input.location,
           contact_info: input.contact_info,
           store_id: input.store_id || null,
-          user_id: input.store_id ? null : user.id,
+          user_id: user.id,
           catalog_product_id: input.catalog_product_id || null,
-          status: "pending", // Requires admin approval
+          status: "active",
         })
         .select()
         .single();

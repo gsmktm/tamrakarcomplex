@@ -62,19 +62,21 @@ export default function UserDashboard() {
     orders: OrderRow[];
     repairs: RepairRequestRow[];
     quotes: LeadQuoteRow[];
+    unlocks: any[];
     profile: { referral_code: string | null; referral_points: number | null } | null;
   }>({
     queryKey: ["user-dashboard", user?.id],
     queryFn: async () => {
       if (!user) {
-        return { listings: [], orders: [], repairs: [], quotes: [], profile: null };
+        return { listings: [], orders: [], repairs: [], quotes: [], unlocks: [], profile: null };
       }
 
-      const [listingsResult, ordersResult, repairsResult, quotesResult, profileResult] = await Promise.allSettled([
+      const [listingsResult, ordersResult, repairsResult, quotesResult, unlocksResult, profileResult] = await Promise.allSettled([
         supabase.from("sell_listings").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
         supabase.from("orders").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
         supabase.from("repair_requests").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
         supabase.from("leads_quotes").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("unlock_requests").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
         supabase.from("profiles").select("referral_code, referral_points").eq("user_id", user.id).single(),
       ]);
 
@@ -106,6 +108,7 @@ export default function UserDashboard() {
         orders: getRows<OrderRow>(ordersResult, "orders"),
         repairs: getRows<RepairRequestRow>(repairsResult, "repairs"),
         quotes: getRows<LeadQuoteRow>(quotesResult, "quotes"),
+        unlocks: getRows<any>(unlocksResult, "unlocks"),
         profile: getProfile(profileResult as PromiseSettledResult<{ data: { referral_code: string | null; referral_points: number | null } | null; error: unknown }>),
       };
     },
@@ -118,6 +121,7 @@ export default function UserDashboard() {
   const myOrders = data?.orders ?? [];
   const myRepairs = data?.repairs ?? [];
   const myQuotes = data?.quotes ?? [];
+  const myUnlocks = data?.unlocks ?? [];
 
   const recentActivity = [
     ...myOrders.map((order) => ({
@@ -135,6 +139,14 @@ export default function UserDashboard() {
       href: "/user/repairs",
       createdAt: repair.created_at || "",
       badge: repair.status || "pending",
+    })),
+    ...myUnlocks.map((unlock) => ({
+      id: `unlock-${unlock.id}`,
+      title: `Unlock: ${unlock.brand} ${unlock.model}`,
+      subtitle: unlock.service_type,
+      href: "/user/unlocking",
+      createdAt: unlock.created_at || "",
+      badge: unlock.status || "pending",
     })),
     ...myQuotes.map((quote) => ({
       id: `quote-${quote.id}`,

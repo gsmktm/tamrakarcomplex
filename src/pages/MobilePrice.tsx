@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -14,6 +14,8 @@ interface CatalogProductWithBrand {
   variant?: { storage?: string; ram?: string; color?: string };
   image_url?: string;
   specs_json: Record<string, unknown>;
+  official_price?: number;
+  market_price?: number;
   price_npr?: number;
   price_text?: string;
   source_url?: string;
@@ -22,6 +24,7 @@ interface CatalogProductWithBrand {
   is_active: boolean;
 }
 import { ProductCard } from "@/components/products/ProductCard";
+import type { Product } from "@/hooks/useProducts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -142,6 +145,25 @@ function BrandAvatar({ brand, size = 36 }: { brand: string; size?: number }) {
   );
 }
 
+function toProductCardProduct(product: CatalogProductWithBrand): Product {
+  const officialPrice = product.official_price ?? product.price_npr ?? null;
+  return {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    brand: product.brand?.name ?? null,
+    price: officialPrice ? `Rs. ${officialPrice.toLocaleString()}` : product.price_text || "—",
+    price_value: officialPrice,
+    image: product.image_url || "/default-product.svg",
+    rating: null,
+    category: "Mobile",
+    specs: product.specs_json as Record<string, string | number | boolean> | null,
+    in_stock: product.is_active,
+    source_url: product.source_url,
+    source_site: product.source_site,
+  };
+}
+
 // ─── Product table row ────────────────────────────────────────────────────────
 function ProductTableRow({ product, rank }: { product: CatalogProductWithBrand; rank: number }) {
   const specs = product.specs_json as Record<string, unknown> | null;
@@ -150,7 +172,8 @@ function ProductTableRow({ product, rank }: { product: CatalogProductWithBrand; 
   const battery = extractSpec(specs, "battery", "Battery", "Capacity");
   const camera  = extractSpec(specs, "camera", "Camera", "Main Camera", "Rear Camera");
   const storage = extractSpec(specs, "storage", "Storage", "Internal");
-  const priceDisplay = product.price_text || (product.price_npr ? `Rs. ${product.price_npr.toLocaleString()}` : "—");
+  const officialPrice = product.official_price ?? product.price_npr;
+  const priceDisplay = officialPrice ? `Rs. ${officialPrice.toLocaleString()}` : product.price_text || "—";
 
   return (
     <tr className="group border-b border-border/50 hover:bg-muted/40 transition-colors">
@@ -377,6 +400,14 @@ export default function MobilePrice() {
 
   const [priceRange, setPriceRange] = useState<[number, number]>([minPrice ?? 0, maxPrice ?? 300000]);
   const [localSearch, setLocalSearch] = useState(search);
+
+  useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
+
+  useEffect(() => {
+    setPriceRange([minPrice ?? 0, maxPrice ?? 300000]);
+  }, [minPrice, maxPrice]);
 
   const { data: productsData, isLoading } = usePublicPriceList({
     brand_id: brandParam || undefined,
@@ -809,7 +840,7 @@ export default function MobilePrice() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
                   {items.map((product) => (
-                    <ProductCard key={product.id} product={product as unknown as import("@/hooks/useProducts").Product} />
+                    <ProductCard key={product.id} product={toProductCardProduct(product)} />
                   ))}
                 </div>
               )}

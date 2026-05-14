@@ -16,6 +16,8 @@ const RepairManager = lazy(() => import("@/pages/admin/RepairManager"));
 const ListingManager = lazy(() => import("@/pages/admin/ListingManager"));
 const ContactManager = lazy(() => import("@/pages/admin/ContactManager"));
 const SubscriptionManager = lazy(() => import("@/pages/admin/SubscriptionManager"));
+const StoreApplicationManager = lazy(() => import("@/pages/admin/StoreApplicationManager"));
+const LeadManager = lazy(() => import("@/pages/admin/LeadManager"));
 
 export const adminRoutes = (
   <Route
@@ -32,6 +34,10 @@ export const adminRoutes = (
     <Route path="products" element={<Suspense fallback={<RouteFallback />}><ProductManager /></Suspense>} />
     <Route path="orders" element={<Suspense fallback={<RouteFallback />}><OrderManager /></Suspense>} />
     <Route path="stores" element={<Suspense fallback={<RouteFallback />}><StoreManager /></Suspense>} />
+    <Route path="stores/:id" element={<Suspense fallback={<RouteFallback />}><StoreManager /></Suspense>} />
+    <Route path="packages" element={<Suspense fallback={<RouteFallback />}><SubscriptionManager /></Suspense>} />
+    <Route path="store-requests" element={<Suspense fallback={<RouteFallback />}><StoreApplicationManager /></Suspense>} />
+    <Route path="store-leads" element={<Suspense fallback={<RouteFallback />}><LeadManager /></Suspense>} />
     <Route path="users" element={<Suspense fallback={<RouteFallback />}><UserManager /></Suspense>} />
     <Route path="analytics" element={<Suspense fallback={<RouteFallback />}><Analytics /></Suspense>} />
     <Route path="repairs" element={<Suspense fallback={<RouteFallback />}><RepairManager /></Suspense>} />

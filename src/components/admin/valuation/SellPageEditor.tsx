@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Save } from "lucide-react";
+import { Loader2, Plus, Trash2, Save, Edit2, X } from "lucide-react";
 
 export function SellPageEditor() {
   const queryClient = useQueryClient();
@@ -21,6 +21,8 @@ export function SellPageEditor() {
   });
   const [newBrand, setNewBrand] = useState("");
   const [newLogoUrl, setNewLogoUrl] = useState("");
+  const [editingBrand, setEditingBrand] = useState<string | null>(null);
+  const [editingUrl, setEditingUrl] = useState("");
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["admin-sell-settings"],
@@ -131,37 +133,83 @@ export function SellPageEditor() {
           <CardTitle>Brand Logos</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex gap-4 items-end bg-secondary/20 p-4 rounded-lg">
-            <div className="grid gap-2 flex-1">
-              <Label>Brand Name</Label>
-              <Input placeholder="Apple" value={newBrand} onChange={e => setNewBrand(e.target.value)} />
+          {/* Add new logo row */}
+          <div className="bg-secondary/20 p-4 rounded-lg space-y-3">
+            <p className="text-sm font-medium">Add / Update Brand Logo</p>
+            <div className="flex gap-3 items-end flex-wrap">
+              <div className="grid gap-1.5 flex-1 min-w-[120px]">
+                <Label className="text-xs">Brand Name</Label>
+                <Input placeholder="e.g. Apple" value={newBrand} onChange={e => setNewBrand(e.target.value)} />
+              </div>
+              <div className="grid gap-1.5 flex-[2] min-w-[220px]">
+                <Label className="text-xs">Logo URL (SVG or PNG preferred)</Label>
+                <Input placeholder="https://cdn.simpleicons.org/apple/000000" value={newLogoUrl} onChange={e => setNewLogoUrl(e.target.value)} />
+              </div>
+              {/* Live preview */}
+              {newLogoUrl && (
+                <div className="h-10 w-10 border rounded-lg bg-white flex items-center justify-center flex-shrink-0">
+                  <img src={newLogoUrl} alt="preview" className="h-8 w-8 object-contain" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                </div>
+              )}
+              <Button onClick={handleAddLogo} type="button" disabled={!newBrand || !newLogoUrl}>
+                <Plus className="h-4 w-4 mr-2" /> Add
+              </Button>
             </div>
-            <div className="grid gap-2 flex-[2]">
-              <Label>Logo URL (SVG preferred)</Label>
-              <Input placeholder="https://..." value={newLogoUrl} onChange={e => setNewLogoUrl(e.target.value)} />
-            </div>
-            <Button onClick={handleAddLogo} type="button">
-              <Plus className="h-4 w-4 mr-2" /> Add Logo
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              Tip: Use <code className="bg-secondary px-1 rounded">https://cdn.simpleicons.org/BRAND/COLOR</code> for free brand SVG icons.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {Object.entries(logos).map(([brand, url]) => (
-              <div key={brand} className="flex items-center justify-between p-3 border rounded-lg bg-card hover:shadow-sm transition-all group">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="h-8 w-8 flex-shrink-0">
-                    <img src={url} alt={brand} className="h-full w-full object-contain" />
+              <div key={brand} className="border rounded-lg bg-card overflow-hidden group">
+                {editingBrand === brand ? (
+                  <div className="p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      {editingUrl && (
+                        <img src={editingUrl} alt="preview" className="h-7 w-7 object-contain flex-shrink-0"
+                          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      )}
+                      <Input
+                        className="h-8 text-xs"
+                        value={editingUrl}
+                        autoFocus
+                        onChange={e => setEditingUrl(e.target.value)}
+                        placeholder="New logo URL"
+                      />
+                    </div>
+                    <div className="flex gap-1">
+                      <Button size="sm" className="h-7 text-xs flex-1" onClick={() => {
+                        if (editingUrl) setLogos(prev => ({ ...prev, [brand]: editingUrl }));
+                        setEditingBrand(null);
+                      }}>Save</Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingBrand(null)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <span className="text-sm font-medium truncate">{brand}</span>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => handleRemoveLogo(brand)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                ) : (
+                  <div className="flex items-center justify-between p-3 hover:shadow-sm transition-all">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="h-9 w-9 bg-white border rounded flex-shrink-0 flex items-center justify-center">
+                        <img src={url} alt={brand} className="h-7 w-7 object-contain"
+                          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      </div>
+                      <span className="text-sm font-medium truncate">{brand}</span>
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                        setEditingBrand(brand);
+                        setEditingUrl(url);
+                      }}>
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveLogo(brand)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

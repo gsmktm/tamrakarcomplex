@@ -82,21 +82,32 @@ export default function CustomRepairRequest() {
 
   const prefilledDevice = searchParams.get("device");
   const prefilledGuide = searchParams.get("guide");
+  const prefilledIssue = searchParams.get("issue");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: user?.user_metadata?.display_name || "",
-      phone: "",
+      name: user?.user_metadata?.display_name || user?.user_metadata?.full_name || "",
+      phone: user?.user_metadata?.phone || "",
       email: user?.email || "",
       device_brand: "",
       device_model: "",
       issue_type: "screen",
-      description: "",
+      description: prefilledIssue ? `Diagnosed issue: ${prefilledIssue}` : "",
     },
   });
 
   useEffect(() => {
+    if (prefilledIssue) {
+      // Map common prefilled issues to issue_type
+      const lowerIssue = prefilledIssue.toLowerCase();
+      if (lowerIssue.includes("battery") || lowerIssue.includes("power")) form.setValue("issue_type", "battery");
+      if (lowerIssue.includes("charging")) form.setValue("issue_type", "charging");
+      if (lowerIssue.includes("camera")) form.setValue("issue_type", "camera");
+      if (lowerIssue.includes("water")) form.setValue("issue_type", "water_damage");
+      if (lowerIssue.includes("software") || lowerIssue.includes("diagnostics") || lowerIssue.includes("boot")) form.setValue("issue_type", "software");
+    }
+
     if (prefilledDevice && devices) {
       const device = devices.find(d => d.slug === prefilledDevice);
       if (device) {
