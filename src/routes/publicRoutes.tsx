@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route } from "react-router-dom";
+import { Navigate, Route, useParams } from "react-router-dom";
 import { RequireAuth } from "@/routes/RequireAuth";
 import { ParamRouteRedirect } from "@/components/routing/ParamRouteRedirect";
 import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
@@ -57,6 +57,9 @@ const UserSettingsPage = lazy(() => import("@/pages/user/UserSettingsPage"));
 const UserHistoryCenter = lazy(() => import("@/pages/user/UserHistoryCenter"));
 const UserNotificationsPage = lazy(() => import("@/pages/user/UserNotificationsPage"));
 const ModelHub = lazy(() => import("@/pages/ModelHub"));
+const MobileCategoryPage = lazy(() => import("@/pages/MobileCategoryPage"));
+const MobileBrandPage = lazy(() => import("@/pages/MobileBrandPage"));
+const ModelDetailPage = lazy(() => import("@/pages/ModelDetailPage"));
 const ProfileRedirect = lazy(() => import("@/components/routing/ProfileRedirect"));
 const DashboardRedirect = lazy(() => import("@/components/routing/DashboardRedirect"));
 const StoreRedirect = lazy(() => import("@/components/routing/StoreRedirect"));
@@ -66,6 +69,11 @@ const withSuspense = (Component: React.ComponentType) => (
     <Component />
   </Suspense>
 );
+
+function RedirectBrandToNew() {
+  const { brand } = useParams<{ brand: string }>();
+  return <Navigate to={`/cat/mobiles/${brand ?? ''}`} replace />;
+}
 
 export const publicRoutes = (
   <>
@@ -126,13 +134,15 @@ export const publicRoutes = (
     <Route path="/buy" element={withSuspense(Products)} />
     <Route path="/products" element={<Navigate to="/buy" replace />} />
     <Route path="/brands" element={withSuspense(Brands)} />
-    <Route path="/mobile-price" element={withSuspense(MobilePrice)} />
-    <Route path="/mobile-price/brand/:brand" element={withSuspense(MobilePriceBrand)} />
+    <Route path="/cat/mobiles/" element={withSuspense(MobileCategoryPage)} />
+    <Route path="/cat/mobiles/:brand" element={withSuspense(MobileBrandPage)} />
+    <Route path="/mobile-price" element={<Navigate to="/cat/mobiles/" replace />} />
+    <Route path="/mobile-price/brand/:brand" element={<RedirectBrandToNew />} />
     <Route path="/laptop-price" element={withSuspense(LaptopPrice)} />
     <Route path="/article/:slug" element={withSuspense(ArticleDetail)} />
     <Route path="/guide/:slug" element={withSuspense(GuideDetail)} />
     <Route path="/product/:slug" element={withSuspense(ProductDetail)} />
-    <Route path="/mobile/:slug" element={withSuspense(ModelHub)} />
+    <Route path="/mobile/:slug" element={withSuspense(ModelDetailPage)} />
     <Route path="/brand/:brand" element={withSuspense(BrandProducts)} />
     <Route path="/mobile-guides" element={withSuspense(MobileGuides)} />
     <Route path="/laptop-guides" element={withSuspense(LaptopGuides)} />
