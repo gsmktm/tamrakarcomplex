@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS phone_variant_prices (
   is_default BOOLEAN DEFAULT false,
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT sale_price_check CHECK (sale_price IS NULL OR sale_price < regular_price)
 );
 
 -- 5. price_history — immutable trigger log
@@ -125,8 +126,8 @@ CREATE OR REPLACE FUNCTION log_price_change()
 RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.regular_price IS DISTINCT FROM NEW.regular_price THEN
-    INSERT INTO price_history (model_id, variant_id, old_price, new_price)
-    VALUES (NEW.model_id, NEW.variant_id, OLD.regular_price, NEW.regular_price);
+    INSERT INTO price_history (model_id, variant_id, old_price, new_price, changed_by)
+    VALUES (NEW.model_id, NEW.variant_id, OLD.regular_price, NEW.regular_price, auth.uid());
   END IF;
   NEW.updated_at = now();
   RETURN NEW;
@@ -138,34 +139,44 @@ CREATE TRIGGER trg_price_history
   BEFORE UPDATE ON phone_variant_prices
   FOR EACH ROW EXECUTE FUNCTION log_price_change();
 
--- 12. RLS — public read, authenticated write
+-- 12. Indexes for FK columns (performance)
+CREATE INDEX IF NOT EXISTS idx_pvp_model    ON phone_variant_prices(model_id);
+CREATE INDEX IF NOT EXISTS idx_pvp_variant  ON phone_variant_prices(variant_id);
+CREATE INDEX IF NOT EXISTS idx_ph_model     ON price_history(model_id);
+CREATE INDEX IF NOT EXISTS idx_mi_model     ON model_images(model_id);
+CREATE INDEX IF NOT EXISTS idx_mur_model    ON model_user_reviews(model_id);
+CREATE INDEX IF NOT EXISTS idx_me_model     ON model_emi(model_id);
+
+-- 13. RLS — public read, admin write
 ALTER TABLE phone_variant_prices ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_prices" ON phone_variant_prices FOR SELECT USING (true);
-CREATE POLICY "auth_write_prices" ON phone_variant_prices FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "auth_write_prices" ON phone_variant_prices FOR ALL TO authenticated USING (public.is_admin());
 
 ALTER TABLE expert_scores ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_expert" ON expert_scores FOR SELECT USING (true);
-CREATE POLICY "auth_write_expert" ON expert_scores FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "auth_write_expert" ON expert_scores FOR ALL TO authenticated USING (public.is_admin());
 
 ALTER TABLE model_images ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_images" ON model_images FOR SELECT USING (true);
-CREATE POLICY "auth_write_images" ON model_images FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "auth_write_images" ON model_images FOR ALL TO authenticated USING (public.is_admin());
 
 ALTER TABLE model_user_reviews ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_approved_reviews" ON model_user_reviews FOR SELECT USING (status = 'approved');
-CREATE POLICY "auth_write_reviews" ON model_user_reviews FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "auth_write_reviews" ON model_user_reviews FOR ALL TO authenticated USING (public.is_admin());
+CREATE POLICY "users_insert_own_review" ON model_user_reviews
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id AND status = 'pending');
 
 ALTER TABLE emi_plans ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_emi_plans" ON emi_plans FOR SELECT USING (status = 'active');
-CREATE POLICY "auth_write_emi_plans" ON emi_plans FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "auth_write_emi_plans" ON emi_plans FOR ALL TO authenticated USING (public.is_admin());
 
 ALTER TABLE model_emi ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_model_emi" ON model_emi FOR SELECT USING (true);
-CREATE POLICY "auth_write_model_emi" ON model_emi FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "auth_write_model_emi" ON model_emi FOR ALL TO authenticated USING (public.is_admin());
 
 ALTER TABLE retailers ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_retailers" ON retailers FOR SELECT USING (status = 'active');
-CREATE POLICY "auth_write_retailers" ON retailers FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "auth_write_retailers" ON retailers FOR ALL TO authenticated USING (public.is_admin());
 
 ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read_history" ON price_history FOR SELECT USING (true);
