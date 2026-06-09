@@ -26,7 +26,7 @@ import {
   ExternalLink,
   PlusCircle
 } from "lucide-react";
-import { mobileMasterService, Brand, PhoneSeries, PhoneModel, PhoneVariant } from "@/services/mobileMasterService";
+import { mobileMasterService, Brand, PhoneSeries, PhoneModel, PhoneVariant, VariantPrice, ExpertScore, ModelImage, EmiPlan, ModelEmi } from "@/services/mobileMasterService";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
 import { Link } from "react-router-dom";
@@ -702,11 +702,35 @@ function ModelConnections({ modelId, modelName }: { modelId: string, modelName: 
           icon={<Tag className="h-5 w-5" />}
           href={`/admin/accessories?modelId=${modelId}`}
         />
-        <ConnectionCard 
-          title="SEO & Content" 
+        <ConnectionCard
+          title="SEO & Content"
           description="Auto-generate landing page content."
           icon={<ExternalLink className="h-5 w-5" />}
           href={`/admin/seo?modelId=${modelId}`}
+        />
+        <ConnectionCard
+          title="Prices"
+          description="Variant prices, stock status, and buy URLs."
+          icon={<Tag className="h-5 w-5" />}
+          action={<PriceEditor modelId={modelId} />}
+        />
+        <ConnectionCard
+          title="Expert Score"
+          description="7 dimension scores (0–10). Overall auto-computed."
+          icon={<Smartphone className="h-5 w-5" />}
+          action={<ExpertScoreEditor modelId={modelId} />}
+        />
+        <ConnectionCard
+          title="Gallery"
+          description="Image gallery for the model detail page."
+          icon={<Plus className="h-5 w-5" />}
+          action={<GalleryEditor modelId={modelId} />}
+        />
+        <ConnectionCard
+          title="EMI"
+          description="EMI offers linked to bank plans."
+          icon={<Database className="h-5 w-5" />}
+          action={<EmiConnectionEditor modelId={modelId} />}
         />
       </div>
     </div>
@@ -975,5 +999,258 @@ function SpecEditor({ modelId }: { modelId: string }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PriceEditor({ modelId }: { modelId: string }) {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState<Partial<VariantPrice>>({ currency: 'NPR', stock_status: 'in_stock', is_default: false, sort_order: 0 });
+
+  const { data: variants } = useQuery({ queryKey: ['variants', modelId], queryFn: () => mobileMasterService.getVariants(modelId) });
+  const { data: prices, isLoading } = useQuery({ queryKey: ['variant_prices', modelId], queryFn: () => mobileMasterService.getVariantPrices(modelId) });
+  const { data: retailers } = useQuery({ queryKey: ['retailers'], queryFn: () => mobileMasterService.getRetailers() });
+
+  const upsert = useMutation({
+    mutationFn: (p: Partial<VariantPrice>) => mobileMasterService.upsertVariantPrice({ ...p, model_id: modelId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['variant_prices', modelId] }); setAdding(false); toast.success('Price saved'); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const del = useMutation({
+    mutationFn: (id: string) => mobileMasterService.deleteVariantPrice(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['variant_prices', modelId] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  if (isLoading) return <div className="text-sm text-muted-foreground py-2">Loading prices...</div>;
+
+  return (
+    <div className="space-y-3">
+      {(prices ?? []).map((p) => (
+        <div key={p.id} className="flex items-center gap-3 p-3 border rounded-lg text-sm">
+          <div className="flex-1">
+            <div className="font-medium">NPR {p.regular_price.toLocaleString()}{p.sale_price ? ` → ${p.sale_price.toLocaleString()}` : ''}</div>
+            <div className="text-muted-foreground">{p.stock_status} · {p.is_default ? 'Default' : ''}</div>
+          </div>
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => del.mutate(p.id)}>
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      ))}
+      {adding ? (
+        <div className="border rounded-lg p-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Variant</Label>
+              <Select value={form.variant_id ?? ''} onValueChange={(v) => setForm(f => ({ ...f, variant_id: v }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Pick variant" /></SelectTrigger>
+                <SelectContent>{(variants ?? []).map(v => <SelectItem key={v.id} value={v.id}>{v.ram}/{v.storage} {v.color}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Regular Price (NPR)</Label>
+              <Input className="h-8 text-sm" type="number" value={form.regular_price ?? ''} onChange={e => setForm(f => ({ ...f, regular_price: Number(e.target.value) }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Sale Price (NPR, optional)</Label>
+              <Input className="h-8 text-sm" type="number" value={form.sale_price ?? ''} onChange={e => setForm(f => ({ ...f, sale_price: Number(e.target.value) || undefined }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Stock Status</Label>
+              <Select value={form.stock_status ?? 'in_stock'} onValueChange={(v) => setForm(f => ({ ...f, stock_status: v }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="in_stock">In Stock</SelectItem>
+                  <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                  <SelectItem value="pre_order">Pre-Order</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label className="text-xs">Buy URL</Label>
+              <Input className="h-8 text-sm" value={form.buy_url ?? ''} onChange={e => setForm(f => ({ ...f, buy_url: e.target.value }))} placeholder="https://..." />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => upsert.mutate(form)} disabled={!form.variant_id || !form.regular_price || upsert.isPending}>
+              {upsert.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setAdding(false)}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="outline" onClick={() => setAdding(true)}><Plus className="h-3 w-3 mr-1" />Add Price</Button>
+      )}
+    </div>
+  );
+}
+
+function ExpertScoreEditor({ modelId }: { modelId: string }) {
+  const qc = useQueryClient();
+  const { data: score, isLoading } = useQuery({ queryKey: ['expert_score', modelId], queryFn: () => mobileMasterService.getExpertScore(modelId) });
+  const [form, setForm] = useState<Partial<ExpertScore>>({});
+
+  useEffect(() => { if (score) setForm(score); }, [score]);
+
+  const save = useMutation({
+    mutationFn: (s: Partial<ExpertScore>) => mobileMasterService.upsertExpertScore({ ...s, model_id: modelId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['expert_score', modelId] }); toast.success('Expert score saved'); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const DIMENSIONS: { key: keyof ExpertScore; label: string }[] = [
+    { key: 'design_score', label: 'Design' },
+    { key: 'display_score', label: 'Display' },
+    { key: 'performance_score', label: 'Performance' },
+    { key: 'software_score', label: 'Software' },
+    { key: 'camera_score', label: 'Camera' },
+    { key: 'battery_score', label: 'Battery' },
+    { key: 'value_score', label: 'Value' },
+  ];
+
+  const overall = (() => {
+    const scores = DIMENSIONS.map(d => form[d.key] as number | undefined).filter((v): v is number => v != null);
+    if (!scores.length) return null;
+    return (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+  })();
+
+  if (isLoading) return <div className="text-sm text-muted-foreground py-2">Loading...</div>;
+
+  return (
+    <div className="space-y-3">
+      {overall && <div className="text-2xl font-bold text-primary">{overall}<span className="text-sm font-normal text-muted-foreground">/10 overall</span></div>}
+      <div className="grid grid-cols-2 gap-2">
+        {DIMENSIONS.map(({ key, label }) => (
+          <div key={key}>
+            <Label className="text-xs">{label} (0–10)</Label>
+            <Input className="h-8 text-sm" type="number" min={0} max={10} step={0.1}
+              value={form[key] as number ?? ''} onChange={e => setForm(f => ({ ...f, [key]: Number(e.target.value) || undefined }))} />
+          </div>
+        ))}
+        <div className="col-span-2">
+          <Label className="text-xs">Review post slug (optional)</Label>
+          <Input className="h-8 text-sm" value={form.review_post_slug ?? ''} onChange={e => setForm(f => ({ ...f, review_post_slug: e.target.value }))} placeholder="samsung-galaxy-s24-review" />
+        </div>
+      </div>
+      <Button size="sm" onClick={() => save.mutate(form)} disabled={save.isPending}>
+        {save.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}Save Score
+      </Button>
+    </div>
+  );
+}
+
+function GalleryEditor({ modelId }: { modelId: string }) {
+  const qc = useQueryClient();
+  const [url, setUrl] = useState('');
+  const [alt, setAlt] = useState('');
+  const { data: images, isLoading } = useQuery({ queryKey: ['model_images', modelId], queryFn: () => mobileMasterService.getModelImages(modelId) });
+
+  const add = useMutation({
+    mutationFn: () => mobileMasterService.addModelImage({ model_id: modelId, image_url: url, alt_text: alt, sort_order: (images?.length ?? 0) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['model_images', modelId] }); setUrl(''); setAlt(''); toast.success('Image added'); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const del = useMutation({
+    mutationFn: (id: string) => mobileMasterService.deleteModelImage(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['model_images', modelId] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const toggleFeatured = useMutation({
+    mutationFn: ({ id, val }: { id: string; val: boolean }) => mobileMasterService.updateModelImage(id, { is_featured: val }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['model_images', modelId] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  if (isLoading) return <div className="text-sm text-muted-foreground py-2">Loading...</div>;
+
+  return (
+    <div className="space-y-3">
+      {(images ?? []).map((img) => (
+        <div key={img.id} className="flex items-center gap-2 text-sm border rounded p-2">
+          <img src={img.image_url} alt={img.alt_text ?? ''} className="h-10 w-10 object-cover rounded" onError={(e) => { (e.target as HTMLImageElement).src = '/default-product.svg'; }} />
+          <div className="flex-1 truncate">{img.image_url}</div>
+          <Button size="sm" variant={img.is_featured ? 'default' : 'outline'} className="h-6 text-xs" onClick={() => toggleFeatured.mutate({ id: img.id, val: !img.is_featured })}>
+            {img.is_featured ? '★' : '☆'}
+          </Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6 text-red-500" onClick={() => del.mutate(img.id)}><Trash2 className="h-3 w-3" /></Button>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <Input className="h-8 text-sm flex-1" placeholder="Image URL" value={url} onChange={e => setUrl(e.target.value)} />
+        <Input className="h-8 text-sm w-32" placeholder="Alt text" value={alt} onChange={e => setAlt(e.target.value)} />
+        <Button size="sm" onClick={() => add.mutate()} disabled={!url || add.isPending}>Add</Button>
+      </div>
+    </div>
+  );
+}
+
+function EmiConnectionEditor({ modelId }: { modelId: string }) {
+  const qc = useQueryClient();
+  const { data: plans } = useQuery({ queryKey: ['emi_plans'], queryFn: () => mobileMasterService.getEmiPlans() });
+  const { data: variants } = useQuery({ queryKey: ['variants', modelId], queryFn: () => mobileMasterService.getVariants(modelId) });
+  const { data: emis, isLoading } = useQuery({ queryKey: ['model_emi', modelId], queryFn: () => mobileMasterService.getModelEmi(modelId) });
+  const [form, setForm] = useState<Partial<ModelEmi>>({ down_payment: 0 });
+  const [adding, setAdding] = useState(false);
+
+  const add = useMutation({
+    mutationFn: (e: Partial<ModelEmi>) => mobileMasterService.upsertModelEmi({ ...e, model_id: modelId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['model_emi', modelId] }); setAdding(false); toast.success('EMI saved'); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const del = useMutation({
+    mutationFn: (id: string) => mobileMasterService.deleteModelEmi(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['model_emi', modelId] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  if (isLoading) return <div className="text-sm text-muted-foreground py-2">Loading...</div>;
+
+  return (
+    <div className="space-y-3">
+      {(emis ?? []).map((e) => (
+        <div key={e.id} className="flex items-center gap-3 p-2 border rounded text-sm">
+          <div className="flex-1">NPR {e.monthly_amount.toLocaleString()}/mo · DP {e.down_payment.toLocaleString()}</div>
+          <Button size="icon" variant="ghost" className="h-6 w-6 text-red-500" onClick={() => del.mutate(e.id)}><Trash2 className="h-3 w-3" /></Button>
+        </div>
+      ))}
+      {adding ? (
+        <div className="border rounded p-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Variant</Label>
+              <Select value={form.variant_id ?? ''} onValueChange={v => setForm(f => ({ ...f, variant_id: v }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Pick variant" /></SelectTrigger>
+                <SelectContent>{(variants ?? []).map(v => <SelectItem key={v.id} value={v.id}>{v.ram}/{v.storage}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">EMI Plan</Label>
+              <Select value={form.emi_plan_id ?? ''} onValueChange={v => setForm(f => ({ ...f, emi_plan_id: v }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Pick plan" /></SelectTrigger>
+                <SelectContent>{(plans ?? []).map(p => <SelectItem key={p.id} value={p.id}>{p.bank_name} {p.duration_months}mo</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Monthly Amount (NPR)</Label>
+              <Input className="h-8 text-sm" type="number" value={form.monthly_amount ?? ''} onChange={e => setForm(f => ({ ...f, monthly_amount: Number(e.target.value) }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Down Payment (NPR)</Label>
+              <Input className="h-8 text-sm" type="number" value={form.down_payment ?? 0} onChange={e => setForm(f => ({ ...f, down_payment: Number(e.target.value) }))} />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => add.mutate(form)} disabled={!form.variant_id || !form.emi_plan_id || !form.monthly_amount || add.isPending}>Save</Button>
+            <Button size="sm" variant="outline" onClick={() => setAdding(false)}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="outline" onClick={() => setAdding(true)}><Plus className="h-3 w-3 mr-1" />Add EMI</Button>
+      )}
+    </div>
   );
 }
