@@ -490,6 +490,30 @@ export function canStoreBeFeatured(packageSlug: string | null | undefined): bool
   return entitlements.verifiedBadge || entitlements.homepageFeature || entitlements.featuredListing;
 }
 
+/**
+ * Enhanced featured eligibility check that considers yearly billing cycle.
+ * Yearly subscriptions can be featured regardless of package tier.
+ * Non-yearly subscriptions: only silver/gold/diamond can be featured.
+ * 
+ * Prefer this over canStoreBeFeatured when billing_cycle data is available.
+ */
+export function canStoreBeFeaturedWithYearly(
+  packageSlug: string | null | undefined,
+  isYearly: boolean,
+): boolean {
+  const normalizedSlug = normalizeStorePackageSlug(packageSlug);
+  
+  // Free package can never be featured unless yearly
+  if (normalizedSlug === "free" && !isYearly) return false;
+  
+  // Yearly subscriptions unlock featured for all tiers
+  if (isYearly) return true;
+  
+  // Non-yearly: only silver/gold/diamond can be featured
+  const currentEntitlements = getStoreEntitlements(normalizedSlug);
+  return currentEntitlements.verifiedBadge || currentEntitlements.homepageFeature || currentEntitlements.featuredListing;
+}
+
 export function getStoreMarketplaceCommission(packageSlug: string | null | undefined): number {
   return getStoreEntitlements(packageSlug).marketplaceCommission;
 }

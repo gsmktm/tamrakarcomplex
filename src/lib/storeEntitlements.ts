@@ -16,6 +16,11 @@ export type FeatureAccessResult = {
   packageSlug: StorePackageSlug;
 };
 
+export type PackageWithYearly = {
+  packageSlug: StorePackageSlug;
+  isYearly: boolean;
+};
+
 export type StoreEntitlements = {
   canShowStoreName: boolean;
   canShowShopNumber: boolean;
@@ -93,6 +98,42 @@ export function resolveEffectiveStorePackage(input: {
   const packageSlug = normalizeStorePackageSlug(input.package_slug);
   if (packageSlug === "free") return "free";
   return hasActiveSubscription(input.subscription_status, input.subscription_end_date) ? packageSlug : "free";
+}
+
+/**
+ * Enhanced resolution that includes yearly billing cycle flag.
+ * Used for featured placement logic (yearly subscriptions unlock featured regardless of tier).
+ */
+export function resolveEffectiveStorePackageWithYearly(input: {
+  package_slug?: string | null;
+  subscription_status?: string | null;
+  subscription_end_date?: string | null;
+  billing_cycle?: string | null;
+}): PackageWithYearly {
+  const packageSlug = resolveEffectiveStorePackage(input);
+  const isYearly = (input.billing_cycle ?? "").toLowerCase() === "yearly";
+  return { packageSlug, isYearly };
+}
+
+/**
+ * Check if store can be featured this cycle.
+ * Yearly subscriptions can be featured regardless of package tier.
+ * Non-yearly: only silver/gold/diamond packages can be featured.
+ */
+export function canBeFeaturedThisCycle(input: {
+  packageSlug: StorePackageSlug;
+  isYearly: boolean;
+  subscriptionStatus?: string | null;
+  subscriptionEndDate?: string | null;
+}): boolean {
+  // Cannot be featured on free package unless yearly
+  if (input.packageSlug === "free" && !input.isYearly) return false;
+  
+  // Yearly subscriptions can always be featured (unlocks featured for all tiers)
+  if (input.isYearly) return true;
+  
+  // Non-yearly: only silver/gold/diamond can be featured
+  return input.packageSlug !== "free";
 }
 
 export function buildEntitlements(packageSlug: string | null | undefined): StoreEntitlements {
