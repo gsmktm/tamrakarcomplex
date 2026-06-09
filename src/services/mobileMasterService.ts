@@ -145,6 +145,7 @@ export interface ModelDetail {
 
 export interface CategoryFilter {
   brandSlugs?: string[];
+  brand_id?: string;
   minPrice?: number;
   maxPrice?: number;
   market_status?: string;
@@ -475,6 +476,12 @@ export const mobileMasterService = {
       (supabase as any).from('expert_scores').select('*').eq('model_id', model.id).maybeSingle(),
     ]);
 
+    if (variants.error) throw variants.error;
+    if (prices.error) throw prices.error;
+    if (specs.error) throw specs.error;
+    if (images.error) throw images.error;
+    if (expertScore.error) throw expertScore.error;
+
     return {
       model: model as ModelDetail['model'],
       variants: (variants.data ?? []) as PhoneVariant[],
@@ -494,6 +501,7 @@ export const mobileMasterService = {
     if (filters.market_status) query = query.eq('market_status', filters.market_status);
     if (filters.is_featured) query = query.eq('is_featured', true);
     if (filters.is_upcoming) query = query.eq('is_upcoming', true);
+    if (filters.brand_id) query = query.eq('brand_id', filters.brand_id);
     query = query.eq('status', 'active');
     query = query.order('created_at', { ascending: false });
     if (filters.limit) query = query.range(filters.offset ?? 0, (filters.offset ?? 0) + filters.limit - 1);
