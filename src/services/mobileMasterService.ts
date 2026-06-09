@@ -503,13 +503,31 @@ export const mobileMasterService = {
     if (filters.is_upcoming) query = query.eq('is_upcoming', true);
     if (filters.brand_id) query = query.eq('brand_id', filters.brand_id);
     query = query.eq('status', 'active');
-    query = query.order('created_at', { ascending: false });
+    if (filters.sort !== 'price_asc' && filters.sort !== 'price_desc') {
+      query = query.order('created_at', { ascending: false });
+    }
     if (filters.limit) query = query.range(filters.offset ?? 0, (filters.offset ?? 0) + filters.limit - 1);
 
     const { data, error, count } = await query;
     if (error) throw error;
 
-    const items: ModelListItem[] = (data ?? []).map((m: any) => ({
+    const modelIds = (data ?? []).map((m: any) => m.id);
+    const minPriceMap: Record<string, number> = {};
+    if (modelIds.length > 0) {
+      const { data: priceRows } = await (supabase as any)
+        .from('phone_variant_prices')
+        .select('model_id, regular_price')
+        .in('model_id', modelIds)
+        .eq('stock_status', 'in_stock');
+      for (const row of (priceRows ?? [])) {
+        const existing = minPriceMap[row.model_id];
+        if (!existing || row.regular_price < existing) {
+          minPriceMap[row.model_id] = row.regular_price;
+        }
+      }
+    }
+
+    let items: ModelListItem[] = (data ?? []).map((m: any) => ({
       id: m.id,
       name: m.name,
       slug: m.slug,
@@ -520,7 +538,14 @@ export const mobileMasterService = {
       release_year: m.release_year,
       brand_name: m.brands?.name ?? '',
       brand_slug: m.brands?.slug ?? '',
+      min_price: minPriceMap[m.id],
     }));
+
+    if (filters.sort === 'price_asc') {
+      items.sort((a, b) => (a.min_price ?? Infinity) - (b.min_price ?? Infinity));
+    } else if (filters.sort === 'price_desc') {
+      items.sort((a, b) => (b.min_price ?? -Infinity) - (a.min_price ?? -Infinity));
+    }
 
     return { items, total: count ?? 0 };
   },

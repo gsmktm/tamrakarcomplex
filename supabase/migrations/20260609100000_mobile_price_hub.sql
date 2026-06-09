@@ -123,7 +123,9 @@ CREATE TABLE IF NOT EXISTS model_emi (
 
 -- 11. Trigger: log price changes to price_history
 CREATE OR REPLACE FUNCTION log_price_change()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SECURITY DEFINER
+AS $$
 BEGIN
   IF OLD.regular_price IS DISTINCT FROM NEW.regular_price THEN
     INSERT INTO price_history (model_id, variant_id, old_price, new_price, changed_by)
