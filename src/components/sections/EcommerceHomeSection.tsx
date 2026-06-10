@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   Clock,
+  CreditCard,
   Cpu,
   Headphones,
   Laptop,
@@ -24,6 +25,7 @@ import {
   Store,
   Tablet,
   TrendingUp,
+  Trophy,
   Watch,
   Wrench,
   Zap,
@@ -31,6 +33,8 @@ import {
   ExternalLink,
   Search,
   ShieldAlert,
+  PackageCheck,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +44,6 @@ import { ArticleCard } from "@/components/articles/ArticleCard";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { PollSection } from "@/components/sections/PollSection";
 import { HomeSearchBox } from "@/components/home/HomeSearchBox";
-import { HomeQuickActions } from "@/components/home/HomeQuickActions";
 import { HomePriceFinder } from "@/components/home/HomePriceFinder";
 import { PhoneFinderQuiz } from "@/components/home/PhoneFinderQuiz";
 import { HomeMarketplaceFeed } from "@/components/home/HomeMarketplaceFeed";
@@ -50,7 +53,6 @@ import { HomeOffers } from "@/components/home/HomeOffers";
 import { HomeTrustStats } from "@/components/home/HomeTrustStats";
 import { HomeCompareMini } from "@/components/home/HomeCompareMini";
 import { MobileStickyCTA } from "@/components/home/MobileStickyCTA";
-import { BannerSlider } from "@/components/home/BannerSlider";
 import { useFeaturedProducts, useProducts, type Product } from "@/hooks/useProducts";
 import { useArticlesList } from "@/hooks/useArticles";
 import { useGuidesList } from "@/hooks/useGuides";
@@ -63,6 +65,7 @@ import { getPublicStorePath } from "@/lib/storeRoutes";
 import type { SectionConfig } from "@/types/app";
 import { formatDistanceToNow } from "date-fns";
 import { FlagshipShowcase } from "@/components/sections/FlagshipShowcase";
+import { Reveal } from "@/components/home/Reveal";
 
 type HomeStore = {
   id: string;
@@ -115,10 +118,12 @@ function DeviceFrame({ type, children, className }: { type: 'phone' | 'laptop', 
 
 const defaultSections: SectionConfig[] = [
   { key: "hero", label: "Hero", enabled: true, settings: {} },
+  { key: "quick_actions", label: "Quick Actions", enabled: true, settings: {} },
   { key: "serviceMatrix", label: "Service Matrix", enabled: true, settings: {} },
   { key: "priceDesk", label: "Price Desk", enabled: true, settings: {} },
   { key: "featured", label: "Featured Products", enabled: true, settings: {} },
   { key: "storesAndStories", label: "Stores and Stories", enabled: true, settings: {} },
+  { key: "trust_stats", label: "Trust Stats", enabled: true, settings: {} },
   { key: "trust", label: "Trust Section", enabled: true, settings: {} },
   { key: "poll", label: "Community Poll", enabled: true, settings: {} },
   { key: "chat", label: "Chat Widget", enabled: true, settings: {} },
@@ -146,7 +151,7 @@ const tickerItems = [
   { label: "Verified Stores — Safe & Trusted Purchases", href: "/stores" },
 ];
 
-const heroStats = [
+const _legacyHeroStats = [
   { value: "500+", label: "Products" },
   { value: "50+", label: "Stores" },
   { value: "10K+", label: "Customers" },
@@ -384,14 +389,11 @@ export function EcommerceHomeSection() {
     <div className="pb-20">
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       {(enabledSections.hero || enabledSections.search_box) && (
-        <HeroSection products={products} showSearch={enabledSections.search_box} />
+        <HeroSection products={products} />
       )}
 
       {/* ── FLAGSHIP SHOWCASE (Apple + Samsung + Algorithm) ──────────────── */}
       <FlagshipShowcase />
-
-      {/* ── QUICK ACTIONS ────────────────────────────────────────────────── */}
-      {enabledSections.quick_actions && <HomeQuickActions />}
 
       {/* ── OFFERS & DEALS ───────────────────────────────────────────────── */}
       {enabledSections.offers && <HomeOffers />}
@@ -422,13 +424,16 @@ export function EcommerceHomeSection() {
       {/* ── REPAIR MINI FORM ─────────────────────────────────────────────── */}
       {enabledSections.repair_form && <HomeRepairMiniForm />}
 
+      {/* ── PRE-BOOKING ──────────────────────────────────────────────────── */}
+      <PreBookingSection />
+
+      {/* ── EMI INQUIRY ──────────────────────────────────────────────────── */}
+      <EmiInquirySection />
+
       {/* ── WHAT'S HOT — EDITORIAL ───────────────────────────────────────── */}
       <EditorialSection articles={articles} guides={guides} isLoading={articlesLoading} />
 
-      {/* ── STORES SPOTLIGHT ─────────────────────────────────────────────── */}
-      {(enabledSections.storesAndStories || enabledSections.store_spotlight) && (
-        <HomeStoreSpotlight />
-      )}
+      {/* Store Spotlight — removed */}
 
       {/* ── TRUST STATS ──────────────────────────────────────────────────── */}
       {enabledSections.trust_stats && <HomeTrustStats />}
@@ -436,15 +441,7 @@ export function EcommerceHomeSection() {
       {/* ── SELL CTA BANNER ──────────────────────────────────────────────── */}
       <SellCtaBanner />
 
-      {/* ── COMMUNITY POLL ───────────────────────────────────────────────── */}
-      {enabledSections.poll && (
-        <section className="py-12 bg-secondary/20">
-          <div className="container max-w-2xl">
-            <SectionHeader eyebrow="Community" title="Quick Poll" />
-            <PollSection />
-          </div>
-        </section>
-      )}
+      {/* Community Poll — removed */}
 
       {/* ── CHAT WIDGET ──────────────────────────────────────────────────── */}
       {enabledSections.chat && <ChatWidget />}
@@ -455,107 +452,225 @@ export function EcommerceHomeSection() {
   );
 }
 
+// ─── Ticker ──────────────────────────────────────────────────────────────────
+
+const tickerData = [
+  { icon: Sparkles, text: "New iPhone 16 Pro - Now in Stock" },
+  { icon: Zap, text: "Samsung Galaxy S24 Ultra - Best Price in Nepal" },
+  { icon: Wrench, text: "Free Diagnosis with Every Repair Booking" },
+  { icon: CircleDollarSign, text: "Sell Your Old Phone - Get Instant Quote Today" },
+  { icon: RefreshCw, text: "MacBook Air M3 - Best Exchange Offer" },
+  { icon: BadgeCheck, text: "250+ Verified Stores in Tamrakar Complex" },
+  { icon: Smartphone, text: "Used iPhone 14 Pro - From Rs. 85,000" },
+  { icon: Trophy, text: "Nepal's Largest Mobile Mega Market" },
+];
+
+function NewsTicker() {
+  const items = [...tickerData, ...tickerData];
+  return (
+    <div className="overflow-hidden bg-gold py-1.5">
+      <div className="flex gap-12 ticker-track whitespace-nowrap">
+        {items.map((item, i) => (
+          <span key={i} className="inline-flex items-center gap-2 text-[11px] font-bold text-navy tracking-wide">
+            <item.icon className="h-3.5 w-3.5" aria-hidden />
+            <span>{item.text}</span>
+            <span className="text-navy/40 mx-2">•</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
-function HeroSection({ products, showSearch }: { products: Product[], showSearch?: boolean }) {
-  const [activeSlide, setActiveSlide] = useState(0);
-  const spotlight = products.slice(0, 3);
-  const { data: homeSettings } = useHomepageSettings();
+const heroStats = [
+  { stat: "500+",  label: "Products",      href: "/buy" },
+  { stat: "250+",  label: "Stores",        href: "/stores" },
+  { stat: "10K+",  label: "Customers",     href: "/marketplace" },
+  { stat: "4.9★",  label: "Rating",        href: "/stores" },
+];
 
-  useEffect(() => {
-    if (spotlight.length < 2) return;
-    const t = setInterval(() => setActiveSlide((p) => (p + 1) % spotlight.length), 4500);
-    return () => clearInterval(t);
-  }, [spotlight.length]);
+const heroCTAs = [
+  { label: "Browse Phones",   icon: ShoppingBag,       href: "/buy",               variant: "gold" },
+  { label: "Find Stores",     icon: Store,              href: "/stores",            variant: "outline" },
+  { label: "Book Repair",     icon: Wrench,             href: "/repair",            variant: "outline" },
+  { label: "Sell Phone",      icon: CircleDollarSign,   href: "/sell-your-phone",   variant: "ghost" },
+  { label: "Exchange",        icon: RefreshCw,          href: "/exchange-your-phone", variant: "ghost" },
+  { label: "Compare Prices",  icon: TrendingUp,         href: "/mobile-price",      variant: "ghost" },
+];
 
-  const heroData = homeSettings?.hero_section || {
-    title: "Buy. Sell. Repair. Repeat.",
-    subtitle: "Nepal's most connected gadget platform — shop the latest phones, get instant trade-in quotes, book repairs, and discover verified stores all in one place."
+const quickCategories = [
+  { label: "iPhone",      href: "/buy?brand=Apple",    icon: Smartphone },
+  { label: "Samsung",     href: "/buy?brand=Samsung",  icon: Star },
+  { label: "Xiaomi",      href: "/buy?brand=Xiaomi",   icon: Zap },
+  { label: "MacBook",     href: "/buy?category=Laptops&brand=Apple", icon: Laptop },
+  { label: "Used Phones", href: "/marketplace",        icon: RefreshCw },
+  { label: "Accessories", href: "/buy?category=Accessories", icon: Headphones },
+  { label: "Repair",      href: "/repair",             icon: Wrench },
+  { label: "iPad",        href: "/buy?category=Tablets", icon: Tablet },
+];
+
+const operationTiles = [
+  { label: "Buy", value: "Live stock", href: "/buy", icon: ShoppingBag },
+  { label: "Sell", value: "Instant quote", href: "/sell-your-phone", icon: CircleDollarSign },
+  { label: "Repair", value: "Book service", href: "/repair", icon: Wrench },
+  { label: "Stores", value: "Verified only", href: "/stores", icon: Store },
+];
+
+function HeroSection({ products }: { products: Product[] }) {
+  const [query, setQuery] = useState("");
+  const navigate = useNavigate();
+
+  const handleSearch = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    navigate(`/buy?q=${encodeURIComponent(query.trim() || "")}`);
   };
 
   return (
-    <section className="relative overflow-hidden border-b border-border/40 bg-background">
-      {/* Ambient gradient orbs */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-32 -top-32 h-[600px] w-[600px] rounded-full bg-primary/10 blur-[120px] animate-[orb1_18s_ease-in-out_infinite]" />
-        <div className="absolute -right-20 top-10 h-[500px] w-[500px] rounded-full bg-blue-500/8 blur-[100px] animate-[orb2_22s_ease-in-out_infinite]" />
-        <div className="absolute bottom-0 left-1/2 h-[400px] w-[800px] -translate-x-1/2 rounded-full bg-emerald-500/5 blur-[80px] animate-[orb3_16s_ease-in-out_infinite]" />
-        {/* Dot grid */}
-        <div
-          className="absolute inset-0 opacity-[0.025]"
-          style={{ backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: "28px 28px" }}
-        />
-      </div>
+    <>
+      <section
+        className="relative overflow-hidden"
+        style={{ background: "linear-gradient(160deg, oklch(10% 0.028 258) 0%, oklch(13% 0.034 258) 55%, oklch(16% 0.040 258) 100%)" }}
+      >
+        {/* Structured backdrop */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 opacity-[0.04]"
+            style={{
+              backgroundImage: "linear-gradient(oklch(100% 0 0 / 0.15) 1px, transparent 1px), linear-gradient(90deg, oklch(100% 0 0 / 0.15) 1px, transparent 1px)",
+              backgroundSize: "48px 48px",
+            }}
+          />
+          <div className="absolute inset-x-0 top-0 h-px bg-gold/40" />
+          <div className="absolute left-0 top-0 h-full w-1/3 bg-[linear-gradient(90deg,oklch(64%_0.118_70_/_0.12),transparent)]" />
+        </div>
 
-      <div className="container relative py-14 md:py-20 xl:py-24">
-        <div className="flex flex-col items-center text-center space-y-12">
-          {/* Top — copy */}
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/8 px-4 py-1.5 text-xs font-semibold tracking-[0.2em] uppercase text-primary">
-              <Zap className="h-3.5 w-3.5" />
-              Nepal's #1 Mobile Hub
-            </div>
+        <div className="container relative pt-10 pb-0 md:pt-14 md:pb-0">
+          {/* ── Badge ── */}
+          <div className="flex justify-center mb-6 animate-fade-up delay-0">
+            <span className="inline-flex items-center gap-2 rounded-full border border-gold/35 bg-gold/10 px-4 py-1.5 text-[11px] font-semibold tracking-[0.20em] uppercase text-gold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              <Zap className="h-3 w-3" aria-hidden />
+              Nepal's Mobile Mega Market — New Road, Kathmandu
+            </span>
+          </div>
 
-            <h1 className="font-display text-[2.8rem] font-black leading-[1] tracking-tight md:text-7xl xl:text-8xl mb-6">
-              {heroData.title.includes(".") ? (
-                <>
-                  {heroData.title.split(".")[0]}. {heroData.title.split(".")[1]}.
-                  <span className="block bg-gradient-to-r from-primary via-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                    {heroData.title.split(".").slice(2).join(".")}
-                  </span>
-                </>
-              ) : heroData.title}
+          {/* ── Headline ── */}
+          <div className="text-center mb-6 animate-fade-up delay-100">
+            <h1
+              className="font-display font-bold text-white leading-[1.0] tracking-[-0.01em]"
+              style={{ fontSize: "clamp(2.6rem, 7.5vw, 5.6rem)", fontWeight: 600 }}
+            >
+              Find Mobiles,{" "}
+              <em style={{ color: "oklch(70% 0.112 72)", fontStyle: "italic", fontWeight: 600 }}>Gadgets</em>
+              <br />
+              &amp; Trusted Stores
             </h1>
-
-            <p className="mt-6 mx-auto max-w-2xl text-lg leading-relaxed text-muted-foreground">
-              {heroData.subtitle}
+            <p className="mt-4 text-white/55 text-base md:text-lg max-w-xl mx-auto leading-relaxed">
+              Search phones, compare price, call real shops, book repair, or exchange your old phone — all from Tamrakar Complex.
             </p>
           </div>
 
-          {/* New Banner Slider */}
-          <div className="w-full max-w-6xl mx-auto px-4">
-            <BannerSlider />
-          </div>
-
-          {/* Smart Search Box */}
-          {showSearch && (
-            <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
-              <HomeSearchBox />
+          {/* ── Search bar ── */}
+          <form
+            onSubmit={handleSearch}
+            className="animate-fade-up delay-150 max-w-2xl mx-auto mb-6"
+          >
+            <div className="flex items-center h-14 rounded-xl shadow-[0_8px_40px_rgba(0,0,0,0.45)] overflow-hidden ring-2 ring-gold/0 focus-within:ring-gold/50 transition-all duration-300" style={{ background: "oklch(98.5% 0.010 78)" }}>
+              <Search className="ml-4 h-5 w-5 shrink-0" style={{ color: "oklch(55% 0.080 60)" }} aria-hidden />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search iPhone 16, Samsung S25, screen repair, charger…"
+                className="flex-1 h-full px-3 text-sm md:text-base bg-transparent outline-none"
+                style={{ color: "oklch(20% 0.025 50)", fontFamily: "'Outfit', sans-serif" }}
+                aria-label="Search products and stores"
+              />
+              <button
+                type="submit"
+                className="h-full px-6 font-semibold text-sm shrink-0 transition-all pressable hover:opacity-90"
+                style={{ background: "oklch(64% 0.118 70)", color: "oklch(11% 0.022 48)", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "0.02em" }}
+              >
+                Search
+              </button>
             </div>
-          )}
+          </form>
 
-          {/* CTA row (Only if search is hidden or as secondary) */}
-          {!showSearch && (
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link to="/buy">
-                <Button size="lg" className="h-12 rounded-full px-7 hero-gradient text-primary-foreground shadow-glow gap-2">
-                  <ShoppingBag className="h-4 w-4" /> Shop Now
-                </Button>
+          {/* ── Quick category chips ── */}
+          <div className="animate-fade-up delay-200 flex flex-wrap justify-center gap-2 mb-8">
+            {quickCategories.map((cat) => (
+              <Link
+                key={cat.label}
+                to={cat.href}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/8 px-3.5 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/15 hover:text-white hover:border-gold/40 transition-all duration-200 pressable"
+                style={{ background: "rgba(255,255,255,0.06)" }}
+              >
+                <cat.icon className="h-3.5 w-3.5" aria-hidden />
+                {cat.label}
               </Link>
-              <Link to="/sell-your-phone">
-                <Button size="lg" variant="outline" className="h-12 rounded-full px-7 border-border/60 hover:bg-secondary gap-2">
-                  <CircleDollarSign className="h-4 w-4" /> Sell Phone
-                </Button>
-              </Link>
-              <Link to="/valuation-estimator">
-                <Button size="lg" variant="ghost" className="h-12 rounded-full px-7 hover:-translate-y-0.5 transition-all gap-2">
-                  <Sparkles className="h-4 w-4" /> Get Valuation
-                </Button>
-              </Link>
-            </div>
-          )}
-          
-          <div className="mt-12 flex items-center justify-center gap-8 border-t border-border/40 pt-10 w-full max-w-2xl mx-auto">
-            {heroStats.map((stat) => (
-              <div key={stat.label}>
-                <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
-                <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">{stat.label}</p>
-              </div>
             ))}
           </div>
+
+          <div className="animate-fade-up delay-250 mx-auto mb-8 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
+            {operationTiles.map((tile) => (
+              <Link
+                key={tile.label}
+                to={tile.href}
+                className="group border border-white/15 bg-white/[0.06] p-3 text-left transition-all hover:border-gold/45 hover:bg-white/[0.10] focus-visible:outline-gold"
+              >
+                <div className="mb-3 flex h-9 w-9 items-center justify-center border border-white/15 bg-white/[0.08] text-gold transition-colors group-hover:border-gold/45">
+                  <tile.icon className="h-4 w-4" aria-hidden />
+                </div>
+                <p className="font-data text-sm font-semibold text-white">{tile.label}</p>
+                <p className="mt-0.5 text-xs text-white/50">{tile.value}</p>
+              </Link>
+            ))}
+          </div>
+
+          {/* ── CTA row ── */}
+          <div className="animate-fade-up delay-300 flex flex-wrap justify-center gap-2.5 mb-10">
+            {heroCTAs.map((cta) => {
+              const Icon = cta.icon;
+              if (cta.variant === "gold") return (
+                <Link key={cta.label} to={cta.href}>
+                  <button className="inline-flex items-center gap-2 h-10 px-5 rounded-lg font-semibold text-sm pressable shadow-gold hover:opacity-90 transition-opacity"
+                    style={{ background: "oklch(64% 0.118 70)", color: "oklch(11% 0.022 48)", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    <Icon className="h-4 w-4" aria-hidden />{cta.label}
+                  </button>
+                </Link>
+              );
+              if (cta.variant === "outline") return (
+                <Link key={cta.label} to={cta.href}>
+                  <button className="inline-flex items-center gap-2 h-10 px-5 rounded-lg font-medium text-sm text-white/80 border border-white/20 hover:border-gold/45 hover:text-gold pressable transition-all"
+                    style={{ background: "rgba(255,255,255,0.05)" }}>
+                    <Icon className="h-4 w-4" aria-hidden />{cta.label}
+                  </button>
+                </Link>
+              );
+              return (
+                <Link key={cta.label} to={cta.href}>
+                  <button className="inline-flex items-center gap-2 h-10 px-4 rounded-xl font-medium text-sm text-white/50 hover:text-white/80 pressable transition-colors">
+                    <Icon className="h-4 w-4" aria-hidden />{cta.label}
+                  </button>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* ── Stats bar — clips into ivory section ── */}
+          <div className="animate-fade-up delay-300 clip-diagonal-up -mx-4 md:-mx-8 lg:mx-0 rounded-t-3xl px-4 pt-6 pb-0" style={{ background: "oklch(98.5% 0.010 78)" }}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border max-w-2xl mx-auto">
+              {heroStats.map(({ stat, label, href }) => (
+                <Link key={label} to={href} className="flex flex-col items-center py-4 px-3 hover:bg-secondary/60 rounded-xl transition-colors">
+                  <span className="font-display text-2xl md:text-3xl font-semibold text-navy" style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: "-0.01em" }}>{stat}</span>
+                  <span className="text-xs text-muted-foreground mt-0.5">{label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
 
@@ -567,34 +682,50 @@ function ServiceMatrix() {
   return (
     <section className="py-14 bg-background">
       <div className="container">
-        <SectionHeader eyebrow="Everything you need" title="Our Services" href="/services" />
+        <Reveal>
+          <SectionHeader eyebrow="Everything you need" title="Our Services" href="/services" />
+        </Reveal>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {serviceCards.map((card) => {
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {serviceCards.map((card, i) => {
             const Icon = card.icon;
             return (
-              <Link key={card.title} to={card.href} className="group">
-                <div
-                  className={cn(
-                    "relative flex flex-col gap-4 rounded-2xl border border-border/60 p-6 h-full transition-all duration-300",
-                    "hover:-translate-y-1.5 hover:border-primary/30",
-                    card.bg,
-                    "hover:" + card.glow,
-                  )}
-                >
-                  <div className={cn("h-11 w-11 rounded-xl bg-gradient-to-br flex items-center justify-center text-white shrink-0", card.gradient)}>
-                    <Icon className="h-5 w-5" />
+              <Reveal key={card.title} delay={(Math.min(i, 5) as 0 | 1 | 2 | 3 | 4 | 5)}>
+                <Link to={card.href} className="group block h-full">
+                  <div
+                    className={cn(
+                      "relative flex flex-col gap-3 border border-border bg-background p-5 h-full",
+                      "transition-colors duration-200 hover:bg-secondary/40 hover:border-primary/40",
+                    )}
+                  >
+                    {/* Icon */}
+                    <div className="h-10 w-10 border border-border flex items-center justify-center bg-secondary shrink-0 transition-colors duration-200 group-hover:bg-primary group-hover:border-primary group-hover:text-primary-foreground">
+                      <Icon className="h-5 w-5" aria-hidden />
+                    </div>
+                    {/* Copy */}
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm leading-tight">{card.title}</p>
+                      <p className="text-[11px] text-primary mt-0.5 font-medium">{card.subtitle}</p>
+                      <p className="mt-2 text-xs text-muted-foreground line-clamp-2 leading-relaxed">{card.description}</p>
+                    </div>
+                    {/* Arrow */}
+                    <div className="flex items-center gap-1 text-[11px] font-semibold text-primary">
+                      Learn more
+                      <ArrowRight
+                        className="h-3 w-3 translate-x-0 group-hover:translate-x-1 transition-transform duration-200"
+                        style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
+                        aria-hidden
+                      />
+                    </div>
+                    {/* Bottom sweep */}
+                    <span
+                      aria-hidden
+                      className="absolute bottom-0 left-0 h-0.5 w-0 bg-primary group-hover:w-full transition-[width] duration-300"
+                      style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
+                    />
                   </div>
-                  <div>
-                    <p className="font-semibold leading-tight">{card.title}</p>
-                    <p className="text-xs text-primary mt-0.5">{card.subtitle}</p>
-                    <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{card.description}</p>
-                  </div>
-                  <div className="mt-auto flex items-center gap-1 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                    Learn more <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              </Link>
+                </Link>
+              </Reveal>
             );
           })}
         </div>
@@ -1149,25 +1280,261 @@ function StoresSection({
 
 // ─── Sell CTA Banner ──────────────────────────────────────────────────────────
 
+// ─── Pre-Booking Section ──────────────────────────────────────────────────────
+
+function PreBookingSection() {
+  const [form, setForm] = useState({ name: "", phone: "", model: "", storage: "", color: "", city: "", delivery: "pickup", notes: "" });
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.phone || !form.model) return;
+    setLoading(true);
+    try {
+      await supabase.from("pre_bookings").insert({
+        customer_name: form.name,
+        phone: form.phone,
+        model: form.model,
+        storage: form.storage,
+        color: form.color,
+        city: form.city,
+        delivery_option: form.delivery,
+        notes: form.notes,
+        status: "new",
+      });
+      setSubmitted(true);
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const field = (label: string, key: keyof typeof form, placeholder = "", type = "text") => (
+    <div>
+      <label className="block text-xs font-semibold text-navy mb-1">{label}</label>
+      <input
+        type={type}
+        value={form[key]}
+        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+        placeholder={placeholder}
+        className="w-full h-10 px-3 rounded-lg border border-border text-sm outline-none focus:border-gold focus:ring-1 focus:ring-gold/30 transition-all bg-white"
+      />
+    </div>
+  );
+
+  return (
+    <section className="py-16">
+      <div className="container">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+
+          {/* ── Left content ── */}
+          <Reveal>
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-full bg-gold/10 border border-gold/30 px-3.5 py-1 text-[11px] font-bold tracking-widest uppercase text-gold mb-4">
+                <PackageCheck className="h-3.5 w-3.5" aria-hidden />
+                New Model Pre-Booking
+              </span>
+              <h2 className="font-display text-3xl md:text-4xl font-black text-navy leading-tight mb-4">
+                Reserve Your Next
+                <span className="text-gold block">iPhone Before It Lands</span>
+              </h2>
+              <p className="text-muted-foreground leading-relaxed mb-6">
+                Be the first to get the latest iPhones, Samsungs, and flagship devices. Book now — zero advance payment. We'll call you to confirm.
+              </p>
+              <div className="space-y-3">
+                {[
+                  { icon: CheckCircle2, text: "Zero advance payment required" },
+                  { icon: Phone, text: "We call to confirm within 24 hours" },
+                  { icon: Zap, text: "Priority delivery when stock arrives" },
+                  { icon: Store, text: "Pickup or home delivery options" },
+                ].map((item) => (
+                  <div key={item.text} className="flex items-center gap-3 text-sm text-foreground">
+                    <item.icon className="h-4 w-4 text-gold" aria-hidden />
+                    <span>{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+
+          {/* ── Form ── */}
+          <Reveal>
+            <div className="bg-white rounded-2xl border border-border p-6 shadow-tk-md">
+              {submitted ? (
+                <div className="text-center py-8">
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gold/15 text-gold">
+                    <CheckCircle2 className="h-7 w-7" aria-hidden />
+                  </div>
+                  <h3 className="font-display text-xl font-bold text-navy mb-2">Pre-Booking Confirmed!</h3>
+                  <p className="text-muted-foreground text-sm">We'll contact you within 24 hours to confirm your booking.</p>
+                  <button onClick={() => setSubmitted(false)} className="mt-6 text-xs text-gold hover:underline">Book another</button>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <h3 className="font-display text-lg font-bold text-navy mb-2">Pre-Book a Device</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {field("Your Name *", "name", "Full name")}
+                    {field("WhatsApp / Phone *", "phone", "+977 98XXXXXXXX", "tel")}
+                  </div>
+                  {field("Device Model *", "model", "e.g. iPhone 16 Pro Max, Samsung S24")}
+                  <div className="grid grid-cols-2 gap-4">
+                    {field("Storage", "storage", "e.g. 256GB")}
+                    {field("Color", "color", "e.g. Natural Titanium")}
+                  </div>
+                  {field("Your City", "city", "e.g. Kathmandu")}
+                  <div>
+                    <label className="block text-xs font-semibold text-navy mb-1">Delivery Option</label>
+                    <select
+                      value={form.delivery}
+                      onChange={(e) => setForm((f) => ({ ...f, delivery: e.target.value }))}
+                      className="w-full h-10 px-3 rounded-lg border border-border text-sm outline-none focus:border-gold bg-white"
+                    >
+                      <option value="pickup">Store Pickup — Tamrakar Complex</option>
+                      <option value="delivery">Home Delivery (Kathmandu Valley)</option>
+                      <option value="courier">Outside Valley — Courier</option>
+                    </select>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full h-11 rounded-xl font-bold text-sm text-navy transition-opacity hover:opacity-90 pressable disabled:opacity-60"
+                    style={{ background: "oklch(72% 0.175 75)" }}
+                  >
+                    {loading ? "Submitting..." : "Pre-Book Now - Free & Instant"}
+                  </button>
+                  <p className="text-[11px] text-muted-foreground text-center">No payment now. We confirm by call or WhatsApp.</p>
+                </form>
+              )}
+            </div>
+          </Reveal>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── EMI Inquiry Section ─────────────────────────────────────────────────────
+
+function EmiInquirySection() {
+  const [form, setForm] = useState({ name: "", phone: "", product: "", down: "", plan: "" });
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.phone) return;
+    setLoading(true);
+    try {
+      await supabase.from("emi_inquiries").insert({
+        customer_name: form.name,
+        phone: form.phone,
+        product_interest: form.product,
+        down_payment: form.down,
+        preferred_plan: form.plan,
+        status: "new",
+      });
+      setSubmitted(true);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <section className="py-12" style={{ background: "oklch(14% 0.042 255)" }}>
+      <div className="container">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+
+          <Reveal>
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-full bg-gold/15 border border-gold/30 px-3.5 py-1 text-[11px] font-bold tracking-widest uppercase text-gold mb-4">
+                <CreditCard className="h-3.5 w-3.5" aria-hidden />
+                EMI Available
+              </span>
+              <h2 className="font-display text-2xl md:text-3xl font-black text-white leading-tight mb-3">
+                Buy Now,<br />
+                <span className="text-gold">Pay Easy EMI</span>
+              </h2>
+              <p className="text-white/55 text-sm leading-relaxed mb-5">
+                Get iPhone 15 or Samsung S24 Ultra on easy monthly installments. Submit your inquiry — our store partners will reach out with the best offer.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {["3 Month", "6 Month", "12 Month", "24 Month"].map((plan) => (
+                  <span key={plan} className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-xs font-semibold text-gold">
+                    <CheckCircle2 className="h-3 w-3" aria-hidden />
+                    {plan}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal>
+            <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              {submitted ? (
+                <div className="text-center py-6">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 text-gold">
+                    <CheckCircle2 className="h-6 w-6" aria-hidden />
+                  </div>
+                  <p className="text-white font-bold">EMI Inquiry Sent!</p>
+                  <p className="text-white/50 text-sm mt-1">A store partner will call you within 24 hours.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <h3 className="font-display text-base font-bold text-white mb-1">EMI Inquiry</h3>
+                  {[
+                    { label: "Your Name *", key: "name" as const, ph: "Full name" },
+                    { label: "Phone *", key: "phone" as const, ph: "+977 98XXXXXXXX" },
+                    { label: "Product Interested In", key: "product" as const, ph: "e.g. iPhone 15 Pro 256GB" },
+                    { label: "Down Payment Amount", key: "down" as const, ph: "e.g. Rs. 20,000" },
+                  ].map(({ label, key, ph }) => (
+                    <div key={key}>
+                      <label className="block text-xs font-semibold text-white/70 mb-1">{label}</label>
+                      <input
+                        value={form[key]}
+                        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                        placeholder={ph}
+                        className="w-full h-9 px-3 rounded-lg text-sm outline-none transition-all text-white"
+                        style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full h-10 rounded-xl font-bold text-sm text-navy hover:opacity-90 pressable disabled:opacity-60"
+                    style={{ background: "oklch(72% 0.175 75)" }}
+                  >
+                    {loading ? "Sending..." : "Send EMI Inquiry"}
+                  </button>
+                </form>
+              )}
+            </div>
+          </Reveal>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SellCtaBanner() {
   return (
     <section className="py-6">
       <div className="container">
-        <div className="relative overflow-hidden rounded-3xl bg-foreground px-8 py-12 md:px-14 md:py-16">
-          {/* Gradient orbs inside banner */}
+        <div className="relative overflow-hidden bg-foreground px-8 py-12 md:px-14 md:py-16">
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary/25 blur-[80px]" />
-            <div className="absolute -left-10 bottom-0 h-60 w-60 rounded-full bg-blue-500/15 blur-[60px]" />
+            <div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(90deg,transparent,oklch(64%_0.118_70_/_0.18))]" />
+            <div className="absolute inset-x-0 top-0 h-px bg-white/20" />
           </div>
 
           <div className="relative grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white/80">
-                <TrendingUp className="h-3.5 w-3.5" /> Best Resale Prices
+              <div className="mb-4 inline-flex items-center gap-2 border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white/80">
+                <TrendingUp className="h-3.5 w-3.5" aria-hidden /> Best Resale Prices
               </div>
-              <h2 className="font-display text-3xl font-black text-white md:text-4xl xl:text-5xl leading-tight">
+              <h2 className="font-syne text-3xl font-black text-white md:text-4xl xl:text-5xl leading-tight">
                 Your old phone is
-                <span className="block bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent">
+                <span className="block text-primary">
                   worth more than you think.
                 </span>
               </h2>
@@ -1176,13 +1543,13 @@ function SellCtaBanner() {
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link to="/sell-your-phone">
-                  <Button size="lg" className="h-12 rounded-full px-7 bg-primary hover:bg-primary/90 text-primary-foreground shadow-glow gap-2">
-                    <CircleDollarSign className="h-4 w-4" /> Sell Now
+                  <Button size="lg" className="h-12 rounded-sm px-7 bg-primary hover:bg-primary/90 text-primary-foreground pressable gap-2">
+                    <CircleDollarSign className="h-4 w-4" aria-hidden /> Sell Now
                   </Button>
                 </Link>
                 <Link to="/valuation-estimator">
-                  <Button size="lg" variant="outline" className="h-12 rounded-full px-7 border-white/25 text-white hover:bg-white/10 gap-2">
-                    <Sparkles className="h-4 w-4" /> Get Estimate
+                  <Button size="lg" variant="outline" className="h-12 rounded-sm px-7 border-white/25 text-white hover:bg-white/10 pressable gap-2">
+                    <Sparkles className="h-4 w-4" aria-hidden /> Get Estimate
                   </Button>
                 </Link>
               </div>
