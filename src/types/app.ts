@@ -4,6 +4,7 @@ export type AppRole =
   | "suadmin"
   | "staffadmin"
   | "storeadmin"
+  | "storestaff"
   | "user";
 
 export type ThemeButtonStyle = "rounded" | "pill" | "square";

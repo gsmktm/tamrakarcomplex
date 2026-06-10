@@ -57,7 +57,6 @@ const SuperAdminDashboard = () => {
         // Try RPC first (if deployed)
         const { data: stats, error } = await supabase.rpc("get_super_admin_stats");
         if (!error && stats) {
-          console.info("Dashboard: RPC function successful");
           const systemHealth: SystemHealth = {
             database: "healthy",
             api: "healthy",

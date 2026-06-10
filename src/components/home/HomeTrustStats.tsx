@@ -1,37 +1,68 @@
 import { useHomepageSettings } from "@/hooks/useHomepageSettings";
-import { Users, Store, TrendingUp, BadgeCheck, Globe } from "lucide-react";
+import { Reveal } from "@/components/home/Reveal";
 
 export const HomeTrustStats = () => {
   const { data: settings } = useHomepageSettings();
-  const stats = settings?.trust_stats || {
-    stores: "250+",
-    monthly_flow: "100K+",
-    services: "Buy / Sell / Repair / Exchange",
-    network: "Verified Store Network",
-    hub: "Nepal Mobile Market Hub"
-  };
+  const raw = settings?.trust_stats;
 
-  const items = [
-    { label: "Target Mobile Stores", value: stats.stores, icon: Store, color: "text-blue-600 bg-blue-50" },
-    { label: "Monthly Mobile Flow", value: stats.monthly_flow, icon: TrendingUp, color: "text-green-600 bg-green-50" },
-    { label: stats.network, value: "Verified", icon: BadgeCheck, color: "text-purple-600 bg-purple-50" },
-    { label: stats.hub, value: "Nepal Hub", icon: Globe, color: "text-orange-600 bg-orange-50" },
+  const stats = [
+    {
+      value: raw?.stores ?? "250+",
+      label: "Verified stores",
+      note: "across Nepal",
+      delay: "delay-0",
+    },
+    {
+      value: raw?.monthly_flow ?? "100K+",
+      label: "Monthly transactions",
+      note: "buy, sell, repair",
+      delay: "delay-100",
+    },
+    {
+      value: "7",
+      label: "Services in one place",
+      note: "buy · sell · repair · unlock · exchange · diagnose · compare",
+      delay: "delay-200",
+    },
+    {
+      value: "NP#1",
+      label: "Nepal's gadget hub",
+      note: "Tamrakar Complex, Kathmandu",
+      delay: "delay-300",
+    },
   ];
 
   return (
-    <section className="py-20 border-y bg-background">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-          {items.map((item, i) => (
-            <div key={i} className="text-center space-y-4 group">
-              <div className={`mx-auto w-16 h-16 rounded-2xl flex items-center justify-center ${item.color} group-hover:scale-110 transition-transform duration-300 shadow-sm`}>
-                <item.icon className="h-8 w-8" />
-              </div>
-              <div>
-                <h3 className="text-3xl font-black tracking-tight">{item.value}</h3>
-                <p className="text-muted-foreground font-medium text-sm mt-1">{item.label}</p>
-              </div>
-            </div>
+    <section className="border-y border-border bg-background">
+      <div className="container mx-auto px-4 max-w-6xl">
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
+          {stats.map((stat, i) => (
+            <Reveal
+              key={stat.value}
+              delay={(i as 0 | 1 | 2 | 3 | 4 | 5)}
+              className={[
+                "py-12 px-6 group",
+              ].join(" ")}
+            >
+              {/* Large number */}
+              <p
+                className="font-syne font-bold text-4xl md:text-5xl leading-none text-foreground mb-2"
+                aria-label={`${stat.value} ${stat.label}`}
+              >
+                {stat.value}
+              </p>
+
+              {/* Label */}
+              <p className="text-sm font-semibold text-foreground/80">{stat.label}</p>
+
+              {/* Note */}
+              <p className="text-xs text-muted-foreground mt-1 text-pretty leading-snug">
+                {stat.note}
+              </p>
+
+              {/* Saffron accent — thin rule, grows left on section enter */}
+              <div className="mt-5 h-0.5 w-8 bg-primary/40 group-hover:w-16 transition-[width] duration-300" style={{ transitionTimingFunction: "var(--ease-out-quart)" }} />
+            </Reveal>
           ))}
         </div>
       </div>

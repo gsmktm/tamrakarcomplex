@@ -28,7 +28,21 @@ import { ErrorBoundary } from "@/components/system/ErrorBoundary";
 import StoreRedirect from "@/components/routing/StoreRedirect";
 import "@/styles/dynamic-theme.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Data considered fresh for 5 minutes — no refetch on remount within this window
+      staleTime: 5 * 60 * 1000,
+      // Keep unused query data in memory for 15 minutes
+      gcTime: 15 * 60 * 1000,
+      // Do not refetch just because user switched tabs
+      refetchOnWindowFocus: false,
+      // Only retry once on network error
+      retry: 1,
+      retryDelay: 1500,
+    },
+  },
+});
 
 const VisitorTracker = () => {
   useVisitorTracking();

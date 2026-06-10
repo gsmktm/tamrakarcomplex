@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { storeDirectoryService } from "@/services/storeDirectoryService";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
@@ -121,12 +123,26 @@ function ServiceTag({ svc }: { svc: string }) {
 // ─── Modern Store Card ────────────────────────────────────────────────────────
 function ModernStoreCard({ store, isAdmin }: { store: StoreDirectoryItem; isAdmin: boolean }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const tier = store.subscription_tier || "free";
   const isDiamond = tier === "diamond";
   const isGold = tier === "gold";
 
+  // Prefetch store detail on hover so the page feels instant on click
+  const handleMouseEnter = useCallback(() => {
+    const identifierValue = (store as any).slug || (store as any).seo_slug || store.id;
+    const identifierType = (store as any).slug || (store as any).seo_slug ? "slug" : "id";
+    queryClient.prefetchQuery({
+      queryKey: ["store-detail", identifierType, identifierValue],
+      queryFn: () => storeDirectoryService.getStoreByIdentifier({ type: identifierType, value: identifierValue }),
+      staleTime: 10 * 60 * 1000,
+    });
+  }, [queryClient, store]);
+
   return (
-    <div className={cn(
+    <div
+      onMouseEnter={handleMouseEnter}
+      className={cn(
       "group relative flex flex-col p-6 rounded-[2.5rem] transition-all duration-500 border h-full",
       "hover:shadow-[0_20px_50px_-20px_rgba(0,0,0,0.1)] hover:-translate-y-1",
       isDiamond ? "bg-white/40 backdrop-blur-xl border-cyan-100 shadow-[0_10px_30px_-15px_rgba(34,211,238,0.1)]" : 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveListingImage } from "@/lib/phoneImages";
 import { Loader2, ArrowLeft, MapPin, Calendar, User, Edit, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,11 +75,15 @@ export default function ListingDetail() {
         .maybeSingle();
 
       if (unifiedData) {
-        const images = Array.isArray(unifiedData.images)
+        const rawImages = Array.isArray(unifiedData.images)
           ? unifiedData.images
           : unifiedData.images
             ? Object.values(unifiedData.images as Record<string, string>).filter(Boolean)
             : [];
+        const resolvedFirst = resolveListingImage(unifiedData.title ?? null, unifiedData.brand ?? null, rawImages);
+        const images: string[] = resolvedFirst
+          ? [resolvedFirst, ...rawImages.filter((u: string) => u !== resolvedFirst)]
+          : rawImages;
         return {
           ...unifiedData,
           user_id: unifiedData.created_by,
@@ -95,7 +100,14 @@ export default function ListingDetail() {
         .eq("id", id)
         .maybeSingle();
 
-      if (data) return data as ListingDetailRecord;
+      if (data) {
+        const rawImgs = Array.isArray(data.images) ? data.images as string[] : [];
+        const resolvedFirst = resolveListingImage(data.title ?? null, (data as any).brand ?? null, rawImgs);
+        const resolvedImgs: string[] = resolvedFirst
+          ? [resolvedFirst, ...rawImgs.filter((u) => u !== resolvedFirst)]
+          : rawImgs;
+        return { ...data, images: resolvedImgs } as ListingDetailRecord;
+      }
 
       const { data: marketplaceData, error: marketplaceError } = await supabase
         .from("marketplace_listings")

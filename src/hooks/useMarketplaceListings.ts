@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCrudResource } from "@/hooks/useCrudResource";
 import { getFallbackMarketplaceListings } from "@/services/publicFallbackData";
+import { resolveListingImage } from "@/lib/phoneImages";
 
 export type MarketplaceListingRecord = {
   id: string;
@@ -59,6 +60,8 @@ export type MarketplaceListingsParams = {
 export function useMarketplaceListings(params: MarketplaceListingsParams = {}) {
   const query = useQuery({
     queryKey: ["marketplace-listings", params],
+    staleTime: 3 * 60 * 1000, // 3 min — marketplace listings change frequently
+    placeholderData: (prev) => prev,
     queryFn: async () => {
       let request = (supabase as any)
         .from("public_marketplace_items")
@@ -143,11 +146,17 @@ export function useMarketplaceListings(params: MarketplaceListingsParams = {}) {
 }
 
 function normalizeListing(listing: MarketplaceListingRecord): MarketplaceListingRecord {
-  const images = Array.isArray(listing.images)
+  const rawImages = Array.isArray(listing.images)
     ? listing.images
     : listing.images
       ? Object.values(listing.images as unknown as Record<string, string>).filter(Boolean)
       : [];
+
+  // Resolve best image (injects GSMArena URL for iPhones that have null/Unsplash images)
+  const resolvedFirst = resolveListingImage(listing.title ?? null, listing.brand ?? null, rawImages);
+  const images: string[] = resolvedFirst
+    ? [resolvedFirst, ...rawImages.filter((u) => u !== resolvedFirst)]
+    : rawImages;
 
   return {
     ...listing,

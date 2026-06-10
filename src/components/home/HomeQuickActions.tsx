@@ -1,97 +1,198 @@
 import { useNavigate } from "react-router-dom";
-import { 
-  Smartphone, 
-  Banknote, 
-  RefreshCw, 
-  Wrench, 
-  Unlock, 
-  Store,
-  ShieldAlert 
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { ArrowRight } from "lucide-react";
 
 const actions = [
   {
-    title: "Buy New Phone",
-    text: "Latest smartphones with warranty",
-    icon: Smartphone,
+    number: "01",
+    title: "Buy New",
+    subtitle: "Phones & Laptops",
+    description: "Latest devices with warranty from 250+ verified stores",
     route: "/buy",
-    color: "bg-blue-500/10 text-blue-600",
+    tag: "Most Popular",
+    size: "large",
   },
   {
-    title: "Sell Used Phone",
-    text: "Get instant cash for your device",
-    icon: Banknote,
+    number: "02",
+    title: "Sell Used",
+    subtitle: "Get Instant Cash",
+    description: "Best price for your old device, paid same day",
     route: "/sell-your-phone",
-    color: "bg-green-500/10 text-green-600",
+    tag: "Fast Payout",
+    size: "large",
   },
   {
-    title: "Exchange Phone",
-    text: "Upgrade to your dream phone",
-    icon: RefreshCw,
-    route: "/exchange-your-phone",
-    color: "bg-purple-500/10 text-purple-600",
-  },
-  {
-    title: "Repair Phone",
-    text: "Expert screen & battery fix",
-    icon: Wrench,
+    number: "03",
+    title: "Repair",
+    subtitle: "Screen · Battery · Software",
+    description: "Expert service at trusted shops in your area",
     route: "/repair",
-    color: "bg-orange-500/10 text-orange-600",
+    tag: null,
+    size: "medium",
   },
   {
-    title: "Unlock / Software",
-    text: "iCloud, Network & OS service",
-    icon: Unlock,
+    number: "04",
+    title: "Exchange",
+    subtitle: "Upgrade Your Device",
+    description: "Trade in your old phone toward a new one",
+    route: "/exchange-your-phone",
+    tag: null,
+    size: "medium",
+  },
+  {
+    number: "05",
+    title: "Unlock",
+    subtitle: "iCloud · Network · OS",
+    description: "Software & carrier unlock services",
     route: "/unlocking",
-    color: "bg-red-500/10 text-red-600",
+    tag: null,
+    size: "medium",
   },
   {
-    title: "Diagnostics",
-    text: "Identify hardware & software issues",
-    icon: ShieldAlert,
+    number: "06",
+    title: "Diagnose",
+    subtitle: "Hardware & Software Check",
+    description: "Know what's wrong before you spend",
     route: "/repair#diagnostics-section",
-    color: "bg-amber-500/10 text-amber-600",
+    tag: null,
+    size: "medium",
   },
   {
-    title: "Store Directory",
-    text: "Find 250+ stores in Nepal",
-    icon: Store,
+    number: "07",
+    title: "Find Stores",
+    subtitle: "250+ Shops in Nepal",
+    description: "Locate verified gadget stores near you",
     route: "/stores",
-    color: "bg-teal-500/10 text-teal-600",
+    tag: "Verified Network",
+    size: "wide",
   },
-];
+] as const;
 
 export const HomeQuickActions = () => {
   const navigate = useNavigate();
 
+  const large  = actions.filter((a) => a.size === "large");
+  const medium = actions.filter((a) => a.size === "medium");
+  const wide   = actions.filter((a) => a.size === "wide");
+
   return (
-    <section className="py-12 bg-muted/30">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {actions.map((action) => (
-            <Card key={action.title} className="group hover:shadow-lg transition-all border-none bg-background">
-              <CardContent className="p-6 flex items-start gap-4">
-                <div className={`p-4 rounded-2xl ${action.color} group-hover:scale-110 transition-transform`}>
-                  <action.icon className="h-8 w-8" />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <h3 className="font-bold text-lg">{action.title}</h3>
-                  <p className="text-sm text-muted-foreground">{action.text}</p>
-                  <Button 
-                    variant="link" 
-                    className="p-0 h-auto text-primary font-semibold group-hover:translate-x-1 transition-transform"
-                    onClick={() => navigate(action.route)}
-                  >
-                    Get Started →
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+    <section className="py-16 border-y border-border">
+      <div className="container mx-auto px-4 max-w-6xl">
+        {/* Header */}
+        <div className="mb-10 animate-fade-up delay-0">
+          <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground mb-2">
+            Services
+          </p>
+          <h2 className="font-syne text-3xl md:text-4xl font-bold text-foreground">
+            What do you need today?
+          </h2>
+        </div>
+
+        {/* Large 2-col primary actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-border mb-px border border-border animate-fade-up delay-100">
+          {large.map((action) => (
+            <ActionTile key={action.number} action={action} onNavigate={navigate} variant="large" />
           ))}
         </div>
+
+        {/* Medium 4-col secondary */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border mb-px border border-border animate-fade-up delay-200">
+          {medium.map((action) => (
+            <ActionTile key={action.number} action={action} onNavigate={navigate} variant="medium" />
+          ))}
+        </div>
+
       </div>
     </section>
   );
 };
+
+// ─── Tile ─────────────────────────────────────────────────────────────────────
+
+type TileVariant = "large" | "medium" | "wide";
+
+function ActionTile({
+  action,
+  onNavigate,
+  variant,
+}: {
+  action: (typeof actions)[number];
+  onNavigate: (route: string) => void;
+  variant: TileVariant;
+}) {
+  const isLarge  = variant === "large";
+  const isWide   = variant === "wide";
+  const isMedium = variant === "medium";
+
+  return (
+    <button
+      onClick={() => onNavigate(action.route)}
+      className={[
+        "group relative bg-background flex items-start gap-4 text-left",
+        "transition-colors duration-200 hover:bg-secondary/40",
+        "pressable",
+        isLarge  ? "p-8 md:p-10"                              : "",
+        isMedium ? "p-6"                                       : "",
+        isWide   ? "p-6 md:p-8 flex-row items-center"         : "",
+      ].join(" ")}
+    >
+      {/* Number index */}
+      <span
+        className={[
+          "font-syne font-bold leading-none text-primary/20 select-none shrink-0",
+          "group-hover:text-primary/40 transition-colors duration-200",
+          isLarge ? "text-5xl" : "text-3xl",
+        ].join(" ")}
+      >
+        {action.number}
+      </span>
+
+      {/* Content */}
+      <div className={["flex-1 min-w-0", isWide ? "flex items-center gap-8" : ""].join(" ")}>
+        <div className={isWide ? "flex-1" : ""}>
+          {action.tag && (
+            <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-primary border border-primary/30 rounded-sm px-2 py-0.5 mb-3">
+              {action.tag}
+            </span>
+          )}
+          <h3
+            className={[
+              "font-syne font-bold text-foreground leading-tight",
+              isLarge ? "text-2xl md:text-3xl" : "text-xl",
+            ].join(" ")}
+          >
+            {action.title}
+          </h3>
+          <p className="text-sm font-medium text-primary mt-0.5">{action.subtitle}</p>
+          {(isLarge || isWide) && (
+            <p className="text-sm text-muted-foreground mt-2 text-pretty">{action.description}</p>
+          )}
+        </div>
+
+        {isWide && (
+          <span className="text-sm font-semibold text-foreground hidden md:flex items-center gap-1.5 shrink-0">
+            Browse all stores
+            <ArrowRight
+              className="h-4 w-4 translate-x-0 group-hover:translate-x-1.5 transition-transform duration-200"
+              style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
+            />
+          </span>
+        )}
+      </div>
+
+      {/* Arrow for large tiles */}
+      {isLarge && (
+        <ArrowRight
+          className="h-5 w-5 text-muted-foreground shrink-0 mt-1 translate-x-0 group-hover:translate-x-1.5 transition-transform duration-200 self-start"
+          style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
+        />
+      )}
+
+      {/* Saffron sweep on hover */}
+      <span
+        aria-hidden="true"
+        className="absolute bottom-0 left-0 h-0.5 w-0 bg-primary group-hover:w-full transition-[width] duration-300"
+        style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
+      />
+    </button>
+  );
+}

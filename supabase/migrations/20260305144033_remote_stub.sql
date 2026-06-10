@@ -1,0 +1,1 @@
+-- Remote migration stub (applied directly to Supabase dashboard)

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Heart, Menu, MessageCircle, Search, X } from "lucide-react";
+import { BadgeCheck, Heart, MapPin, Menu, MessageCircle, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { isStoreAdminRole } from "@/lib/roles";
@@ -125,67 +125,121 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full">
-      <div className="border-b border-border/60 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
-        <div className="container flex h-16 items-center gap-4">
-          <Link to="/" className="flex shrink-0 items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white p-1.5 shadow-glow">
-              <img src={logo} alt="Tamrakar Complex" className="h-full w-full object-contain" />
+      {/* ── Trust bar ──────────────────────────────────────────────────────── */}
+      <div className="bg-navy text-white/70 text-[11px] font-medium border-b border-white/10 hidden md:block">
+        <div className="container flex items-center justify-between h-8 gap-4">
+          <div className="flex items-center gap-4">
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 text-gold" aria-hidden />
+              New Road, Kathmandu - Nepal's Mobile Mega Market
+            </span>
+            <span className="text-white/30">|</span>
+            <span className="inline-flex items-center gap-1.5">
+              <BadgeCheck className="h-3.5 w-3.5 text-gold" aria-hidden />
+              Verified Stores Only
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <a href="/stores" className="hover:text-gold transition-colors">Find Stores</a>
+            <span className="text-white/30">|</span>
+            <a href="/repair" className="hover:text-gold transition-colors">Book Repair</a>
+            <span className="text-white/30">|</span>
+            <a href="/sell-your-phone" className="hover:text-gold transition-colors">Sell Phone</a>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Main bar ─────────────────────────────────────────────────────── */}
+      <div className="border-b border-white/10 bg-navy shadow-navy">
+        <div className="container flex h-14 items-center gap-4">
+          {/* Wordmark */}
+          <Link
+            to="/"
+            className="flex shrink-0 items-center gap-2.5 pressable"
+            aria-label="Tamrakar Complex home"
+          >
+            <div className="flex h-8 w-8 items-center justify-center bg-white/10 border border-white/20 rounded-md">
+              <img src={logo} alt="" className="h-full w-full object-contain p-0.5" />
             </div>
-            <span className="hidden font-display text-xl font-bold sm:block">
-              Tamrakar<span className="text-primary">Complex</span>
+            <span className="hidden font-display text-base font-bold tracking-tight sm:block text-white">
+              Tamrakar<span className="text-gold">.</span>
             </span>
           </Link>
 
-          <button onClick={() => setIsSearchDialogOpen(true)} className="hidden lg:block flex-1 max-w-md ml-8">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <div className="flex w-full items-center gap-2 rounded-full border border-border bg-secondary/40 px-12 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-secondary/60">
-                <span className="truncate">Search products, prices, stores...</span>
-                <kbd className="ml-auto rounded-full border border-border/60 bg-background/70 px-2 py-0.5 text-[10px]">
-                  ⌘K
-                </kbd>
-              </div>
-            </div>
+          {/* Search bar — desktop */}
+          <button
+            onClick={() => setIsSearchDialogOpen(true)}
+            className="hidden lg:flex flex-1 max-w-md ml-4 items-center gap-2 h-9 px-3 rounded-lg border border-white/20 bg-white/8 text-sm text-white/50 hover:bg-white/12 hover:border-white/30 transition-all pressable"
+            aria-label="Open search"
+            style={{ background: "rgba(255,255,255,0.06)" }}
+          >
+            <Search className="h-3.5 w-3.5 shrink-0 text-white/40" />
+            <span className="truncate flex-1 text-left text-white/40">Search iPhone, Samsung, MacBook, repair…</span>
+            <kbd className="hidden xl:inline-flex border border-white/20 bg-white/10 rounded px-1.5 py-0.5 text-[10px] font-medium text-white/40">
+              ⌘K
+            </kbd>
           </button>
 
+          {/* Actions */}
           <div className="flex items-center gap-1.5 ml-auto">
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSearchDialogOpen(true)}>
-              <Search className="h-5 w-5" />
+            {/* Mobile search */}
+            <Button variant="ghost" size="icon" className="lg:hidden h-9 w-9 text-white/70 hover:text-white hover:bg-white/10" onClick={() => setIsSearchDialogOpen(true)}>
+              <Search className="h-4 w-4" />
             </Button>
-
-            <a
-              href={`https://api.whatsapp.com/send?phone=${contactInfo.whatsapp}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white hover:bg-[#128C7E] transition-colors"
-              aria-label="WhatsApp Chat"
-            >
-              <MessageCircle className="h-5 w-5" />
-            </a>
 
             <ThemeToggle />
             <CartSheet />
 
             {user && <NotificationBell />}
 
-            <Button variant="ghost" size="icon" className="relative hidden md:flex" asChild>
-              <Link to="/wishlist" aria-label="Open wishlist">
-                <Heart className="h-5 w-5" />
-                {wishlistCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+            {/* Wishlist */}
+            <Button variant="ghost" size="icon" className="relative hidden md:flex h-9 w-9 text-white/70 hover:text-white hover:bg-white/10" asChild>
+              <Link to="/wishlist" aria-label="Wishlist">
+                <Heart className="h-4 w-4" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[9px] font-bold text-navy">
                     {wishlistCount > 9 ? "9+" : wishlistCount}
                   </span>
-                ) : null}
+                )}
               </Link>
             </Button>
 
-            <Button variant="outline" size="sm" className="hidden xl:inline-flex" asChild>
-              <Link to="/valuation-estimator">Get Estimate</Link>
+            {/* WhatsApp */}
+            <a
+              href={`https://api.whatsapp.com/send?phone=${contactInfo.whatsapp}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg bg-[#25D366] text-white hover:bg-[#1aab56] transition-colors pressable"
+              aria-label="WhatsApp"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </a>
+
+            {/* Gold CTA */}
+            <Button
+              size="sm"
+              className="hidden xl:inline-flex h-8 text-xs font-bold rounded-lg bg-gold text-navy hover:bg-gold/90 shadow-gold pressable"
+              asChild
+            >
+              <Link to="/sell-your-phone">Sell Phone</Link>
             </Button>
 
+            {/* Admin console */}
             {user && (role === "suadmin" || role === "staffadmin" || isStoreAdminUser) && (
-              <Button size="sm" className="hidden xl:inline-flex hero-gradient" asChild>
-                <Link to={role === "suadmin" ? "/suadmin/console" : role === "staffadmin" ? "/staffadmin/console" : "/storeadmin/console"}>
+              <Button
+                size="sm"
+                className="hidden xl:inline-flex h-8 text-xs font-semibold rounded-lg bg-white/10 text-white border border-white/20 hover:bg-white/20 pressable"
+                asChild
+              >
+                <Link
+                  to={
+                    role === "suadmin"
+                      ? "/suadmin/console"
+                      : role === "staffadmin"
+                        ? "/staffadmin/console"
+                        : "/storeadmin/console"
+                  }
+                >
                   Console
                 </Link>
               </Button>
@@ -193,13 +247,15 @@ export function Header() {
 
             <UserMenuDropdown user={user} onSignOut={handleSignOut} />
 
+            {/* Mobile menu toggle */}
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="lg:hidden h-9 w-9 text-white/70 hover:text-white hover:bg-white/10"
               onClick={() => setIsMobileMenuOpen((open) => !open)}
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
             >
-              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </Button>
           </div>
         </div>

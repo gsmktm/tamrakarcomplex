@@ -41,8 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // 1. Try RPC first (preferred)
       const { data: roleRows, error: roleRpcError } = await supabase.rpc("get_my_roles");
-      console.info("Auth: get_my_roles RPC result:", { data: roleRows, error: roleRpcError });
-      
+
       if (!roleRpcError && roleRows) {
         // Handle both array of strings (legacy) and array of objects (new 4-panel)
         const normalizedRoles = (roleRows as any[]).map(row => {
@@ -51,8 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return 'user';
         });
         
-        console.info("Auth: Normalized roles from RPC:", normalizedRoles);
-        
+        // Priority order: suadmin > staffadmin > storeadmin > storestaff > user
         if (normalizedRoles.includes("suadmin")) {
           setRole("suadmin");
           return;
@@ -63,6 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (normalizedRoles.includes("storeadmin")) {
           setRole("storeadmin");
+          return;
+        }
+        if (normalizedRoles.includes("storestaff")) {
+          setRole("storestaff");
           return;
         }
         if (normalizedRoles.includes("user")) {
@@ -82,29 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (roles.includes("suadmin")) setRole("suadmin");
         else if (roles.includes("staffadmin")) setRole("staffadmin");
         else if (roles.includes("storeadmin")) setRole("storeadmin");
+        else if (roles.includes("storestaff")) setRole("storestaff");
         else setRole("user");
         return;
       }
 
-      // 3. Last resort: Email/Metadata heuristics
-      const superAdminEmails = [
-        'suadmin@tamrakarcomplex.com',
-        'admin@tamrakarcomplex.com',
-        'gsmktm@gmail.com',
-        'gskmtm@gmail.com',
-        'gsktm@gmail.com',
-        'superadmin@tamrakarcomplex.com',
-        'timrobani@gmail.com',
-        'info@tamrakarcomplex.com',
-        'bootstrap-admin@example.invalid'
-      ];
-      
-      let finalRole = emailRole ?? metadataRole ?? "user";
-      
-      if (authUser.email && superAdminEmails.includes(authUser.email.toLowerCase())) {
-        console.info("Auth: Granting suadmin role via email fallback for:", authUser.email);
-        finalRole = "suadmin";
-      }
+      // 3. Last resort: metadata heuristics only — no email-based bypass
+      const finalRole = emailRole ?? metadataRole ?? "user";
 
       setRole(finalRole);
       if (!emailRole && !metadataRole && finalRole === "user") {

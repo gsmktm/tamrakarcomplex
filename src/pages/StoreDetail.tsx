@@ -545,6 +545,7 @@ export default function StoreDetail() {
       return { ...data, subscription_tier: tier };
     },
     enabled: !!id,
+    staleTime: 10 * 60 * 1000, // 10 min — store profile changes infrequently
   });
 
   const { data: products, isLoading: isProductsLoading } = useQuery<SellListingRow[]>({
@@ -563,6 +564,7 @@ export default function StoreDetail() {
       return data;
     },
     enabled: !!store?.id,
+    staleTime: 3 * 60 * 1000, // 3 min — listings can change more often
   });
 
   const { data: inventory, isLoading: isInventoryLoading } = useQuery({
@@ -580,6 +582,7 @@ export default function StoreDetail() {
       return data;
     },
     enabled: !!store?.id,
+    staleTime: 3 * 60 * 1000, // 3 min
   });
 
   const { data: storeReviews } = useQuery({
@@ -596,6 +599,7 @@ export default function StoreDetail() {
       return data;
     },
     enabled: !!store?.id,
+    staleTime: 5 * 60 * 1000, // 5 min — reviews are slow-changing
   });
 
   const averageRating = storeReviews?.length 
@@ -616,6 +620,7 @@ export default function StoreDetail() {
       return data;
     },
     enabled: !!store?.id,
+    staleTime: 10 * 60 * 1000, // 10 min — accessories catalogue is stable
   });
 
   const { data: repairServices } = useQuery({
@@ -632,6 +637,7 @@ export default function StoreDetail() {
       return data;
     },
     enabled: !!store?.id,
+    staleTime: 10 * 60 * 1000, // 10 min — repair catalogue is stable
   });
 
   const { data: pages } = useQuery<StorePageRow[]>({
@@ -647,6 +653,7 @@ export default function StoreDetail() {
       return data;
     },
     enabled: !!store?.id,
+    staleTime: 10 * 60 * 1000, // 10 min — CMS pages rarely change
   });
 
   if (isStoreLoading) {

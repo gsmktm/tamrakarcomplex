@@ -11,7 +11,8 @@ import {
   ExternalLink, 
   Loader2,
   Calendar,
-  Layers
+  Layers,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -24,11 +25,26 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
+
+type MarketingBanner = {
+  id?: string;
+  title: string;
+  subtitle?: string | null;
+  image_url: string;
+  link_url?: string | null;
+  button_text?: string | null;
+  placement: string;
+  is_active: boolean;
+  sort_order: number;
+  starts_at?: string | null;
+  ends_at?: string | null;
+};
 
 export default function CampaignManager() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingBanner, setEditingBanner] = useState<any>(null);
+  const [editingBanner, setEditingBanner] = useState<MarketingBanner | null>(null);
 
   const { data: banners, isLoading, error: bannersError } = useQuery({
     queryKey: ["marketing-banners"],
@@ -46,11 +62,11 @@ export default function CampaignManager() {
       }
     },
     retry: 1,
-    },
   });
 
   const upsertBannerMutation = useMutation({
-    mutationFn: async (banner: any) => {
+    mutationFn: async (banner: MarketingBanner | null) => {
+      if (!banner) return;
       if (banner.id) {
         const { error } = await supabase.from("marketing_banners").update(banner).eq("id", banner.id);
         if (error) throw error;
@@ -65,7 +81,7 @@ export default function CampaignManager() {
       setIsDialogOpen(false);
       setEditingBanner(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast.error(error.message || "Failed to save banner");
     },
   });
@@ -92,7 +108,7 @@ export default function CampaignManager() {
     },
   });
 
-  const handleEdit = (banner: any) => {
+  const handleEdit = (banner: MarketingBanner) => {
     setEditingBanner(banner);
     setIsDialogOpen(true);
   };
@@ -154,7 +170,7 @@ export default function CampaignManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {banners?.map((banner) => (
+                {banners?.map((banner: MarketingBanner) => (
                   <TableRow key={banner.id} className="group">
                     <TableCell>
                       <div className="h-12 w-24 rounded-lg bg-muted overflow-hidden border border-border/50">
@@ -193,7 +209,7 @@ export default function CampaignManager() {
                       <div className="flex flex-col text-xs">
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Calendar className="h-3 w-3" />
-                          Starts: {format(new Date(banner.starts_at), "MMM d")}
+                          Starts: {format(new Date(banner.starts_at ?? new Date()), "MMM d")}
                         </div>
                         {banner.ends_at && (
                           <div className="flex items-center gap-1 text-orange-500 font-medium">
@@ -238,7 +254,7 @@ export default function CampaignManager() {
               <div className="space-y-2">
                 <Label>Campaign Title</Label>
                 <Input 
-                  value={editingBanner?.title} 
+                  value={editingBanner?.title ?? ""} 
                   onChange={(e) => setEditingBanner({ ...editingBanner, title: e.target.value })}
                   placeholder="e.g., iPhone 15 Mega Sale" 
                 />
@@ -246,7 +262,7 @@ export default function CampaignManager() {
               <div className="space-y-2">
                 <Label>Placement Zone</Label>
                 <Select 
-                  value={editingBanner?.placement} 
+                  value={editingBanner?.placement ?? "home_hero"} 
                   onValueChange={(val) => setEditingBanner({ ...editingBanner, placement: val })}
                 >
                   <SelectTrigger>
@@ -265,7 +281,7 @@ export default function CampaignManager() {
             <div className="space-y-2">
               <Label>Subtitle / Description</Label>
               <Input 
-                value={editingBanner?.subtitle} 
+                value={editingBanner?.subtitle ?? ""} 
                 onChange={(e) => setEditingBanner({ ...editingBanner, subtitle: e.target.value })}
                 placeholder="Brief description for the banner" 
               />
@@ -276,7 +292,7 @@ export default function CampaignManager() {
                 <Label>Image URL</Label>
                 <div className="flex gap-2">
                   <Input 
-                    value={editingBanner?.image_url} 
+                    value={editingBanner?.image_url ?? ""} 
                     onChange={(e) => setEditingBanner({ ...editingBanner, image_url: e.target.value })}
                     placeholder="https://..." 
                   />
@@ -289,7 +305,7 @@ export default function CampaignManager() {
                 <Label>Link Destination</Label>
                 <div className="flex gap-2">
                   <Input 
-                    value={editingBanner?.link_url} 
+                    value={editingBanner?.link_url ?? ""} 
                     onChange={(e) => setEditingBanner({ ...editingBanner, link_url: e.target.value })}
                     placeholder="/product/..." 
                   />
@@ -304,7 +320,7 @@ export default function CampaignManager() {
               <div className="space-y-2">
                 <Label>Button Text</Label>
                 <Input 
-                  value={editingBanner?.button_text} 
+                  value={editingBanner?.button_text ?? ""} 
                   onChange={(e) => setEditingBanner({ ...editingBanner, button_text: e.target.value })}
                 />
               </div>
@@ -312,15 +328,15 @@ export default function CampaignManager() {
                 <Label>Sort Order</Label>
                 <Input 
                   type="number" 
-                  value={editingBanner?.sort_order} 
-                  onChange={(e) => setEditingBanner({ ...editingBanner, sort_order: parseInt(e.target.value) })}
+                  value={editingBanner?.sort_order ?? 0} 
+                  onChange={(e) => setEditingBanner({ ...editingBanner, sort_order: parseInt(e.target.value) || 0 } as MarketingBanner)}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Live Status</Label>
                 <div className="flex items-center h-10 gap-2">
                   <Switch 
-                    checked={editingBanner?.is_active} 
+                    checked={editingBanner?.is_active ?? false} 
                     onCheckedChange={(val) => setEditingBanner({ ...editingBanner, is_active: val })}
                   />
                   <span className="text-sm font-medium">{editingBanner?.is_active ? "Active" : "Hidden"}</span>
@@ -338,25 +354,5 @@ export default function CampaignManager() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function Clock({ className }: { className?: string }) {
-  return (
-    <svg 
-      className={className} 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10"></circle>
-      <polyline points="12 6 12 12 16 14"></polyline>
-    </svg>
   );
 }

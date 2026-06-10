@@ -57,6 +57,7 @@ function matchesCategory(product: Product, category?: string) {
 export function useProducts(limit?: number) {
   return useQuery({
     queryKey: ["products", limit],
+    staleTime: 5 * 60 * 1000, // 5 min
     queryFn: async () => {
       let query = supabase.from("products").select("*").order("created_at", { ascending: false });
 
@@ -76,6 +77,7 @@ export function useProducts(limit?: number) {
 export function useFeaturedProducts() {
   return useQuery({
     queryKey: ["products", "featured"],
+    staleTime: 5 * 60 * 1000, // 5 min
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
@@ -94,6 +96,7 @@ export function useFeaturedProducts() {
 export function useProduct(slug: string) {
   return useQuery({
     queryKey: ["product", slug],
+    staleTime: 10 * 60 * 1000, // 10 min — individual product pages
     queryFn: async () => {
       const { data, error } = await supabase.from("products").select("*").eq("slug", slug).maybeSingle();
 

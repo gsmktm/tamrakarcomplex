@@ -16,7 +16,7 @@ function getDefinedRoutes() {
     const parentMatch = content.match(/path="(\/[^"]+)"/);
     const parentPath = parentMatch ? parentMatch[1] : '';
     
-    // Find all paths
+    // Find all JSX paths: <Route path="...">
     const pathMatches = content.matchAll(/path="([^"]+)"/g);
     for (const match of pathMatches) {
       let route = match[1];
@@ -31,6 +31,17 @@ function getDefinedRoutes() {
         if (route.endsWith('/*')) {
           routes.add(fullPath.replace('/*', ''));
         }
+      }
+    }
+
+    // Find object route definitions: { path: "/..." }
+    const objectPathMatches = content.matchAll(/path:\s*["']([^"']+)["']/g);
+    for (const match of objectPathMatches) {
+      const route = match[1];
+      if (route.startsWith('/')) {
+        routes.add(route);
+      } else if (parentPath) {
+        routes.add((parentPath + '/' + route).replace(/\/+/g, '/'));
       }
     }
 

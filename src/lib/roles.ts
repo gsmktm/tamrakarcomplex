@@ -19,6 +19,10 @@ export function normalizeRole(role?: string | null): AppRole {
     case "store_owner":
     case "moderator":
       return "storeadmin";
+    case "storestaff":
+    case "store_staff":
+    case "staff":
+      return "storestaff";
     case "user":
     case "public_user":
     case "customer":
@@ -83,6 +87,8 @@ export function getRoleLabel(role?: string | null) {
       return "Staff Admin";
     case "storeadmin":
       return "Store Admin";
+    case "storestaff":
+      return "Store Staff";
     case "user":
       return "User";
     default:

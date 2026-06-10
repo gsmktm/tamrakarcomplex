@@ -29,16 +29,21 @@ export function ProfileOverview() {
   const { data: profile, isLoading } = useQuery({
     queryKey: ["my-profile-overview", user?.id],
     queryFn: async () => {
-      const profileRes = await supabase.from("profiles").select("*").eq("user_id", user!.id).maybeSingle();
+      const [profileRes, ordersRes, repairsRes, listingsRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("user_id", user!.id).maybeSingle(),
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
+        supabase.from("repair_requests").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
+        supabase.from("sell_listings").select("id", { count: "exact", head: true }).eq("user_id", user!.id),
+      ]);
 
       if (profileRes.error) throw profileRes.error;
 
       return {
         profile: profileRes.data,
         stats: {
-          total_orders: 0, // TODO: Add real counts
-          total_repairs: 0,
-          total_listings: 0,
+          total_orders: ordersRes.count ?? 0,
+          total_repairs: repairsRes.count ?? 0,
+          total_listings: listingsRes.count ?? 0,
           total_points: profileRes.data?.referral_points || 0,
           member_since: user?.created_at,
         },

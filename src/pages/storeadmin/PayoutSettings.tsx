@@ -19,8 +19,8 @@ export default function PayoutSettings() {
       const { data, error } = await supabase
         .from("stores")
         .select("payout_method, payout_details")
-        .eq("owner_id", user?.id)
-        .single();
+        .or(`owner_id.eq.${user?.id},owner_user_id.eq.${user?.id}`)
+        .maybeSingle();
 
       if (error) throw error;
       return data;
@@ -33,7 +33,7 @@ export default function PayoutSettings() {
       const { error } = await supabase
         .from("stores")
         .update(updates)
-        .eq("owner_id", user?.id);
+        .or(`owner_id.eq.${user?.id},owner_user_id.eq.${user?.id}`);
 
       if (error) throw error;
     },

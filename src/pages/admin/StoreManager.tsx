@@ -226,14 +226,10 @@ const StoreManager = () => {
         let data: StoreWithSubscriptionsRaw[] | StoreRow[] = [];
 
         try {
-          try {
-            data = await tryLoadWithSubscriptions();
-          } catch (e) {
-            if (!isMissingRelationshipError(e)) throw e;
-            data = await loadBaseStores();
-          }
+          data = await tryLoadWithSubscriptions();
         } catch (e) {
-          throw e;
+          if (!isMissingRelationshipError(e)) throw e;
+          data = await loadBaseStores();
         }
 
         // Flatten store_subscriptions from array to single object (when join exists)

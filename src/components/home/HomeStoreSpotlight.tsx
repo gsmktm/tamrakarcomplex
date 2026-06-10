@@ -1,11 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { Store, MapPin, BadgeCheck, MessageCircle, ShoppingBag, Phone, ExternalLink } from "lucide-react";
+import { Store, MapPin, BadgeCheck, MessageCircle, ShoppingBag, Phone, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStorePreview } from "@/hooks/useStorePreview";
 import { useAuth } from "@/hooks/useAuth";
 import { getPublicStorePath } from "@/lib/storeRoutes";
+import { Reveal } from "@/components/home/Reveal";
 
 export const HomeStoreSpotlight = () => {
   const navigate = useNavigate();
@@ -13,133 +14,165 @@ export const HomeStoreSpotlight = () => {
   const { data: stores, isLoading } = useStorePreview(4);
 
   return (
-    <section className="py-24 bg-muted/50">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-16 space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary font-bold text-xs uppercase tracking-wider">
-            <Store className="h-3 w-3" />
-            Verified Network
-          </div>
-          <h2 className="text-4xl md:text-5xl font-black tracking-tight">Store Spotlight</h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Discover trusted mobile shops and service centers at Tamrakar Complex. 
-            Official brand partners and certified retailers.
-          </p>
-        </div>
+    <section className="py-24 bg-muted/30 border-y border-border">
+      <div className="container mx-auto px-4 max-w-6xl">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        {/* Section header */}
+        <Reveal className="mb-16">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 border border-border bg-background text-foreground/60 font-bold text-[10px] uppercase tracking-widest">
+                <Store className="h-3 w-3" />
+                Verified Network
+              </div>
+              <h2 className="font-syne font-black text-4xl md:text-5xl tracking-tight leading-none">
+                Store Spotlight
+              </h2>
+              <p className="text-muted-foreground max-w-xl">
+                Trusted mobile shops and service centers at Tamrakar Complex. Official brand partners and certified retailers.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              className="shrink-0 h-11 px-6 rounded-sm font-bold text-sm gap-2 pressable"
+              onClick={() => navigate("/stores")}
+            >
+              All Stores
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </Reveal>
+
+        {/* Store cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border border border-border">
           {isLoading ? (
             Array(4).fill(0).map((_, i) => (
-              <div key={i} className="space-y-4 bg-background p-6 rounded-[2rem] border">
-                <Skeleton className="h-20 w-20 rounded-2xl" />
-                <Skeleton className="h-6 w-3/4" />
+              <div key={i} className="bg-background p-6 space-y-4">
+                <Skeleton className="h-16 w-16" />
+                <Skeleton className="h-5 w-3/4" />
                 <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-9 w-full" />
               </div>
             ))
           ) : stores && stores.length > 0 ? (
-            stores.map((store) => (
-              <div key={store.id} className="group bg-background p-8 rounded-[2.5rem] border hover:shadow-2xl transition-all duration-500 relative flex flex-col">
-                <div className="mb-6 flex justify-between items-start">
-                  <div className="h-20 w-20 rounded-2xl bg-muted overflow-hidden border-2 border-muted group-hover:border-primary/20 transition-colors">
-                    <img 
-                      src={store.logo_url || "/placeholder.svg"} 
-                      alt={store.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  {store.is_verified && (
-                    <Badge className="bg-blue-500 hover:bg-blue-600 border-none px-2 py-1 gap-1">
-                      <BadgeCheck className="h-3 w-3" />
-                      Verified
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="space-y-4 flex-1">
-                  <div>
-                    <h3 className="text-xl font-black line-clamp-1 group-hover:text-primary transition-colors">
-                      {store.name}
-                    </h3>
-                    <div className="flex items-center text-muted-foreground text-sm gap-1 mt-1">
-                      <MapPin className="h-3 w-3" />
-                      <span>{store.location}</span>
+            stores.map((store, i) => (
+              <Reveal key={store.id} delay={(i as 0 | 1 | 2 | 3 | 4 | 5)} className="bg-background group flex flex-col">
+                <div className="p-6 flex-1 flex flex-col">
+                  {/* Logo + verified */}
+                  <div className="mb-4 flex items-start justify-between">
+                    <div className="h-14 w-14 border border-border overflow-hidden bg-muted shrink-0">
+                      <img
+                        src={store.logo_url || "/placeholder.svg"}
+                        alt={store.name}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
+                    {store.is_verified && (
+                      <Badge className="bg-accent text-accent-foreground border-none text-[10px] px-2 py-0.5 gap-1 rounded-sm font-bold uppercase">
+                        <BadgeCheck className="h-3 w-3" />
+                        Verified
+                      </Badge>
+                    )}
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {store.services?.slice(0, 3).map((s) => (
-                      <span key={s} className="text-[10px] font-bold uppercase tracking-wider bg-muted px-2 py-1 rounded-md text-muted-foreground">
-                        {s}
-                      </span>
-                    ))}
+                  {/* Info */}
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <h3 className="font-bold text-base leading-tight line-clamp-1 group-hover:text-primary transition-colors duration-200">
+                        {store.name}
+                      </h3>
+                      <div className="flex items-center text-muted-foreground text-xs gap-1 mt-1">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{store.location}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1">
+                      {store.services?.slice(0, 3).map((s) => (
+                        <span key={s} className="text-[10px] font-bold uppercase tracking-wide bg-secondary px-2 py-0.5 text-secondary-foreground">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+
+                    {user && store.phone && (
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                        <Phone className="h-3 w-3" />
+                        {store.phone}
+                      </div>
+                    )}
+                    {!user && (
+                      <div className="text-[10px] text-muted-foreground italic">
+                        Sign in to view contact number
+                      </div>
+                    )}
                   </div>
 
-                  <div className="pt-4 space-y-3">
+                  {/* Actions */}
+                  <div className="mt-4 pt-4 border-t border-border space-y-2">
                     <div className="flex gap-2">
-                      <Button 
-                        className="flex-1 rounded-xl h-11 font-bold text-xs"
+                      <Button
+                        className="flex-1 h-9 rounded-sm text-xs font-bold pressable"
                         onClick={() => navigate(getPublicStorePath(store))}
                       >
                         View Store
                       </Button>
                       {store.phone && (
-                        <Button 
-                          variant="outline" 
-                          className="w-11 h-11 rounded-xl p-0 border-primary/20 hover:bg-primary/5 text-primary"
+                        <Button
+                          variant="outline"
+                          className="w-9 h-9 rounded-sm p-0 pressable"
                           onClick={() => window.open(`https://wa.me/${store.phone.replace(/\D/g, '')}`, '_blank')}
+                          aria-label="WhatsApp"
                         >
-                          <MessageCircle className="h-5 w-5" />
+                          <MessageCircle className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
-                    
-                    <Button 
-                      variant="secondary" 
-                      className="w-full rounded-xl h-11 font-bold text-xs gap-2"
+                    <Button
+                      variant="ghost"
+                      className="w-full h-9 rounded-sm text-xs font-bold gap-1.5 pressable"
                       onClick={() => navigate(`/marketplace?store=${store.id}`)}
                     >
-                      <ShoppingBag className="h-4 w-4" />
+                      <ShoppingBag className="h-3.5 w-3.5" />
                       Browse Products
                     </Button>
                   </div>
-
-                  {user ? (
-                    <div className="flex items-center gap-2 text-xs font-bold text-primary pt-2">
-                      <Phone className="h-3 w-3" />
-                      {store.phone}
-                    </div>
-                  ) : (
-                    <div className="text-[10px] font-medium text-muted-foreground pt-2 italic">
-                      Login to view contact number
-                    </div>
-                  )}
                 </div>
-              </div>
+
+                {/* Bottom accent */}
+                <div className="h-0.5 w-0 bg-primary group-hover:w-full transition-[width] duration-500" style={{ transitionTimingFunction: "var(--ease-out-expo)" }} />
+              </Reveal>
             ))
           ) : null}
         </div>
 
-        <div className="mt-20 bg-primary rounded-[3rem] p-8 md:p-12 text-primary-foreground relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="space-y-4 text-center md:text-left">
-              <h3 className="text-3xl md:text-4xl font-black">Own a mobile shop?</h3>
-              <p className="text-primary-foreground/80 text-lg max-w-xl">
-                Join Nepal's largest mobile network. Get a digital storefront, manage inventory, 
-                and reach thousands of customers daily.
-              </p>
+        {/* CTA banner */}
+        <Reveal delay={2} className="mt-16">
+          <div className="border border-border bg-foreground text-background p-8 md:p-10 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-5" style={{
+              backgroundImage: "repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 50%)",
+              backgroundSize: "20px 20px"
+            }} />
+            <div className="relative flex flex-col md:flex-row items-center justify-between gap-8">
+              <div className="space-y-2 text-center md:text-left">
+                <h3 className="font-syne font-black text-2xl md:text-3xl">Own a mobile shop?</h3>
+                <p className="text-background/70 max-w-md text-sm">
+                  Join Nepal's largest mobile network. Get a digital storefront, manage inventory, and reach thousands of customers.
+                </p>
+              </div>
+              <Button
+                size="lg"
+                variant="outline"
+                className="shrink-0 h-12 px-8 rounded-sm text-sm font-black bg-transparent border-background/40 text-background hover:bg-background hover:text-foreground gap-2 pressable"
+                onClick={() => navigate("/stores/apply")}
+              >
+                Join Tamrakar Complex
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
-            <Button 
-              size="lg" 
-              variant="secondary" 
-              className="h-16 px-10 rounded-2xl text-lg font-black group"
-              onClick={() => navigate("/stores/apply")}
-            >
-              Join Tamrakar Complex
-              <ExternalLink className="h-5 w-5 ml-3 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-            </Button>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

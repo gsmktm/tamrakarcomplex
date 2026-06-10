@@ -122,13 +122,12 @@ export default function StoreThemeBuilder() {
         .from("store_admins")
         .select("store_id")
         .eq("user_id", user.id)
-        .eq("status", "active")
         .limit(1)
-        .maybeSingle();
+        .maybeSingle(); // no status filter — store_admins.status column added in later migration
 
       const query = membership?.store_id
         ? supabase.from("stores").select("*").eq("id", membership.store_id)
-        : supabase.from("stores").select("*").eq("owner_id", user.id);
+        : supabase.from("stores").select("*").or(`owner_id.eq.${user.id},owner_user_id.eq.${user.id}`);
 
       const { data, error } = await query.limit(1).single();
       if (error) throw error;

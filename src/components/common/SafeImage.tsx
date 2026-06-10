@@ -4,7 +4,12 @@ type Props = {
   src: string | null | undefined;
   alt: string;
   className?: string;
+  style?: React.CSSProperties;
   aspect?: "square" | "video" | "free";
+  /** Defaults to "lazy". Set "eager" for above-the-fold hero images. */
+  loading?: "lazy" | "eager";
+  width?: number;
+  height?: number;
 };
 
 const BLOCKED_HOSTS = ["fdn2.gsmarena.com", "fdn.gsmarena.com"];
@@ -27,7 +32,7 @@ function toProxy(url: string): string {
   }
 }
 
-export function SafeImage({ src, alt, className, aspect = "free" }: Props) {
+export function SafeImage({ src, alt, className, style, aspect = "free", loading = "lazy", width, height }: Props) {
   const initial = useMemo(() => (src ? toProxy(src) : "/default-product.svg"), [src]);
   const [current, setCurrent] = useState<string>(initial);
 
@@ -47,7 +52,12 @@ export function SafeImage({ src, alt, className, aspect = "free" }: Props) {
       src={current}
       alt={alt}
       className={`${aspectClass} ${className || ""}`}
+      style={style}
       onError={onError}
+      loading={loading}
+      decoding="async"
+      {...(width ? { width } : {})}
+      {...(height ? { height } : {})}
       referrerPolicy="no-referrer"
       crossOrigin="anonymous"
     />

@@ -10,27 +10,58 @@ export interface MyStore {
   subscription_status: string | null;
 }
 
+/**
+ * Returns all stores the current user has access to:
+ *   - Stores they own (owner_id OR owner_user_id)
+ *   - Stores they are assigned to via store_admins table
+ *
+ * This is the single source of truth for "my stores" across all storeadmin pages.
+ */
 export function useMyStores() {
   const { user } = useAuth();
 
   return useQuery<MyStore[]>({
     queryKey: ["my-stores", user?.id],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // store_admins table not yet in live schema — use owner-based lookup
-      const { data: stores, error } = await supabase
+      // 1. Stores owned directly (owner_id OR owner_user_id)
+      const { data: ownedStores } = await supabase
         .from("stores")
         .select("id, name, package_slug, subscription_status, subscription_end_date")
-        .eq("owner_id", user.id)
+        .or(`owner_id.eq.${user.id},owner_user_id.eq.${user.id}`)
         .order("name");
 
-      if (error) {
-        console.error("Error fetching owned stores:", error);
-        return [];
+      // 2. Stores assigned via store_admins table
+      const { data: adminRows } = await supabase
+        .from("store_admins")
+        .select("store_id")
+        .eq("user_id", user.id);
+
+      let assignedStores: typeof ownedStores = [];
+
+      if (adminRows && adminRows.length > 0) {
+        const assignedIds = adminRows.map((r: { store_id: string }) => r.store_id);
+        const { data: assigned } = await supabase
+          .from("stores")
+          .select("id, name, package_slug, subscription_status, subscription_end_date")
+          .in("id", assignedIds)
+          .order("name");
+        assignedStores = assigned ?? [];
       }
 
-      return (stores ?? []).map((s) => ({
+      // Merge, deduplicate by id
+      const owned = ownedStores ?? [];
+      const combined = [...owned, ...assignedStores];
+      const seen = new Set<string>();
+      const unique = combined.filter((s) => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
+
+      return unique.map((s) => ({
         id: s.id,
         name: s.name,
         package_slug: resolveEffectiveStorePackage(s),

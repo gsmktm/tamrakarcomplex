@@ -28,7 +28,7 @@ export function useNotifications() {
     queryFn: async () => {
       if (!user) return [];
 
-      let query = supabase
+      const query = supabase
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
@@ -49,35 +49,36 @@ export function useNotifications() {
     setUnreadCount(unread);
   }, [notifications]);
 
-  // Real-time subscription
+  // Real-time subscription — scoped to a private user channel
   useEffect(() => {
     if (!user) return;
 
     const channel = supabase
-      .channel("public:notifications")
+      .channel(`private:notifications:${user.id}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "notifications",
+          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
           const newNotif = payload.new as Notification;
-          
-          // Check if it belongs to current user/role/store
-          // Note: RLS will eventually filter this, but for real-time we might get everything
-          // unless we use private channels. For now, we rely on basic checks or just refetch.
-          
+
+          // Only show toast if this notification targets the current user
+          if (newNotif.user_id && newNotif.user_id !== user.id) return;
+
           queryClient.invalidateQueries({ queryKey: ["notifications"] });
-          
-          // Show toast for new notification
+
           toast.info(newNotif.title, {
             description: newNotif.message,
-            action: newNotif.link ? {
-              label: "View",
-              onClick: () => window.location.href = newNotif.link!
-            } : undefined
+            action: newNotif.link
+              ? {
+                  label: "View",
+                  onClick: () => (window.location.href = newNotif.link!),
+                }
+              : undefined,
           });
         }
       )

@@ -60,6 +60,8 @@ function normalizeDirectoryItem(store: StoreDirectoryItem): StoreDirectoryItem {
 export function useStoresDirectory() {
   return useQuery<StoreDirectoryItem[]>({
     queryKey: ["stores-directory"],
+    staleTime: 5 * 60 * 1000, // 5 min — store list is slow-changing
+    placeholderData: (prev) => prev, // keep previous list visible during background refresh
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_stores_directory");
 

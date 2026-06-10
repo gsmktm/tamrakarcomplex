@@ -32,13 +32,12 @@ export const DEFAULT_FOOTER_SETTINGS: FooterConfig = {
 
 export const DEFAULT_THEME_SETTINGS: StoreThemeSettings = {
   siteName: "Tamrakar Complex",
-  primaryColor: "#8b5cf6",
-  secondaryColor: "#22c55e",
-  fontFamily:
-    "Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'",
-  radius: 12,
-  buttonStyle: "rounded",
-  containerMaxWidth: 1200,
+  primaryColor: "",
+  secondaryColor: "",
+  fontFamily: "",
+  radius: 4,
+  buttonStyle: "sharp",
+  containerMaxWidth: 1400,
   maintenance: false,
   menuItems: [
     { name: "Home", href: "/" },

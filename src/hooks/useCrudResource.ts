@@ -6,6 +6,8 @@ type CrudOptions = {
   table: string;
   queryKey: string;
   orderBy?: string;
+  /** ms — how long fetched data is considered fresh. Default: 5 minutes. */
+  staleTime?: number;
 };
 
 export function useCrudResource<T extends { id?: string }>(options: CrudOptions) {
@@ -13,6 +15,9 @@ export function useCrudResource<T extends { id?: string }>(options: CrudOptions)
 
   const query = useQuery({
     queryKey: [options.queryKey],
+    // Reference/catalogue tables (brands, categories) stay fresh a long time.
+    // Callers can override via options.staleTime.
+    staleTime: options.staleTime ?? 5 * 60 * 1000,
     queryFn: async () => {
       let request = supabase.from(options.table).select("*");
       if (options.orderBy) {

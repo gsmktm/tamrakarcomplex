@@ -31,6 +31,13 @@ interface NavigationBarProps {
   visibleQuickItems: NavItem[];
 }
 
+/* Nav link — white on navy, gold underline */
+const navLink =
+  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium text-white/60 transition-colors duration-150 hover:text-white after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:scale-x-0 after:bg-gold after:transition-transform after:duration-200 hover:after:scale-x-100 focus:outline-none focus-visible:after:scale-x-100";
+
+const navTrigger =
+  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium text-white/60 transition-colors duration-150 hover:text-white data-[state=open]:text-white after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:scale-x-0 after:bg-gold after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=open]:after:scale-x-100 focus:outline-none";
+
 export function NavigationBar({
   topLevelHomeItem,
   siteNavigationGroups,
@@ -39,87 +46,80 @@ export function NavigationBar({
   visibleQuickItems,
 }: NavigationBarProps) {
   return (
-    <div className="hidden border-b border-border/60 bg-background/92 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 lg:block">
-      <div className="container flex h-14 items-center overflow-x-auto no-scrollbar">
+    <div className="hidden border-b border-white/10 bg-navy-light lg:block" style={{ background: "oklch(17% 0.036 258)" }}>
+      <div className="container flex h-12 items-center overflow-x-auto no-scrollbar">
         <NavigationMenu className="max-w-full">
-          <NavigationMenuList className="flex-nowrap">
+          <NavigationMenuList className="flex-nowrap gap-0">
+            {/* Home */}
             <NavigationMenuItem>
               <NavigationMenuLink asChild>
-                <Link
-                  to={topLevelHomeItem.href}
-                  className={cn(
-                    "group inline-flex h-10 w-max items-center justify-center whitespace-nowrap rounded-full bg-transparent px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground focus:bg-secondary focus:text-foreground focus:outline-none",
-                  )}
-                >
+                <Link to={topLevelHomeItem.href} className={navLink}>
                   {topLevelHomeItem.name}
                 </Link>
               </NavigationMenuLink>
             </NavigationMenuItem>
 
+            {/* Stores */}
             <NavigationMenuItem>
               <NavigationMenuLink asChild>
-                <Link
-                  to="/stores"
-                  className={cn(
-                    "group inline-flex h-10 w-max items-center justify-center whitespace-nowrap rounded-full bg-transparent px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground focus:bg-secondary focus:text-foreground focus:outline-none",
-                  )}
-                >
+                <Link to="/stores" className={navLink}>
                   Stores
                 </Link>
               </NavigationMenuLink>
             </NavigationMenuItem>
 
+            {/* Marketplace */}
             <NavigationMenuItem>
               <NavigationMenuLink asChild>
-                <Link
-                  to="/marketplace"
-                  className={cn(
-                    "group inline-flex h-10 w-max items-center justify-center whitespace-nowrap rounded-full bg-transparent px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground focus:bg-secondary focus:text-foreground focus:outline-none",
-                  )}
-                >
+                <Link to="/marketplace" className={navLink}>
                   Marketplace
                 </Link>
               </NavigationMenuLink>
             </NavigationMenuItem>
 
+            {/* Site navigation groups */}
             {siteNavigationGroups.map((group) => (
               <NavigationMenuItem key={group.name}>
-                <div className="flex items-center rounded-full border border-transparent transition-colors hover:bg-secondary focus-within:bg-secondary">
-                  <NavigationMenuLink asChild>
-                    <Link
-                      to={group.href}
-                      className="inline-flex h-10 items-center rounded-l-full px-3 text-sm font-medium transition-colors hover:text-foreground focus:outline-none"
-                    >
-                      {group.name}
-                    </Link>
-                  </NavigationMenuLink>
-                  <NavigationMenuTrigger className="h-10 rounded-l-none rounded-r-full bg-transparent px-2 hover:bg-transparent data-[active]:bg-transparent data-[state=open]:bg-secondary">
-                    <span className="sr-only">Open {group.name} menu</span>
-                  </NavigationMenuTrigger>
-                </div>
+                <NavigationMenuTrigger
+                  className={cn(
+                    navTrigger,
+                    "bg-transparent hover:bg-transparent data-[state=open]:bg-transparent",
+                  )}
+                >
+                  {group.name}
+                </NavigationMenuTrigger>
                 <NavigationMenuContent>
-                  <div className="w-[560px] p-4">
-                    <div className="mb-3 px-1">
-                      <Link to={group.href} className="text-sm font-semibold transition-colors hover:text-primary">
+                  <div className="w-[540px] p-5">
+                    <div className="mb-4 pb-3 border-b border-border">
+                      <Link
+                        to={group.href}
+                        className="text-sm font-semibold text-foreground hover:text-primary transition-colors"
+                      >
                         {group.name}
                       </Link>
-                      <p className="text-sm text-muted-foreground">{group.description}</p>
+                      {group.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{group.description}</p>
+                      )}
                     </div>
-                    <ul className="grid gap-3 md:grid-cols-2">
+                    <ul className="grid gap-1 md:grid-cols-2">
                       {group.items.map((item) => (
                         <li key={item.name}>
                           <NavigationMenuLink asChild>
                             <Link
                               to={item.href}
-                              className="block select-none space-y-1 rounded-xl border border-border/60 bg-card p-3 leading-none no-underline outline-none transition-colors hover:bg-secondary focus:bg-secondary"
+                              className="group flex items-start gap-3 select-none rounded-sm p-3 no-underline outline-none transition-colors hover:bg-secondary focus:bg-secondary"
                             >
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="text-sm font-medium leading-none">{item.name}</div>
-                                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-foreground leading-tight">
+                                  {item.name}
+                                </div>
+                                {item.description && (
+                                  <p className="text-xs text-muted-foreground leading-snug mt-0.5 line-clamp-2">
+                                    {item.description}
+                                  </p>
+                                )}
                               </div>
-                              <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                                {item.description}
-                              </p>
+                              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 translate-x-0 group-hover:translate-x-1 transition-transform duration-200" style={{ transitionTimingFunction: "var(--ease-out-quart)" }} />
                             </Link>
                           </NavigationMenuLink>
                         </li>
@@ -130,50 +130,52 @@ export function NavigationBar({
               </NavigationMenuItem>
             ))}
 
+            {/* Explore */}
             <NavigationMenuItem>
-              <div className="flex items-center rounded-full border border-transparent transition-colors hover:bg-secondary focus-within:bg-secondary">
-                <NavigationMenuLink asChild>
-                  <Link
-                    to={exploreLandingItem.href}
-                    className="inline-flex h-10 items-center rounded-l-full px-3 text-sm font-medium transition-colors hover:text-foreground focus:outline-none"
-                  >
-                    {exploreLandingItem.name}
-                  </Link>
-                </NavigationMenuLink>
-                <NavigationMenuTrigger className="h-10 rounded-l-none rounded-r-full bg-transparent px-2 hover:bg-transparent data-[active]:bg-transparent data-[state=open]:bg-secondary">
-                  <span className="sr-only">Open explore menu</span>
-                </NavigationMenuTrigger>
-              </div>
+              <NavigationMenuTrigger
+                className={cn(
+                  navTrigger,
+                  "bg-transparent hover:bg-transparent data-[state=open]:bg-transparent",
+                )}
+              >
+                {exploreLandingItem.name}
+              </NavigationMenuTrigger>
               <NavigationMenuContent>
-                <ul className="grid w-[440px] gap-3 p-4 md:w-[560px] md:grid-cols-2">
-                  {exploreItems.map((item) => (
-                    <li key={item.name}>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          to={item.href}
-                          className="block select-none space-y-1 rounded-xl border border-border/60 bg-card p-3 leading-none no-underline outline-none transition-colors hover:bg-secondary focus:bg-secondary"
-                        >
-                          <div className="text-sm font-medium leading-none">{item.name}</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            {item.description}
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                  ))}
-                </ul>
+                <div className="w-[500px] p-5">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground mb-3">
+                    Browse by category
+                  </p>
+                  <ul className="grid gap-1 md:grid-cols-2">
+                    {exploreItems.map((item) => (
+                      <li key={item.name}>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            to={item.href}
+                            className="group flex items-start gap-3 select-none rounded-sm p-3 no-underline outline-none transition-colors hover:bg-secondary focus:bg-secondary"
+                          >
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-foreground">{item.name}</div>
+                              {item.description && (
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                  {item.description}
+                                </p>
+                              )}
+                            </div>
+                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 translate-x-0 group-hover:translate-x-1 transition-transform duration-200" style={{ transitionTimingFunction: "var(--ease-out-quart)" }} />
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </NavigationMenuContent>
             </NavigationMenuItem>
 
+            {/* Quick items */}
             {visibleQuickItems.map((category) => (
               <NavigationMenuItem key={category.name}>
                 <NavigationMenuLink asChild>
-                  <Link
-                    to={category.href}
-                    className={cn(
-                      "group inline-flex h-10 w-max items-center justify-center whitespace-nowrap rounded-full bg-transparent px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary hover:text-foreground focus:bg-secondary focus:text-foreground focus:outline-none",
-                    )}
-                  >
+                  <Link to={category.href} className={navLink}>
                     {category.name}
                   </Link>
                 </NavigationMenuLink>
@@ -182,11 +184,13 @@ export function NavigationBar({
           </NavigationMenuList>
         </NavigationMenu>
 
-        <a href="tel:+977015351731" className="ml-auto hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10 transition-colors hover:bg-primary/10">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-            <Phone className="h-3.5 w-3.5 text-primary" />
-          </div>
-          <span className="text-sm font-bold text-foreground">+977-015351731</span>
+        {/* Phone — right edge */}
+        <a
+          href="tel:+977015351731"
+          className="ml-auto hidden xl:flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors pressable"
+        >
+          <Phone className="h-3 w-3 text-primary" />
+          +977-015351731
         </a>
       </div>
     </div>
