@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { assertAllowedOrigin, getCorsHeaders, requireUser } from '../_shared/cors.ts'
+import { resolveInitialOrderStatus } from '../_shared/commerce.ts'
 
 console.log('create-order-secure function loaded')
 
@@ -143,8 +144,7 @@ Deno.serve(async (req) => {
     }
 
     // COD orders are immediately actionable by the store; online orders wait for payment.
-    const isCod = payment_method === 'cod'
-    const initialOrderStatus = isCod ? 'confirmed' : 'pending_payment'
+    const initialOrderStatus = resolveInitialOrderStatus(payment_method)
     const initialPaymentStatus = 'pending'
 
     // Create order atomically
