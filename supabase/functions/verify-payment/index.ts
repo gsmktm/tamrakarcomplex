@@ -87,12 +87,12 @@ Deno.serve(async (req) => {
           throw new Error('Failed to update payment record')
         }
 
-        // Update order
+        // Update order — 'paid' marks money captured; store then confirms/packs.
         const { error: orderError } = await supabaseClient
           .from('orders')
           .update({
             payment_status: 'paid',
-            order_status: 'confirmed'
+            order_status: 'paid'
           })
           .eq('id', oid)
 
@@ -100,8 +100,9 @@ Deno.serve(async (req) => {
           throw new Error('Failed to update order status')
         }
 
-        // Calculate commissions
+        // Calculate commissions, then roll them into per-store payout rows
         await supabaseClient.rpc('create_order_commissions', { p_order_id: oid })
+        await supabaseClient.rpc('create_order_payouts', { p_order_id: oid })
 
         return new Response(
           JSON.stringify({

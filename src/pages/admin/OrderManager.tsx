@@ -158,9 +158,12 @@ export default function OrderManager() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'pending':
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
+      case 'paid': return 'bg-teal-100 text-teal-800';
       case 'confirmed': return 'bg-blue-100 text-blue-800';
       case 'processing': return 'bg-purple-100 text-purple-800';
+      case 'packed': return 'bg-amber-100 text-amber-800';
       case 'shipped': return 'bg-indigo-100 text-indigo-800';
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'completed': return 'bg-emerald-100 text-emerald-800';
@@ -275,9 +278,11 @@ export default function OrderManager() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Order Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
                 <SelectItem value="confirmed">Confirmed</SelectItem>
                 <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="packed">Packed</SelectItem>
                 <SelectItem value="shipped">Shipped</SelectItem>
                 <SelectItem value="delivered">Delivered</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
@@ -339,10 +344,24 @@ export default function OrderManager() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+                      {order.order_status === 'paid' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          title="Confirm order"
+                          onClick={() => updateOrderStatusMutation.mutate({
+                            id: order.id,
+                            order_status: 'confirmed'
+                          })}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      )}
                       {order.order_status === 'confirmed' && (
                         <Button
                           size="sm"
                           variant="outline"
+                          title="Mark processing"
                           onClick={() => updateOrderStatusMutation.mutate({
                             id: order.id,
                             order_status: 'processing'
@@ -355,12 +374,26 @@ export default function OrderManager() {
                         <Button
                           size="sm"
                           variant="outline"
+                          title="Mark packed"
+                          onClick={() => updateOrderStatusMutation.mutate({
+                            id: order.id,
+                            order_status: 'packed'
+                          })}
+                        >
+                          <Package className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {order.order_status === 'packed' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          title="Mark shipped"
                           onClick={() => updateOrderStatusMutation.mutate({
                             id: order.id,
                             order_status: 'shipped'
                           })}
                         >
-                          <Package className="h-4 w-4" />
+                          <Truck className="h-4 w-4" />
                         </Button>
                       )}
                     </div>

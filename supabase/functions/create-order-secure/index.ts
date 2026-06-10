@@ -107,6 +107,10 @@ Deno.serve(async (req) => {
         if (error || !data || data.in_stock === false) {
           throw new Error(`Product ${item.product_id} not found or unavailable`)
         }
+        // store_id mandatory for store-sold products so the payout routes correctly
+        if (!data.store_id) {
+          throw new Error(`Product ${data.name} is missing a store assignment`)
+        }
         productData = {
           id: data.id,
           name: data.name,
@@ -129,7 +133,7 @@ Deno.serve(async (req) => {
         product_id: item.product_id,
         catalog_product_id: item.catalog_product_id,
         store_inventory_id: item.store_inventory_id,
-        store_id: productData.store_id ?? item.store_id ?? null,
+        store_id: productData.store_id ?? item.store_id ?? null, // catalog (house) items may be null
         product_name: productData.name,
         product_sku: item.sku,
         quantity,
@@ -138,6 +142,11 @@ Deno.serve(async (req) => {
       })
     }
 
+    // COD orders are immediately actionable by the store; online orders wait for payment.
+    const isCod = payment_method === 'cod'
+    const initialOrderStatus = isCod ? 'confirmed' : 'pending_payment'
+    const initialPaymentStatus = 'pending'
+
     // Create order atomically
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
@@ -145,6 +154,8 @@ Deno.serve(async (req) => {
         user_id: user.id,
         total_amount: totalAmount,
         payment_method,
+        order_status: initialOrderStatus,
+        payment_status: initialPaymentStatus,
         shipping_address: cleanJsonObject(shipping_address),
         contact_info: cleanJsonObject(contact_info),
         notes: cleanText(notes, 1000)
