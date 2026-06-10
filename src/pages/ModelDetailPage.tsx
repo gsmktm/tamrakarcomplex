@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
+import DOMPurify from "dompurify";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -343,7 +344,7 @@ export default function ModelDetailPage() {
               <TabsContent value="overview">
                 <div
                   className="prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: (model as any).overview_content }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize((model as any).overview_content) }}
                 />
               </TabsContent>
             )}

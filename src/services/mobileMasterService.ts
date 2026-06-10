@@ -312,7 +312,7 @@ export const mobileMasterService = {
 
   // ── Prices ──────────────────────────────────────────────────
   async getVariantPrices(modelId: string): Promise<VariantPrice[]> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('phone_variant_prices')
       .select('*')
       .eq('model_id', modelId)
@@ -322,7 +322,7 @@ export const mobileMasterService = {
   },
 
   async upsertVariantPrice(price: Partial<VariantPrice>): Promise<VariantPrice> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('phone_variant_prices')
       .upsert(price)
       .select()
@@ -332,12 +332,12 @@ export const mobileMasterService = {
   },
 
   async deleteVariantPrice(id: string): Promise<void> {
-    const { error } = await (supabase as any).from('phone_variant_prices').delete().eq('id', id);
+    const { error } = await supabase.from('phone_variant_prices').delete().eq('id', id);
     if (error) throw error;
   },
 
   async getPriceHistory(modelId: string, limit = 20) {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('price_history')
       .select('*')
       .eq('model_id', modelId)
@@ -349,7 +349,7 @@ export const mobileMasterService = {
 
   // ── Expert Score ─────────────────────────────────────────────
   async getExpertScore(modelId: string): Promise<ExpertScore | null> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('expert_scores')
       .select('*')
       .eq('model_id', modelId)
@@ -359,7 +359,7 @@ export const mobileMasterService = {
   },
 
   async upsertExpertScore(score: Partial<ExpertScore>): Promise<ExpertScore> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('expert_scores')
       .upsert(score)
       .select()
@@ -370,7 +370,7 @@ export const mobileMasterService = {
 
   // ── Model Images ─────────────────────────────────────────────
   async getModelImages(modelId: string): Promise<ModelImage[]> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('model_images')
       .select('*')
       .eq('model_id', modelId)
@@ -380,7 +380,7 @@ export const mobileMasterService = {
   },
 
   async addModelImage(image: Partial<ModelImage>): Promise<ModelImage> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('model_images')
       .insert(image)
       .select()
@@ -390,18 +390,18 @@ export const mobileMasterService = {
   },
 
   async deleteModelImage(id: string): Promise<void> {
-    const { error } = await (supabase as any).from('model_images').delete().eq('id', id);
+    const { error } = await supabase.from('model_images').delete().eq('id', id);
     if (error) throw error;
   },
 
   async updateModelImage(id: string, updates: Partial<ModelImage>): Promise<void> {
-    const { error } = await (supabase as any).from('model_images').update(updates).eq('id', id);
+    const { error } = await supabase.from('model_images').update(updates).eq('id', id);
     if (error) throw error;
   },
 
   // ── EMI Plans ────────────────────────────────────────────────
   async getEmiPlans(): Promise<EmiPlan[]> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('emi_plans')
       .select('*')
       .eq('status', 'active')
@@ -411,7 +411,7 @@ export const mobileMasterService = {
   },
 
   async getAllEmiPlans(): Promise<EmiPlan[]> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('emi_plans')
       .select('*')
       .order('bank_name');
@@ -420,7 +420,7 @@ export const mobileMasterService = {
   },
 
   async upsertEmiPlan(plan: Partial<EmiPlan>): Promise<EmiPlan> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('emi_plans')
       .upsert(plan)
       .select()
@@ -430,12 +430,12 @@ export const mobileMasterService = {
   },
 
   async deleteEmiPlan(id: string): Promise<void> {
-    const { error } = await (supabase as any).from('emi_plans').delete().eq('id', id);
+    const { error } = await supabase.from('emi_plans').delete().eq('id', id);
     if (error) throw error;
   },
 
   async getModelEmi(modelId: string): Promise<ModelEmi[]> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('model_emi')
       .select('*')
       .eq('model_id', modelId);
@@ -444,7 +444,7 @@ export const mobileMasterService = {
   },
 
   async upsertModelEmi(emi: Partial<ModelEmi>): Promise<ModelEmi> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('model_emi')
       .upsert(emi)
       .select()
@@ -454,7 +454,7 @@ export const mobileMasterService = {
   },
 
   async deleteModelEmi(id: string): Promise<void> {
-    const { error } = await (supabase as any).from('model_emi').delete().eq('id', id);
+    const { error } = await supabase.from('model_emi').delete().eq('id', id);
     if (error) throw error;
   },
 
@@ -470,10 +470,10 @@ export const mobileMasterService = {
 
     const [variants, prices, specs, images, expertScore] = await Promise.all([
       supabase.from('phone_variants').select('*').eq('model_id', model.id),
-      (supabase as any).from('phone_variant_prices').select('*').eq('model_id', model.id).order('sort_order'),
+      supabase.from('phone_variant_prices').select('*').eq('model_id', model.id).order('sort_order'),
       supabase.from('phone_specs').select('*').eq('model_id', model.id).maybeSingle(),
-      (supabase as any).from('model_images').select('*').eq('model_id', model.id).order('sort_order'),
-      (supabase as any).from('expert_scores').select('*').eq('model_id', model.id).maybeSingle(),
+      supabase.from('model_images').select('*').eq('model_id', model.id).order('sort_order'),
+      supabase.from('expert_scores').select('*').eq('model_id', model.id).maybeSingle(),
     ]);
 
     if (variants.error) throw variants.error;
@@ -514,7 +514,7 @@ export const mobileMasterService = {
     const modelIds = (data ?? []).map((m: any) => m.id);
     const minPriceMap: Record<string, number> = {};
     if (modelIds.length > 0) {
-      const { data: priceRows } = await (supabase as any)
+      const { data: priceRows } = await supabase
         .from('phone_variant_prices')
         .select('model_id, regular_price')
         .in('model_id', modelIds)
@@ -551,7 +551,7 @@ export const mobileMasterService = {
   },
 
   async getRetailers(): Promise<Retailer[]> {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('retailers')
       .select('*')
       .eq('status', 'active')

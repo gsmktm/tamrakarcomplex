@@ -15,6 +15,9 @@ const FILTER_CHIPS = [
   { label: 'iPhones', filter: { brand_id: '' } }, // resolved at runtime via brand lookup
   { label: 'Upcoming', filter: { is_upcoming: true } },
   { label: 'Featured', filter: { is_featured: true } },
+  { label: 'Top Rated', filter: { is_top_rated: true } },
+  { label: 'Under Rs.80k', filter: { maxPrice: 80000 } },
+  { label: 'Budget', filter: { maxPrice: 30000 } },
 ];
 
 const SORT_OPTIONS: { value: CategoryFilter['sort']; label: string }[] = [
