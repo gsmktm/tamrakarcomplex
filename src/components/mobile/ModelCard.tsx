@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SafeImage } from "@/components/common/SafeImage";
 import type { ModelListItem } from "@/services/mobileMasterService";
@@ -30,7 +31,11 @@ export function ModelCard({ model, className = '' }: ModelCardProps) {
           {model.is_featured && <Badge className="text-[10px] h-5 bg-amber-500 hover:bg-amber-500">Featured</Badge>}
         </div>
         {model.expert_overall && (
-          <div className="absolute bottom-2 right-2 bg-background/90 rounded-full px-1.5 py-0.5 text-xs font-bold text-primary border">
+          <div
+            className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-background/90 rounded-full px-1.5 py-0.5 text-xs font-bold text-primary border"
+            aria-label={`Expert rating ${model.expert_overall} out of 10`}
+          >
+            <Star className="h-3 w-3 fill-amber-400 text-amber-400" aria-hidden="true" />
             {model.expert_overall}
           </div>
         )}
@@ -41,7 +46,9 @@ export function ModelCard({ model, className = '' }: ModelCardProps) {
           {model.name}
         </div>
         <div className="pt-1">
-          <span className="text-sm font-bold text-foreground">{displayPrice}</span>
+          <span className={`text-sm font-bold ${model.min_price ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+            {displayPrice}
+          </span>
         </div>
       </div>
     </Link>

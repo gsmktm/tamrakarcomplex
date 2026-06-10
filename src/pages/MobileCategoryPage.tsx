@@ -144,7 +144,7 @@ export default function MobileCategoryPage() {
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">No phones found. Try a different filter.</div>
+            <div role="status" className="text-center py-16 text-muted-foreground">No phones found. Try a different filter.</div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {filtered.map(m => <ModelCard key={m.id} model={m} />)}

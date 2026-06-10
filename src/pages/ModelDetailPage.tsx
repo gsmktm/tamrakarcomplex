@@ -63,7 +63,7 @@ export default function ModelDetailPage() {
   }
 
   if (!detail || error) {
-    return <div className="text-center py-24 text-muted-foreground">Phone not found.</div>;
+    return <div role="alert" className="text-center py-24 text-muted-foreground">Phone not found.</div>;
   }
 
   const { model, variants, prices, specs, images, expertScore } = detail;
