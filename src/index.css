@@ -56,6 +56,8 @@
     --gold:                 oklch(64%   0.118 70);
     --gold-light:           oklch(80%   0.088 76);
     --gold-dark:            oklch(52%   0.118 66);
+    --success:              oklch(60%   0.140 152);
+    --success-light:        oklch(72%   0.150 152);
     --whatsapp-green:       oklch(55%   0.180 155);
     --hot-red:              oklch(48%   0.195 22);
     --crimson:              oklch(44%   0.200 18);
@@ -154,6 +156,11 @@
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   }
 
+  /* Clear the fixed mobile BottomNav (h-14 = 56px) + safe area; desktop unaffected */
+  @media (max-width: 767px) {
+    body { padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)); }
+  }
+
   h1, h2, h3, h4, h5, h6 {
     text-wrap: balance;
     font-feature-settings: "kern" 1;
@@ -233,6 +240,18 @@
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Premium glass surface — contrast-safe in both modes (skill: no bg-white/10) */
+  .glass-card {
+    background-color: color-mix(in oklch, var(--card) 82%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid color-mix(in oklch, var(--border) 90%, transparent);
+  }
+  .text-success { color: var(--success); }
+  .dark .text-success { color: var(--success-light); }
+  /* iOS safe-area bottom padding for sticky nav */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
   /* Typography — Himalayan Royal */
   .font-display { font-family: 'Cormorant Garamond', 'Georgia', serif; }

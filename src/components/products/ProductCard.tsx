@@ -128,7 +128,20 @@ export function ProductCard({ product }: ProductCardProps) {
         <h4 className="font-medium text-sm text-foreground line-clamp-2 leading-snug flex-1">
           {product.name}
         </h4>
-        <p className="font-syne font-bold text-sm text-foreground mt-1">{product.price}</p>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="font-syne font-bold text-sm text-success">{product.price}</p>
+          {/* Mobile-visible add — hover overlay is desktop-only (skill: hover-vs-tap) */}
+          {!outOfStock && (
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              aria-label={`Add ${product.name} to cart`}
+              className="md:hidden inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground active:scale-95 transition-transform"
+            >
+              <ShoppingCart className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Saffron sweep on hover */}

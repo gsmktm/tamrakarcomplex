@@ -18,6 +18,7 @@ import { storeAdminRoutes } from "@/routes/storeAdminRoutes";
 import { staffRoutes } from "@/routes/staffRoutes";
 import ScrollToTop from "@/components/ScrollToTop";
 import { OfflineBanner } from "@/components/system/OfflineBanner";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { FrontendLiveEditor } from "@/components/system/FrontendLiveEditor";
 import { SiteSettingsHydrator } from "@/components/system/SiteSettingsHydrator";
 import { DynamicFavicon } from "@/components/system/DynamicFavicon";
@@ -101,6 +102,7 @@ const AppContent = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </MaintenanceGate>
+        <BottomNav />
       </ErrorBoundary>
     </BrowserRouter>
   );

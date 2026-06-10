@@ -52,7 +52,6 @@ import { HomeStoreSpotlight } from "@/components/home/HomeStoreSpotlight";
 import { HomeOffers } from "@/components/home/HomeOffers";
 import { HomeTrustStats } from "@/components/home/HomeTrustStats";
 import { HomeCompareMini } from "@/components/home/HomeCompareMini";
-import { MobileStickyCTA } from "@/components/home/MobileStickyCTA";
 import { useFeaturedProducts, useProducts, type Product } from "@/hooks/useProducts";
 import { useArticlesList } from "@/hooks/useArticles";
 import { useGuidesList } from "@/hooks/useGuides";
@@ -445,9 +444,7 @@ export function EcommerceHomeSection() {
 
       {/* ── CHAT WIDGET ──────────────────────────────────────────────────── */}
       {enabledSections.chat && <ChatWidget />}
-
-      {/* ── MOBILE STICKY CTA ────────────────────────────────────────────── */}
-      <MobileStickyCTA />
+      {/* Global mobile bottom nav (BottomNav) replaces the old homepage-only sticky CTA */}
     </div>
   );
 }
