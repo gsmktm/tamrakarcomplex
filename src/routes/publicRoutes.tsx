@@ -75,6 +75,11 @@ function RedirectBrandToNew() {
   return <Navigate to={`/cat/mobiles/${brand ?? ''}`} replace />;
 }
 
+function RedirectModelToNew() {
+  const { slug } = useParams<{ slug: string }>();
+  return <Navigate to={`/mobile/${slug ?? ''}`} replace />;
+}
+
 export const publicRoutes = (
   <>
     <Route path="/" element={<Index />} />
@@ -138,6 +143,7 @@ export const publicRoutes = (
     <Route path="/cat/mobiles/:brand" element={withSuspense(MobileBrandPage)} />
     <Route path="/mobile-price" element={<Navigate to="/cat/mobiles/" replace />} />
     <Route path="/mobile-price/brand/:brand" element={<RedirectBrandToNew />} />
+    <Route path="/mobile-price/:slug" element={<RedirectModelToNew />} />
     <Route path="/laptop-price" element={withSuspense(LaptopPrice)} />
     <Route path="/article/:slug" element={withSuspense(ArticleDetail)} />
     <Route path="/guide/:slug" element={withSuspense(GuideDetail)} />
