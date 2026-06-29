@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tamrakar Commerce</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 24px; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 6px; color: #f8fafc; }
+    .subtitle { font-size: 0.8rem; color: #64748b; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .kpi { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 16px; }
+    .kpi .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin-bottom: 6px; }
+    .kpi .value { font-size: 1.6rem; font-weight: 700; color: #38bdf8; }
+    .kpi .sub { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+    section { margin-bottom: 32px; }
+    section h2 { font-size: 1rem; font-weight: 600; color: #cbd5e1; margin-bottom: 12px; border-bottom: 1px solid #1e293b; padding-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th { text-align: left; padding: 8px 10px; background: #1e293b; color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 0.65rem; letter-spacing: .05em; }
+    td { padding: 8px 10px; border-bottom: 1px solid #1e293b; }
+    tr:hover td { background: #1e293b44; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+    .badge.STRONG_DEMAND { background: #064e3b; color: #6ee7b7; }
+    .badge.HEALTHY      { background: #1e3a5f; color: #7dd3fc; }
+    .badge.MIXED        { background: #422006; color: #fbbf24; }
+    .badge.LOTTERY_NOISE{ background: #3b0764; color: #e879f9; }
+    .funnel-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1e293b; }
+    .funnel-label { width: 90px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: #94a3b8; }
+    .bar-wrap { flex: 1; background: #1e293b; border-radius: 4px; height: 18px; overflow: hidden; }
+    .bar { height: 100%; background: #0ea5e9; border-radius: 4px; transition: width .5s; }
+    .funnel-pct { width: 60px; text-align: right; font-size: 0.75rem; color: #38bdf8; }
+    .loading { color: #475569; font-size: 0.85rem; padding: 20px 0; }
+    .error { color: #f87171; font-size: 0.85rem; padding: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1>🛒 Tamrakar Commerce</h1>
+  <p class="subtitle">Purchase flow analysis · real vs lottery demand · payout queue</p>
+
+  <div class="grid" id="kpis">
+    <div class="loading">Loading stats…</div>
+  </div>
+
+  <section>
+    <h2>Demand Flow — Real vs Lottery</h2>
+    <div id="demand-table"><div class="loading">Loading…</div></div>
+  </section>
+
+  <section>
+    <h2>Payment Funnel</h2>
+    <div id="funnel"><div class="loading">Loading…</div></div>
+  </section>
+
+  <section>
+    <h2>Pending COD Orders</h2>
+    <div id="cod-table"><div class="loading">Loading…</div></div>
+  </section>
+
+  <section>
+    <h2>Payout Queue</h2>
+    <div id="payout-table"><div class="loading">Loading…</div></div>
+  </section>
+
+<script>
+const fmt = (n) => Number(n).toLocaleString('en-NP');
+const pct = (n) => `${n}%`;
+
+async function load(path) {
+  try {
+    const r = await fetch(`../api${path}`);  // relative — works behind proxy
+    if (!r.ok) throw new Error(r.statusText);
+    return await r.json();
+  } catch (e) {
+    return { _error: e.message };
+  }
+}
+
+function err(msg) {
+  return `<div class="error">Error: ${msg}</div>`;
+}
+
+async function renderStats() {
+  const d = await load('/orders/stats');
+  if (d._error) { document.getElementById('kpis').innerHTML = err(d._error); return; }
+
+  const statuses = d.by_status || {};
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="label">Total Orders (30d)</div><div class="value">${d.total}</div></div>
+    <div class="kpi"><div class="label">Revenue (30d)</div><div class="value">रु ${fmt(d.revenue_npr)}</div></div>
+    <div class="kpi"><div class="label">Confirmed</div><div class="value">${statuses.confirmed || 0}</div><div class="sub">COD ready to process</div></div>
+    <div class="kpi"><div class="label">Pending Payment</div><div class="value">${statuses.pending_payment || 0}</div><div class="sub">Awaiting eSewa</div></div>
+    <div class="kpi"><div class="label">Completed</div><div class="value">${statuses.completed || 0}</div></div>
+    <div class="kpi"><div class="label">Cancelled</div><div class="value">${statuses.cancelled || 0}</div></div>
+  `;
+}
+
+async function renderDemand() {
+  const d = await load('/demand/flow');
+  if (d._error) { document.getElementById('demand-table').innerHTML = err(d._error); return; }
+
+  const items = (d.items || []).slice(0, 30);
+  if (!items.length) { document.getElementById('demand-table').innerHTML = '<div class="loading">No data</div>'; return; }
+
+  document.getElementById('demand-table').innerHTML = `
+    <table>
+      <tr>
+        <th>Product</th>
+        <th>Real Orders</th>
+        <th>Lottery Orders</th>
+        <th>Lottery %</th>
+        <th>Real:Lottery</th>
+        <th>Revenue (Real)</th>
+        <th>Sentiment</th>
+      </tr>
+      ${items.map(i => `
+        <tr>
+          <td>${i.name}</td>
+          <td>${i.real_orders}</td>
+          <td>${i.lottery_orders}</td>
+          <td>${pct(i.lottery_pct)}</td>
+          <td>${i.real_demand_ratio}x</td>
+          <td>रु ${fmt(i.real_revenue)}</td>
+          <td><span class="badge ${i.sentiment}">${i.sentiment.replace('_',' ')}</span></td>
+        </tr>
+      `).join('')}
+    </table>
+  `;
+}
+
+async function renderFunnel() {
+  const rows = await load('/demand/funnel');
+  if (rows._error) { document.getElementById('funnel').innerHTML = err(rows._error); return; }
+
+  const maxPlaced = Math.max(...rows.map(r => r.placed), 1);
+  document.getElementById('funnel').innerHTML = rows.map(r => `
+    <div class="funnel-row">
+      <div class="funnel-label">${r.method}</div>
+      <div style="flex:1">
+        <div style="display:flex;gap:8px;margin-bottom:4px;font-size:.7rem;color:#94a3b8">
+          <span>Placed: ${r.placed}</span>
+          <span>Paid: ${r.paid}</span>
+          <span>Completed: ${r.completed}</span>
+          <span>Revenue: रु ${fmt(r.revenue)}</span>
+        </div>
+        <div class="bar-wrap"><div class="bar" style="width:${r.placed/maxPlaced*100}%"></div></div>
+      </div>
+      <div class="funnel-pct">${pct(r.conversion_rate)} conv</div>
+    </div>
+  `).join('');
+}
+
+async function renderCOD() {
+  const rows = await load('/orders/pending-cod');
+  if (rows._error) { document.getElementById('cod-table').innerHTML = err(rows._error); return; }
+  if (!rows.length) { document.getElementById('cod-table').innerHTML = '<div class="loading">No pending COD orders</div>'; return; }
+
+  document.getElementById('cod-table').innerHTML = `
+    <table>
+      <tr><th>Order ID</th><th>Name</th><th>Phone</th><th>City</th><th>Amount</th><th>Placed</th></tr>
+      ${rows.map(o => {
+        const c = o.contact_info || {};
+        const s = o.shipping_address || {};
+        const dt = new Date(o.created_at).toLocaleDateString('en-NP');
+        return `<tr>
+          <td style="font-family:monospace;font-size:.7rem">${o.id.slice(0,8)}</td>
+          <td>${c.name || '—'}</td>
+          <td>${c.phone || '—'}</td>
+          <td>${s.city || '—'}</td>
+          <td>रु ${fmt(o.total_amount)}</td>
+          <td>${dt}</td>
+        </tr>`;
+      }).join('')}
+    </table>
+  `;
+}
+
+async function renderPayouts() {
+  const rows = await load('/payouts/pending');
+  if (rows._error) { document.getElementById('payout-table').innerHTML = err(rows._error); return; }
+  if (!rows.length) { document.getElementById('payout-table').innerHTML = '<div class="loading">No pending payouts</div>'; return; }
+
+  document.getElementById('payout-table').innerHTML = `
+    <table>
+      <tr><th>Payout ID</th><th>Store ID</th><th>Net Amount</th><th>Commission</th><th>Created</th><th>Action</th></tr>
+      ${rows.map(p => {
+        const dt = new Date(p.created_at).toLocaleDateString('en-NP');
+        return `<tr>
+          <td style="font-family:monospace;font-size:.7rem">${p.id.slice(0,8)}</td>
+          <td style="font-family:monospace;font-size:.7rem">${(p.store_id||'').slice(0,8)}</td>
+          <td>रु ${fmt(p.net_amount)}</td>
+          <td>रु ${fmt(p.commission_total)}</td>
+          <td>${dt}</td>
+          <td>
+            <button onclick="markPaid('${p.id}')" style="background:#0ea5e9;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.7rem">
+              Mark Paid
+            </button>
+          </td>
+        </tr>`;
+      }).join('')}
+    </table>
+  `;
+}
+
+async function markPaid(id) {
+  if (!confirm('Mark payout ' + id.slice(0,8) + ' as paid?')) return;
+  const r = await fetch(`../api/payouts/${id}/mark-paid`, { method: 'POST' });
+  if (r.ok) { alert('Marked paid'); renderPayouts(); }
+  else { alert('Error: ' + r.statusText); }
+}
+
+// Load all panels
+renderStats();
+renderDemand();
+renderFunnel();
+renderCOD();
+renderPayouts();
+</script>
+</body>
+</html>

@@ -15,8 +15,12 @@ export default function PlatformHealth() {
   const [status, setStatus] = useState("healthy");
 
   const handleAdd = async () => {
+    if (!service.trim()) {
+      toast.error("Service name is required.");
+      return;
+    }
     try {
-      await health.create({ service, status });
+      await health.create({ service: service.trim(), status });
       setService("");
       toast.success("Health log added.");
       await health.refetch();

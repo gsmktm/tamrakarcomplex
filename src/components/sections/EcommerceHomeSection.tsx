@@ -75,6 +75,8 @@ type HomeStore = {
   description?: string | null;
   services?: string[] | null;
   is_verified?: boolean | null;
+  is_featured?: boolean | null;
+  package_slug?: string | null;
   phone?: string | null;
   email?: string | null;
   website?: string | null;
@@ -353,12 +355,20 @@ export function EcommerceHomeSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stores")
-        .select("id,name,slug,seo_slug,location,description,services,is_verified,phone,email,website,logo_url,shop_no,subscription_status")
-        .eq("is_verified", true)
-        .limit(10);
+        .select("id,name,slug,seo_slug,location,description,services,is_verified,is_featured,package_slug,phone,email,website,logo_url,shop_no,subscription_status")
+        .eq("is_active", true)
+        .limit(30);
 
       if (error) throw error;
-      return (data ?? []) as HomeStore[];
+
+      const TIER: Record<string, number> = { diamond: 4, gold: 3, silver: 2, free: 1 };
+      const sorted = (data ?? []).sort((a: HomeStore, b: HomeStore) => {
+        const wa = (TIER[a.package_slug ?? "free"] ?? 1) + (a.is_featured ? 1 : 0);
+        const wb = (TIER[b.package_slug ?? "free"] ?? 1) + (b.is_featured ? 1 : 0);
+        return wb - wa;
+      });
+
+      return sorted.slice(0, 10) as HomeStore[];
     },
   });
   const { data: rawStores, isLoading: storesLoading } = useQuery({
@@ -465,13 +475,16 @@ const tickerData = [
 function NewsTicker() {
   const items = [...tickerData, ...tickerData];
   return (
-    <div className="overflow-hidden bg-gold py-1.5">
+    <div
+      className="overflow-hidden py-1.5 border-b border-white/[0.08]"
+      style={{ background: "linear-gradient(90deg, oklch(18% 0.038 258) 0%, oklch(22% 0.045 270) 50%, oklch(18% 0.038 258) 100%)" }}
+    >
       <div className="flex gap-12 ticker-track whitespace-nowrap">
         {items.map((item, i) => (
-          <span key={i} className="inline-flex items-center gap-2 text-[11px] font-bold text-navy tracking-wide">
-            <item.icon className="h-3.5 w-3.5" aria-hidden />
+          <span key={i} className="inline-flex items-center gap-2 text-[11px] font-bold tracking-wide" style={{ color: "oklch(80% 0.014 80)" }}>
+            <item.icon className="h-3.5 w-3.5" aria-hidden style={{ color: "oklch(78% 0.165 65)" }} />
             <span>{item.text}</span>
-            <span className="text-navy/40 mx-2">•</span>
+            <span className="mx-2" style={{ color: "oklch(62% 0.25 285 / 0.55)" }}>◆</span>
           </span>
         ))}
       </div>
@@ -526,67 +539,69 @@ function HeroSection({ products }: { products: Product[] }) {
 
   return (
     <>
-      <section
-        className="relative overflow-hidden"
-        style={{ background: "linear-gradient(160deg, oklch(10% 0.028 258) 0%, oklch(13% 0.034 258) 55%, oklch(16% 0.040 258) 100%)" }}
-      >
-        {/* Structured backdrop */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute inset-0 opacity-[0.04]"
-            style={{
-              backgroundImage: "linear-gradient(oklch(100% 0 0 / 0.15) 1px, transparent 1px), linear-gradient(90deg, oklch(100% 0 0 / 0.15) 1px, transparent 1px)",
-              backgroundSize: "48px 48px",
-            }}
-          />
-          <div className="absolute inset-x-0 top-0 h-px bg-gold/40" />
-          <div className="absolute left-0 top-0 h-full w-1/3 bg-[linear-gradient(90deg,oklch(64%_0.118_70_/_0.12),transparent)]" />
+      <section className="home-hero border-b border-white/[0.06]">
+        {/* Orb blobs */}
+        <div aria-hidden className="pointer-events-none">
+          <div className="home-orb-violet" />
+          <div className="home-orb-amber" />
+          <div className="home-slash-violet" />
+          <div className="home-slash-amber" />
         </div>
 
-        <div className="container relative pt-10 pb-0 md:pt-14 md:pb-0">
+        <div className="home-hero-content container pt-10 pb-0 md:pt-16 md:pb-0">
           {/* ── Badge ── */}
-          <div className="flex justify-center mb-6 animate-fade-up delay-0">
-            <span className="inline-flex items-center gap-2 rounded-full border border-gold/35 bg-gold/10 px-4 py-1.5 text-[11px] font-semibold tracking-[0.20em] uppercase text-gold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <div className="flex justify-center mb-7 animate-fade-up delay-0">
+            <span className="home-hero-badge" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               <Zap className="h-3 w-3" aria-hidden />
-              Nepal's Mobile Mega Market — New Road, Kathmandu
+              Nepal&apos;s Mobile Mega Market — New Road, Kathmandu
             </span>
           </div>
 
           {/* ── Headline ── */}
-          <div className="text-center mb-6 animate-fade-up delay-100">
+          <div className="text-center mb-7 animate-fade-up delay-100">
             <h1
-              className="font-display font-bold text-white leading-[1.0] tracking-[-0.01em]"
-              style={{ fontSize: "clamp(2.6rem, 7.5vw, 5.6rem)", fontWeight: 600 }}
+              className="font-display font-bold text-white leading-[1.0] tracking-[-0.02em]"
+              style={{ fontSize: "clamp(2.8rem, 8vw, 6rem)", fontWeight: 700 }}
             >
               Find Mobiles,{" "}
-              <em style={{ color: "oklch(70% 0.112 72)", fontStyle: "italic", fontWeight: 600 }}>Gadgets</em>
+              <span className="home-headline-accent" style={{ fontStyle: "italic" }}>Gadgets</span>
               <br />
               &amp; Trusted Stores
             </h1>
-            <p className="mt-4 text-white/55 text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-              Search phones, compare price, call real shops, book repair, or exchange your old phone — all from Tamrakar Complex.
+            <p className="mt-5 text-white/50 text-base md:text-lg max-w-xl mx-auto leading-relaxed">
+              Search phones, compare prices, call real shops, book repair, or exchange your old device — all from Tamrakar Complex.
             </p>
           </div>
 
           {/* ── Search bar ── */}
-          <form
-            onSubmit={handleSearch}
-            className="animate-fade-up delay-150 max-w-2xl mx-auto mb-6"
-          >
-            <div className="flex items-center h-14 rounded-xl shadow-[0_8px_40px_rgba(0,0,0,0.45)] overflow-hidden ring-2 ring-gold/0 focus-within:ring-gold/50 transition-all duration-300" style={{ background: "oklch(98.5% 0.010 78)" }}>
-              <Search className="ml-4 h-5 w-5 shrink-0" style={{ color: "oklch(55% 0.080 60)" }} aria-hidden />
+          <form onSubmit={handleSearch} className="animate-fade-up delay-150 max-w-2xl mx-auto mb-6">
+            <div
+              className="flex items-center h-14 overflow-hidden transition-all duration-300"
+              style={{
+                background: "oklch(98.5% 0.010 78)",
+                clipPath: "polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%)",
+                boxShadow: "0 8px 40px oklch(7% 0.020 252 / 0.55), 0 0 0 1px oklch(62% 0.25 285 / 0.18)",
+              }}
+            >
+              <Search className="ml-4 h-5 w-5 shrink-0" style={{ color: "oklch(52% 0.070 55)" }} aria-hidden />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search iPhone 16, Samsung S25, screen repair, charger…"
+                placeholder="Search iPhone 16, Samsung S25, screen repair…"
                 className="flex-1 h-full px-3 text-sm md:text-base bg-transparent outline-none"
                 style={{ color: "oklch(20% 0.025 50)", fontFamily: "'Outfit', sans-serif" }}
                 aria-label="Search products and stores"
               />
               <button
                 type="submit"
-                className="h-full px-6 font-semibold text-sm shrink-0 transition-all pressable hover:opacity-90"
-                style={{ background: "oklch(64% 0.118 70)", color: "oklch(11% 0.022 48)", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "0.02em" }}
+                className="h-full px-7 font-bold text-sm shrink-0 transition-all pressable hover:brightness-110"
+                style={{
+                  background: "linear-gradient(135deg, oklch(62% 0.25 285), oklch(50% 0.22 275))",
+                  color: "oklch(95% 0.010 285)",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  letterSpacing: "0.04em",
+                }}
               >
                 Search
               </button>
@@ -594,32 +609,24 @@ function HeroSection({ products }: { products: Product[] }) {
           </form>
 
           {/* ── Quick category chips ── */}
-          <div className="animate-fade-up delay-200 flex flex-wrap justify-center gap-2 mb-8">
+          <div className="animate-fade-up delay-200 flex flex-wrap justify-center gap-2 mb-7">
             {quickCategories.map((cat) => (
-              <Link
-                key={cat.label}
-                to={cat.href}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/8 px-3.5 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/15 hover:text-white hover:border-gold/40 transition-all duration-200 pressable"
-                style={{ background: "rgba(255,255,255,0.06)" }}
-              >
+              <Link key={cat.label} to={cat.href} className="home-chip pressable">
                 <cat.icon className="h-3.5 w-3.5" aria-hidden />
                 {cat.label}
               </Link>
             ))}
           </div>
 
+          {/* ── Operation tiles ── */}
           <div className="animate-fade-up delay-250 mx-auto mb-8 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
             {operationTiles.map((tile) => (
-              <Link
-                key={tile.label}
-                to={tile.href}
-                className="group border border-white/15 bg-white/[0.06] p-3 text-left transition-all hover:border-gold/45 hover:bg-white/[0.10] focus-visible:outline-gold"
-              >
-                <div className="mb-3 flex h-9 w-9 items-center justify-center border border-white/15 bg-white/[0.08] text-gold transition-colors group-hover:border-gold/45">
+              <Link key={tile.label} to={tile.href} className="home-op-tile pressable block">
+                <div className="home-op-icon">
                   <tile.icon className="h-4 w-4" aria-hidden />
                 </div>
                 <p className="font-data text-sm font-semibold text-white">{tile.label}</p>
-                <p className="mt-0.5 text-xs text-white/50">{tile.value}</p>
+                <p className="mt-0.5 text-xs text-white/45">{tile.value}</p>
               </Link>
             ))}
           </div>
@@ -630,23 +637,37 @@ function HeroSection({ products }: { products: Product[] }) {
               const Icon = cta.icon;
               if (cta.variant === "gold") return (
                 <Link key={cta.label} to={cta.href}>
-                  <button className="inline-flex items-center gap-2 h-10 px-5 rounded-lg font-semibold text-sm pressable shadow-gold hover:opacity-90 transition-opacity"
-                    style={{ background: "oklch(64% 0.118 70)", color: "oklch(11% 0.022 48)", fontFamily: "'Space Grotesk', sans-serif" }}>
+                  <button
+                    className="inline-flex items-center gap-2 h-11 px-6 font-bold text-sm pressable transition-all"
+                    style={{
+                      background: "linear-gradient(135deg, oklch(78% 0.165 65), oklch(64% 0.118 70))",
+                      color: "oklch(10% 0.022 48)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+                      boxShadow: "0 4px 24px oklch(64% 0.118 70 / 0.45)",
+                    }}
+                  >
                     <Icon className="h-4 w-4" aria-hidden />{cta.label}
                   </button>
                 </Link>
               );
               if (cta.variant === "outline") return (
                 <Link key={cta.label} to={cta.href}>
-                  <button className="inline-flex items-center gap-2 h-10 px-5 rounded-lg font-medium text-sm text-white/80 border border-white/20 hover:border-gold/45 hover:text-gold pressable transition-all"
-                    style={{ background: "rgba(255,255,255,0.05)" }}>
+                  <button
+                    className="inline-flex items-center gap-2 h-11 px-5 font-medium text-sm text-white/80 pressable transition-all hover:text-white"
+                    style={{
+                      border: "1px solid oklch(62% 0.25 285 / 0.35)",
+                      background: "oklch(62% 0.25 285 / 0.08)",
+                      clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+                    }}
+                  >
                     <Icon className="h-4 w-4" aria-hidden />{cta.label}
                   </button>
                 </Link>
               );
               return (
                 <Link key={cta.label} to={cta.href}>
-                  <button className="inline-flex items-center gap-2 h-10 px-4 rounded-xl font-medium text-sm text-white/50 hover:text-white/80 pressable transition-colors">
+                  <button className="inline-flex items-center gap-2 h-10 px-4 font-medium text-sm text-white/45 hover:text-white/75 pressable transition-colors">
                     <Icon className="h-4 w-4" aria-hidden />{cta.label}
                   </button>
                 </Link>
@@ -655,11 +676,14 @@ function HeroSection({ products }: { products: Product[] }) {
           </div>
 
           {/* ── Stats bar — clips into ivory section ── */}
-          <div className="animate-fade-up delay-300 clip-diagonal-up -mx-4 md:-mx-8 lg:mx-0 rounded-t-3xl px-4 pt-6 pb-0" style={{ background: "oklch(98.5% 0.010 78)" }}>
+          <div className="home-stats-bar animate-fade-up delay-300 -mx-4 md:-mx-8 lg:mx-0 px-4 pt-6 pb-0">
             <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border max-w-2xl mx-auto">
               {heroStats.map(({ stat, label, href }) => (
-                <Link key={label} to={href} className="flex flex-col items-center py-4 px-3 hover:bg-secondary/60 rounded-xl transition-colors">
-                  <span className="font-display text-2xl md:text-3xl font-semibold text-navy" style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: "-0.01em" }}>{stat}</span>
+                <Link key={label} to={href} className="flex flex-col items-center py-4 px-3 hover:bg-secondary/60 rounded-xl transition-colors group">
+                  <span
+                    className="font-display text-2xl md:text-3xl font-semibold group-hover:text-primary transition-colors"
+                    style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: "-0.01em", color: "oklch(18% 0.034 255)" }}
+                  >{stat}</span>
                   <span className="text-xs text-muted-foreground mt-0.5">{label}</span>
                 </Link>
               ))}
@@ -675,51 +699,66 @@ function HeroSection({ products }: { products: Product[] }) {
 
 // ─── Service Matrix ───────────────────────────────────────────────────────────
 
+const serviceCardColors = [
+  { hex: "oklch(55% 0.22 255)", bg: "oklch(55% 0.22 255 / 0.12)", glow: "oklch(55% 0.22 255 / 0.25)" },
+  { hex: "oklch(62% 0.25 285)", bg: "oklch(62% 0.25 285 / 0.12)", glow: "oklch(62% 0.25 285 / 0.25)" },
+  { hex: "oklch(60% 0.18 220)", bg: "oklch(60% 0.18 220 / 0.12)", glow: "oklch(60% 0.18 220 / 0.25)" },
+  { hex: "oklch(72% 0.18 65)",  bg: "oklch(72% 0.18 65  / 0.12)", glow: "oklch(72% 0.18 65  / 0.25)" },
+  { hex: "oklch(65% 0.20 35)",  bg: "oklch(65% 0.20 35  / 0.12)", glow: "oklch(65% 0.20 35  / 0.25)" },
+  { hex: "oklch(62% 0.18 152)", bg: "oklch(62% 0.18 152 / 0.12)", glow: "oklch(62% 0.18 152 / 0.25)" },
+];
+
 function ServiceMatrix() {
   return (
     <section className="py-14 bg-background">
       <div className="container">
         <Reveal>
-          <SectionHeader eyebrow="Everything you need" title="Our Services" href="/services" />
+          <div className="flex items-end justify-between gap-4 mb-8">
+            <div>
+              <p className="home-eyebrow mb-2">Everything you need</p>
+              <h2 className="font-display text-2xl lg:text-3xl font-bold">Our Services</h2>
+            </div>
+            <Link to="/services">
+              <Button variant="ghost" size="sm" className="gap-1 text-primary group shrink-0">
+                View all
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
+          </div>
         </Reveal>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {serviceCards.map((card, i) => {
             const Icon = card.icon;
+            const color = serviceCardColors[i % serviceCardColors.length];
             return (
               <Reveal key={card.title} delay={(Math.min(i, 5) as 0 | 1 | 2 | 3 | 4 | 5)}>
                 <Link to={card.href} className="group block h-full">
-                  <div
-                    className={cn(
-                      "relative flex flex-col gap-3 border border-border bg-background p-5 h-full",
-                      "transition-colors duration-200 hover:bg-secondary/40 hover:border-primary/40",
-                    )}
-                  >
-                    {/* Icon */}
-                    <div className="h-10 w-10 border border-border flex items-center justify-center bg-secondary shrink-0 transition-colors duration-200 group-hover:bg-primary group-hover:border-primary group-hover:text-primary-foreground">
-                      <Icon className="h-5 w-5" aria-hidden />
+                  <div className="home-service-card h-full">
+                    {/* Cut-corner accent dot */}
+                    <div
+                      aria-hidden
+                      className="absolute top-0 right-0 w-3 h-3 opacity-60"
+                      style={{ background: color.hex, clipPath: "polygon(0 0, 100% 0, 100% 100%)" }}
+                    />
+                    {/* Hex icon */}
+                    <div
+                      className="home-hex-icon"
+                      style={{ background: color.bg, boxShadow: `0 0 0 1px ${color.hex}40` }}
+                    >
+                      <Icon className="h-5 w-5" aria-hidden style={{ color: color.hex }} />
                     </div>
                     {/* Copy */}
                     <div className="flex-1">
                       <p className="font-semibold text-sm leading-tight">{card.title}</p>
-                      <p className="text-[11px] text-primary mt-0.5 font-medium">{card.subtitle}</p>
+                      <p className="text-[11px] mt-0.5 font-medium" style={{ color: color.hex }}>{card.subtitle}</p>
                       <p className="mt-2 text-xs text-muted-foreground line-clamp-2 leading-relaxed">{card.description}</p>
                     </div>
                     {/* Arrow */}
-                    <div className="flex items-center gap-1 text-[11px] font-semibold text-primary">
+                    <div className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: color.hex }}>
                       Learn more
-                      <ArrowRight
-                        className="h-3 w-3 translate-x-0 group-hover:translate-x-1 transition-transform duration-200"
-                        style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
-                        aria-hidden
-                      />
+                      <ArrowRight className="h-3 w-3 translate-x-0 group-hover:translate-x-1 transition-transform duration-200" aria-hidden />
                     </div>
-                    {/* Bottom sweep */}
-                    <span
-                      aria-hidden
-                      className="absolute bottom-0 left-0 h-0.5 w-0 bg-primary group-hover:w-full transition-[width] duration-300"
-                      style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
-                    />
                   </div>
                 </Link>
               </Reveal>
@@ -1518,36 +1557,70 @@ function SellCtaBanner() {
   return (
     <section className="py-6">
       <div className="container">
-        <div className="relative overflow-hidden bg-foreground px-8 py-12 md:px-14 md:py-16">
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(90deg,transparent,oklch(64%_0.118_70_/_0.18))]" />
-            <div className="absolute inset-x-0 top-0 h-px bg-white/20" />
+        <div className="home-sell-cta relative px-8 py-12 md:px-14 md:py-16">
+          {/* Decorative slashes */}
+          <div aria-hidden className="pointer-events-none">
+            <div className="home-sell-cta-slash" />
+            <div className="home-sell-cta-slash-2" />
           </div>
+          {/* Top accent line */}
+          <div aria-hidden className="absolute inset-x-0 top-0 h-[2px]"
+            style={{ background: "linear-gradient(90deg, oklch(62% 0.25 285), oklch(78% 0.165 65), oklch(62% 0.25 285))" }}
+          />
 
           <div className="relative grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white/80">
-                <TrendingUp className="h-3.5 w-3.5" aria-hidden /> Best Resale Prices
-              </div>
-              <h2 className="font-syne text-3xl font-black text-white md:text-4xl xl:text-5xl leading-tight">
-                Your old phone is
-                <span className="block text-primary">
-                  worth more than you think.
+              <div className="mb-5">
+                <span
+                  className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.20em]"
+                  style={{
+                    clipPath: "polygon(6% 0, 100% 0, 94% 100%, 0 100%)",
+                    background: "oklch(62% 0.25 285 / 0.20)",
+                    border: "1px solid oklch(62% 0.25 285 / 0.40)",
+                    padding: "5px 14px",
+                    color: "oklch(75% 0.22 285)",
+                  }}
+                >
+                  <TrendingUp className="h-3 w-3" aria-hidden /> Best Resale Prices in Nepal
                 </span>
+              </div>
+              <h2
+                className="font-display font-bold text-white leading-tight"
+                style={{ fontSize: "clamp(1.8rem, 4vw, 3.2rem)" }}
+              >
+                Your old phone is
+                <br />
+                <span className="home-headline-accent">worth more than you think.</span>
               </h2>
-              <p className="mt-4 max-w-lg text-white/70 text-lg">
+              <p className="mt-4 max-w-lg text-white/60 text-base md:text-lg">
                 Get an AI-powered instant valuation in 30 seconds. No appointments, no guesswork.
               </p>
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-7 flex flex-wrap gap-3">
                 <Link to="/sell-your-phone">
-                  <Button size="lg" className="h-12 rounded-sm px-7 bg-primary hover:bg-primary/90 text-primary-foreground pressable gap-2">
+                  <button
+                    className="inline-flex items-center gap-2 h-12 px-7 font-bold text-sm pressable transition-all"
+                    style={{
+                      background: "linear-gradient(135deg, oklch(78% 0.165 65), oklch(64% 0.118 70))",
+                      color: "oklch(10% 0.022 48)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+                      boxShadow: "0 4px 24px oklch(64% 0.118 70 / 0.50)",
+                    }}
+                  >
                     <CircleDollarSign className="h-4 w-4" aria-hidden /> Sell Now
-                  </Button>
+                  </button>
                 </Link>
-                <Link to="/valuation-estimator">
-                  <Button size="lg" variant="outline" className="h-12 rounded-sm px-7 border-white/25 text-white hover:bg-white/10 pressable gap-2">
-                    <Sparkles className="h-4 w-4" aria-hidden /> Get Estimate
-                  </Button>
+                <Link to="/sell-your-phone?mode=exchange">
+                  <button
+                    className="inline-flex items-center gap-2 h-12 px-7 font-medium text-sm text-white/85 pressable transition-all hover:text-white"
+                    style={{
+                      border: "1px solid oklch(62% 0.25 285 / 0.40)",
+                      background: "oklch(62% 0.25 285 / 0.10)",
+                      clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4" aria-hidden /> Exchange &amp; Upgrade
+                  </button>
                 </Link>
               </div>
             </div>
@@ -1555,14 +1628,22 @@ function SellCtaBanner() {
             {/* Trust badges */}
             <div className="hidden md:flex flex-col gap-3 shrink-0">
               {[
-                { icon: Zap, label: "Instant quote" },
-                { icon: BadgeCheck, label: "Verified buyers" },
-                { icon: Star, label: "4.9★ rated service" },
-                { icon: MessageCircle, label: "Live support" },
-              ].map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-3 rounded-xl border border-white/15 bg-white/8 px-4 py-2.5 backdrop-blur-sm">
-                  <Icon className="h-4 w-4 text-primary shrink-0" />
-                  <span className="text-sm font-medium text-white/90">{label}</span>
+                { icon: Zap,          label: "Instant quote",      color: "oklch(78% 0.165 65)" },
+                { icon: BadgeCheck,   label: "Verified buyers",    color: "oklch(62% 0.18 152)" },
+                { icon: Star,         label: "4.9★ rated service", color: "oklch(78% 0.165 65)" },
+                { icon: MessageCircle,label: "Live support",       color: "oklch(62% 0.25 285)" },
+              ].map(({ icon: Icon, label, color }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-3 px-4 py-2.5"
+                  style={{
+                    border: "1px solid oklch(100% 0 0 / 0.10)",
+                    background: "oklch(100% 0 0 / 0.05)",
+                    clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+                  }}
+                >
+                  <Icon className="h-4 w-4 shrink-0" style={{ color }} />
+                  <span className="text-sm font-medium text-white/85">{label}</span>
                 </div>
               ))}
             </div>

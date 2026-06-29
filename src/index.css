@@ -422,6 +422,517 @@ button:not(:disabled):not([data-no-press]):active,
   50%       { transform: translate(-50%, -20px) scale(1.05); }
 }
 
+/* ─── Sell / Exchange page — unique design tokens ─────────────────────────── */
+.sell-hero {
+  background:
+    radial-gradient(ellipse 70% 80% at 0% 0%,   oklch(25% 0.20 280 / 0.45) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 60% at 100% 100%, oklch(64% 0.118 70 / 0.20) 0%, transparent 55%),
+    linear-gradient(170deg, oklch(8% 0.028 258) 0%, oklch(11% 0.034 258) 55%, oklch(9% 0.028 258) 100%);
+  position: relative;
+  overflow: hidden;
+}
+.sell-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle, oklch(64% 0.118 70 / 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
+.sell-hero::after {
+  content: "";
+  position: absolute;
+  bottom: -2px; left: 0; right: 0; height: 64px;
+  background: linear-gradient(to bottom, transparent, oklch(var(--background)));
+  pointer-events: none;
+}
+.sell-hero-slash {
+  position: absolute;
+  top: -10%;
+  left: 18%;
+  width: 3px;
+  height: 130%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    oklch(64% 0.118 70 / 0.55) 30%,
+    oklch(72% 0.110 74 / 0.70) 55%,
+    oklch(64% 0.118 70 / 0.45) 70%,
+    transparent 100%
+  );
+  transform: rotate(-18deg) skewX(-18deg);
+  pointer-events: none;
+  filter: blur(1px);
+}
+.sell-hero-slash-2 {
+  position: absolute;
+  top: -10%;
+  left: 22%;
+  width: 1px;
+  height: 130%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    oklch(72% 0.20 280 / 0.35) 40%,
+    oklch(72% 0.20 280 / 0.25) 60%,
+    transparent 100%
+  );
+  transform: rotate(-18deg) skewX(-18deg);
+  pointer-events: none;
+}
+.sell-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(90deg, oklch(64% 0.118 70 / 0.18), oklch(72% 0.20 280 / 0.15));
+  border: 1px solid oklch(64% 0.118 70 / 0.35);
+  color: oklch(82% 0.110 72);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+}
+.sell-headline-accent {
+  background: linear-gradient(135deg, oklch(82% 0.110 72) 0%, oklch(72% 0.20 280) 55%, oklch(78% 0.16 290) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.sell-wizard-wrap {
+  position: relative;
+}
+.sell-wizard-wrap::before {
+  content: "";
+  position: absolute;
+  top: -80px; left: -60px;
+  width: 320px; height: 320px;
+  background: radial-gradient(circle, oklch(72% 0.20 280 / 0.09) 0%, transparent 70%);
+  pointer-events: none;
+  border-radius: 50%;
+}
+.sell-wizard-wrap::after {
+  content: "";
+  position: absolute;
+  bottom: -60px; right: -60px;
+  width: 260px; height: 260px;
+  background: radial-gradient(circle, oklch(64% 0.118 70 / 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  border-radius: 50%;
+}
+.sell-wizard-card {
+  background: oklch(13% 0.030 258);
+  border: 1px solid oklch(64% 0.118 70 / 0.20);
+  box-shadow:
+    0 0 0 1px oklch(72% 0.20 280 / 0.08),
+    0 12px 48px oklch(6% 0.024 258 / 0.70),
+    inset 0 1px 0 oklch(100% 0 0 / 0.06);
+  color: oklch(92% 0.008 80);
+}
+.sell-step-dot-active {
+  box-shadow: 0 0 0 3px oklch(64% 0.118 70 / 0.25), 0 0 12px oklch(64% 0.118 70 / 0.35);
+}
+.sell-step-dot-done {
+  background: linear-gradient(135deg, oklch(64% 0.118 70), oklch(72% 0.20 280));
+  border-color: transparent;
+}
+.sell-brand-btn {
+  position: relative;
+  overflow: hidden;
+  background: oklch(20% 0.028 258) !important;
+  border-color: oklch(32% 0.030 258) !important;
+  color: oklch(88% 0.010 80) !important;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 120ms ease;
+}
+/* Make dark brand logos visible on dark background */
+.sell-brand-btn img {
+  filter: drop-shadow(0 0 6px oklch(88% 0.010 80 / 0.50)) brightness(1.1);
+}
+.sell-brand-btn:hover {
+  border-color: oklch(64% 0.118 70 / 0.70) !important;
+  box-shadow: 0 0 0 1px oklch(64% 0.118 70 / 0.25), 0 4px 20px oklch(64% 0.118 70 / 0.18) !important;
+  transform: translateY(-2px);
+  background: oklch(23% 0.032 258) !important;
+}
+.sell-brand-btn-active {
+  border-color: oklch(64% 0.118 70) !important;
+  background: oklch(22% 0.040 70 / 0.8) !important;
+  box-shadow: 0 0 0 2px oklch(64% 0.118 70 / 0.30), 0 4px 20px oklch(64% 0.118 70 / 0.20) !important;
+}
+/* Section headings and search in dark wizard */
+.sell-wizard-card h2 { color: oklch(92% 0.008 80); }
+.sell-wizard-card .text-muted-foreground { color: oklch(58% 0.015 258); }
+.sell-wizard-card .text-primary { color: oklch(72% 0.110 72); }
+.sell-wizard-card .border-border { border-color: oklch(30% 0.030 258); }
+.sell-wizard-card .bg-muted { background: oklch(20% 0.028 258); }
+.sell-wizard-card .bg-secondary { background: oklch(22% 0.028 258); }
+
+/* ─── Homepage "Electric Bazaar" design tokens ──────────────────────────── */
+
+/* Floating orb animations */
+@keyframes orb-violet {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.55; }
+  35%       { transform: translate(-30px, 40px) scale(1.12); opacity: 0.65; }
+  70%       { transform: translate(20px, -20px) scale(0.92); opacity: 0.48; }
+}
+@keyframes orb-amber {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.45; }
+  45%       { transform: translate(40px, -50px) scale(1.15); opacity: 0.58; }
+  75%       { transform: translate(-25px, 30px) scale(0.90); opacity: 0.40; }
+}
+@keyframes home-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+@keyframes home-spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes home-pulse-ring {
+  0%   { box-shadow: 0 0 0 0   oklch(62% 0.25 285 / 0.45); }
+  100% { box-shadow: 0 0 0 18px oklch(62% 0.25 285 / 0.00); }
+}
+@keyframes home-shimmer {
+  from { background-position: -200% center; }
+  to   { background-position:  200% center; }
+}
+
+/* Hero section background */
+.home-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 70% at 95% 5%,   oklch(30% 0.28 285 / 0.55) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 5%  95%,  oklch(64% 0.118 70 / 0.22) 0%, transparent 55%),
+    radial-gradient(ellipse 45% 40% at 50% 110%, oklch(20% 0.22 295 / 0.35) 0%, transparent 50%),
+    linear-gradient(175deg, oklch(7% 0.020 252) 0%, oklch(10% 0.026 255) 45%, oklch(12% 0.030 258) 100%);
+}
+
+/* Dot grid overlay */
+.home-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, oklch(100% 0 0 / 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Bottom fade to page bg */
+.home-hero::after {
+  content: "";
+  position: absolute;
+  bottom: -1px; left: 0; right: 0;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, oklch(98.5% 0.010 78));
+  pointer-events: none;
+  z-index: 1;
+}
+.dark .home-hero::after {
+  background: linear-gradient(to bottom, transparent, oklch(10% 0.025 258));
+}
+
+/* Diagonal slash accents */
+.home-slash-violet {
+  position: absolute;
+  top: -15%;
+  right: 28%;
+  width: 2px;
+  height: 140%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    oklch(62% 0.25 285 / 0.60) 30%,
+    oklch(68% 0.22 285 / 0.75) 55%,
+    oklch(62% 0.25 285 / 0.45) 75%,
+    transparent 100%
+  );
+  transform: rotate(-14deg);
+  pointer-events: none;
+  filter: blur(0.5px);
+  z-index: 0;
+}
+.home-slash-amber {
+  position: absolute;
+  top: -15%;
+  right: 30%;
+  width: 1px;
+  height: 140%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    oklch(78% 0.165 65 / 0.40) 40%,
+    oklch(78% 0.165 65 / 0.30) 60%,
+    transparent 100%
+  );
+  transform: rotate(-14deg);
+  pointer-events: none;
+  filter: blur(0.5px);
+  z-index: 0;
+}
+
+/* Animated orbs inside hero */
+.home-orb-violet {
+  position: absolute;
+  top: -15%;
+  right: -10%;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(38% 0.28 285 / 0.55) 0%, transparent 65%);
+  animation: orb-violet 14s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+.home-orb-amber {
+  position: absolute;
+  bottom: -15%;
+  left: -8%;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(64% 0.118 70 / 0.35) 0%, transparent 65%);
+  animation: orb-amber 18s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Hero content layer */
+.home-hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Hero badge chip — parallelogram */
+.home-hero-badge {
+  clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+  background: linear-gradient(90deg, oklch(62% 0.25 285 / 0.18), oklch(78% 0.165 65 / 0.15));
+  border: 1px solid oklch(62% 0.25 285 / 0.40);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: oklch(78% 0.165 65);
+}
+
+/* Hero headline gradient text */
+.home-headline-accent {
+  background: linear-gradient(
+    135deg,
+    oklch(84% 0.110 72)  0%,
+    oklch(78% 0.165 65)  25%,
+    oklch(72% 0.25 285)  60%,
+    oklch(78% 0.18 295) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Quick category chip */
+.home-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid oklch(100% 0 0 / 0.14);
+  background: oklch(100% 0 0 / 0.05);
+  font-size: 11px;
+  font-weight: 600;
+  color: oklch(90% 0.010 80);
+  transition: all 200ms ease;
+}
+.home-chip:hover {
+  background: oklch(62% 0.25 285 / 0.18);
+  border-color: oklch(62% 0.25 285 / 0.55);
+  color: oklch(82% 0.16 285);
+}
+
+/* Operation tile */
+.home-op-tile {
+  border: 1px solid oklch(100% 0 0 / 0.12);
+  background: oklch(100% 0 0 / 0.05);
+  padding: 12px;
+  text-align: left;
+  transition: all 200ms ease;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+.home-op-tile:hover {
+  border-color: oklch(78% 0.165 65 / 0.50);
+  background: oklch(100% 0 0 / 0.09);
+}
+.home-op-tile:hover .home-op-icon {
+  background: oklch(62% 0.25 285 / 0.25);
+  border-color: oklch(62% 0.25 285 / 0.60);
+  color: oklch(75% 0.22 285);
+}
+.home-op-icon {
+  height: 36px;
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid oklch(100% 0 0 / 0.14);
+  background: oklch(100% 0 0 / 0.07);
+  color: oklch(78% 0.165 65);
+  margin-bottom: 10px;
+  transition: all 200ms ease;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+}
+
+/* Stats bar */
+.home-stats-bar {
+  background: oklch(98.5% 0.010 78);
+  clip-path: polygon(0 10%, 100% 0, 100% 100%, 0 100%);
+  padding-top: 28px;
+  padding-bottom: 8px;
+  margin-top: -2px;
+}
+.dark .home-stats-bar {
+  background: oklch(14% 0.030 258);
+}
+
+/* ── Service matrix ── */
+.home-service-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid oklch(88% 0.016 78 / 0.70);
+  background: oklch(99% 0.007 80);
+  overflow: hidden;
+  transition: all 220ms ease;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+.dark .home-service-card {
+  border-color: oklch(20% 0.030 258);
+  background: oklch(14% 0.030 258);
+}
+.home-service-card:hover {
+  transform: translateY(-3px);
+  border-color: oklch(62% 0.25 285 / 0.55);
+  box-shadow: 0 12px 40px oklch(62% 0.25 285 / 0.15), 0 2px 8px oklch(8% 0.020 252 / 0.20);
+}
+.home-service-card::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 0;
+  background: linear-gradient(90deg, oklch(62% 0.25 285), oklch(78% 0.165 65));
+  transition: width 300ms ease;
+}
+.home-service-card:hover::after { width: 100%; }
+
+/* Hex icon clip */
+.home-hex-icon {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 220ms ease;
+}
+.home-service-card:hover .home-hex-icon { filter: brightness(1.15); transform: scale(1.08); }
+
+/* ── Sell CTA banner ── */
+.home-sell-cta {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 80% at 0% 50%,   oklch(30% 0.28 285 / 0.60) 0%, transparent 55%),
+    radial-gradient(ellipse 45% 60% at 100% 50%,  oklch(78% 0.165 65 / 0.25) 0%, transparent 50%),
+    linear-gradient(135deg, oklch(12% 0.032 255) 0%, oklch(18% 0.040 265) 60%, oklch(14% 0.035 260) 100%);
+}
+.home-sell-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, oklch(100% 0 0 / 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+.home-sell-cta-slash {
+  position: absolute;
+  top: 0; bottom: 0;
+  right: 25%;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    oklch(62% 0.25 285 / 0.50) 30%,
+    oklch(78% 0.165 65 / 0.60) 55%,
+    oklch(62% 0.25 285 / 0.35) 75%,
+    transparent
+  );
+  transform: rotate(-8deg) scaleY(1.2);
+  pointer-events: none;
+}
+.home-sell-cta-slash-2 {
+  position: absolute;
+  top: 0; bottom: 0;
+  right: 27%;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    oklch(78% 0.165 65 / 0.30) 40%,
+    transparent
+  );
+  transform: rotate(-8deg) scaleY(1.2);
+  pointer-events: none;
+}
+
+/* ── Section header accent ── */
+.home-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: oklch(62% 0.25 285);
+}
+.home-eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  background: linear-gradient(90deg, oklch(62% 0.25 285), oklch(78% 0.165 65));
+  border-radius: 1px;
+}
+
+/* shimmer headline */
+.home-shimmer-text {
+  background: linear-gradient(
+    120deg,
+    oklch(78% 0.165 65) 0%,
+    oklch(62% 0.25 285) 40%,
+    oklch(84% 0.110 72) 60%,
+    oklch(62% 0.25 285) 80%,
+    oklch(78% 0.165 65) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: home-shimmer 4s linear infinite;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up,

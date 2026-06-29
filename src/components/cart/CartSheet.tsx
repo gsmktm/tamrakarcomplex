@@ -7,13 +7,13 @@ import { parseProductPrice, formatNPR } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
-export function CartSheet() {
+export function CartSheet({ triggerClassName }: { triggerClassName?: string }) {
   const { cart, removeFromCart, updateQuantity, cartTotal, cartCount } = useCart();
 
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className={triggerClassName ? `relative ${triggerClassName}` : "relative"}>
           <ShoppingCart className="h-5 w-5" />
           {cartCount > 0 && (
             <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">

@@ -30,16 +30,16 @@ export const defaultQuickMenuItems: SiteNavItem[] = [
 export const siteNavigationGroups: SiteNavGroup[] = [
   {
     name: "Buy",
-    href: "/buy",
+    href: "/cat/mobiles",
     description: "Browse products, compare prices, and discover stores.",
     items: [
-      { name: "Buy Gadgets", href: "/buy", description: "Phones, laptops, tablets, wearables, and accessories" },
-      { name: "Mobile Price", href: "/mobile-price", description: "Current phone prices and Nepal market references" },
+      { name: "Buy Gadgets", href: "/cat/mobiles?tab=buy", description: "Phones, laptops, tablets, wearables, and accessories" },
+      { name: "Mobile Price", href: "/cat/mobiles", description: "Current phone prices and Nepal market references" },
       { name: "Laptop Price", href: "/laptop-price", description: "Laptop price lists for work, study, and gaming" },
       { name: "Compare", href: "/compare", description: "Side-by-side comparisons before you buy" },
       { name: "Stores", href: "/stores", description: "Verified stores, distributors, and repair partners" },
       { name: "Marketplace", href: "/marketplace", description: "Buy directly from community and store listings" },
-      { name: "Unlocking Hub", href: "/unlocking", description: "Professional device unlocking and software services" },
+      { name: "Services", href: "/services", description: "Repair, unlocking, and professional device services" },
       { name: "Repair Hub", href: "/repair", description: "Expert repair guides and service booking" },
     ],
   },
@@ -61,11 +61,11 @@ export const siteNavigationGroups: SiteNavGroup[] = [
     description: "About Tamrakar Complex, policies, and account essentials.",
     items: [
       { name: "About Us", href: "/about-us", description: "Our story, mission, and the team behind Tamrakar Complex" },
+      { name: "Contact Us", href: "/contact-us", description: "Get in touch with our team" },
       { name: "Privacy Policy", href: "/privacy-policy", description: "How we collect and use data" },
       { name: "Terms of Service", href: "/terms-of-service", description: "Platform terms and usage guidelines" },
       { name: "Wishlist", href: "/wishlist", description: "Saved gadgets and listings to revisit later" },
       { name: "My Profile", href: "/user/me", description: "Complete your profile to sell faster" },
-      { name: "My Subscription", href: "/user/me?tab=subscription", description: "View Silver / Gold / Diamond store packages" },
     ],
   },
   {
@@ -86,8 +86,8 @@ export const footerLinkGroups = [
   {
     title: "Buy",
     links: [
-      { name: "Buy Gadgets", href: "/buy" },
-      { name: "Mobile Price", href: "/mobile-price" },
+      { name: "Buy Gadgets", href: "/cat/mobiles?tab=buy" },
+      { name: "Mobile Price", href: "/cat/mobiles" },
       { name: "Laptop Price", href: "/laptop-price" },
       { name: "Compare", href: "/compare" },
       { name: "Marketplace", href: "/marketplace" },

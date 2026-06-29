@@ -140,16 +140,6 @@ export function MobileMenu({
           </>
         ) : null}
 
-        <div className="my-3 border-t border-border" />
-        {user ? (
-          <Link
-            to="/user"
-            className="block rounded-xl px-4 py-2 text-sm transition-colors hover:bg-secondary"
-            onClick={onClose}
-          >
-            My Dashboard
-          </Link>
-        ) : null}
       </div>
     </nav>
   );

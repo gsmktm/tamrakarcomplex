@@ -145,8 +145,8 @@ export default function ExchangeManager() {
                 </TableCell>
                 <TableCell>NPR {req.expected_value?.toLocaleString() || 'N/A'}</TableCell>
                 <TableCell>
-                  <Select 
-                    defaultValue={req.request_status} 
+                  <Select
+                    value={req.request_status}
                     onValueChange={(val) => updateStatusMutation.mutate({ id: req.id, status: val })}
                   >
                     <SelectTrigger className="w-[130px] h-8 text-xs">

@@ -1,5 +1,1 @@
-import AdminModulePlaceholder from "@/pages/admin/AdminModulePlaceholder";
-
-export default function StoreAdminTaskManager() {
-  return <AdminModulePlaceholder title="Store Admin Task Manager" />;
-}
+export { default } from "@/pages/suadmin/StoreAdminTaskManager";

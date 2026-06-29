@@ -1,7 +1,7 @@
 # Tamrakar Complex — Web Platform
 
-**Status:** ✅ Production Ready (v1.0.0)  
-**Last Updated:** May 13, 2026
+**Status:** ✅ Production Ready (v1.2.0)  
+**Last Updated:** June 12, 2026
 
 A full-stack web platform for Tamrakar Complex, featuring an e-commerce storefront, repair service booking, device valuation, marketplace listings, and multi-role admin panels.
 
@@ -31,6 +31,8 @@ A full-stack web platform for Tamrakar Complex, featuring an e-commerce storefro
 - ✅ Device repair service booking and tracking
 - ✅ Automated device valuation
 - ✅ Marketplace for buying/selling devices
+- ✅ **Mobile hub** — Category browser, brand pages, model detail pages with pricing
+- ✅ **Sell & Exchange unified flow** — `/sell-your-phone` with `?mode=exchange` toggle
 - ✅ Store directory with filters
 - ✅ User dashboard (orders, profile, settings)
 - ✅ AI-generated articles and guides
@@ -40,18 +42,20 @@ A full-stack web platform for Tamrakar Complex, featuring an e-commerce storefro
 - ✅ **Super Admin** (19 routes) — Platform analytics, user management, bulk operations
 - ✅ **Staff Admin** (15+ routes) — Permission-gated content/repair/store management
 - ✅ **Store Admin** (12+ routes) — Store-owned data and staff management
+- ✅ **Mobile Master Manager** — Brand/series/model/variant hierarchy editor with price management
 - ✅ **Audit Logging** — Full operation tracking
 
 ## Project Status
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Build | ✅ 0 errors | Production build working |
+| Build | ✅ 0 errors | TypeScript strict, 0 errors |
 | Tests | ✅ 41/41 passing | Full test coverage |
-| Linting | ⚠️ 179 warnings | Non-blocking, mostly `any` types |
-| Database | ✅ 162 migrations | All deployed |
+| Linting | ⚠️ warnings | Non-blocking, mostly `any` types |
+| Database | ✅ 168+ migrations | Includes mobile catalog seed |
+| Mobile Catalog | ✅ 18 brands, ~290 variants | Prices in NPR, exchange values seeded |
 | Edge Functions | ✅ 7 functions | All deployed |
-| Responsive Design | ✅ Complete | Mobile-first approach |
+| Responsive Design | ✅ Complete | Mobile-first with bottom nav |
 
 ## 🛠️ Local Development
 

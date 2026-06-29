@@ -31,6 +31,13 @@ export type MarketplaceListingRecord = {
   contact_info?: string | null;
   created_at: string;
   updated_at: string;
+  store_slug?: string | null;
+  store_seo_slug?: string | null;
+  store_logo_url?: string | null;
+  store_is_verified?: boolean | null;
+  store_is_featured?: boolean | null;
+  store_package_slug?: string | null;
+  tier_weight?: number | null;
   store?: {
     id: string;
     name: string;
@@ -39,6 +46,8 @@ export type MarketplaceListingRecord = {
     location?: string | null;
     logo_url?: string | null;
     is_verified?: boolean | null;
+    is_featured?: boolean | null;
+    package_slug?: string | null;
     subscription_status?: string | null;
   } | null;
 };
@@ -152,11 +161,26 @@ function normalizeListing(listing: MarketplaceListingRecord): MarketplaceListing
       ? Object.values(listing.images as unknown as Record<string, string>).filter(Boolean)
       : [];
 
-  // Resolve best image (injects GSMArena URL for iPhones that have null/Unsplash images)
   const resolvedFirst = resolveListingImage(listing.title ?? null, listing.brand ?? null, rawImages);
   const images: string[] = resolvedFirst
     ? [resolvedFirst, ...rawImages.filter((u) => u !== resolvedFirst)]
     : rawImages;
+
+  // Merge flat store_* columns (from view) into the store object
+  const storeFromFlat = listing.store_id
+    ? {
+        id: listing.store_id,
+        name: listing.store_name ?? "Store",
+        slug: listing.store_slug ?? null,
+        seo_slug: listing.store_seo_slug ?? null,
+        location: listing.location ?? "Nepal",
+        logo_url: listing.store_logo_url ?? null,
+        is_verified: listing.store_is_verified ?? null,
+        is_featured: listing.store_is_featured ?? null,
+        package_slug: listing.store_package_slug ?? null,
+        subscription_status: null,
+      }
+    : null;
 
   return {
     ...listing,
@@ -167,18 +191,13 @@ function normalizeListing(listing: MarketplaceListingRecord): MarketplaceListing
     images,
     verified: listing.verified ?? false,
     featured: listing.featured ?? listing.is_featured ?? false,
-    store: listing.store ?? (listing.store_id
+    store: listing.store
       ? {
-          id: listing.store_id,
-          name: listing.store_name ?? "Store",
-          slug: null,
-          seo_slug: null,
-          location: listing.location ?? "Nepal",
-          logo_url: null,
-          is_verified: null,
-          subscription_status: null,
+          ...listing.store,
+          is_featured: listing.store?.is_featured ?? listing.store_is_featured ?? null,
+          package_slug: listing.store?.package_slug ?? listing.store_package_slug ?? null,
         }
-      : null),
+      : storeFromFlat,
   };
 }
 
@@ -186,12 +205,12 @@ async function getManualUnifiedMarketplace(params: MarketplaceListingsParams) {
   const [storeProductsResult, userListingsResult] = await Promise.all([
     (supabase as any)
       .from("store_products")
-      .select("*, store:stores(id, name, slug, seo_slug, location, logo_url, is_verified, subscription_status)")
+      .select("*, store:stores(id, name, slug, seo_slug, location, logo_url, is_verified, is_featured, package_slug, subscription_status)")
       .eq("status", "active")
       .gt("stock_quantity", 0),
     supabase
       .from("sell_listings")
-      .select("*, store:stores(id, name, slug, seo_slug, location, logo_url, is_verified, subscription_status)")
+      .select("*, store:stores(id, name, slug, seo_slug, location, logo_url, is_verified, is_featured, package_slug, subscription_status)")
       .eq("status", "active"),
   ]);
 
@@ -268,6 +287,12 @@ function applyUnifiedFilters(listings: MarketplaceListingRecord[], params: Marke
     );
   }
 
+  const tierWeight = (l: MarketplaceListingRecord) => {
+    const pkg = l.store?.package_slug ?? l.store_package_slug ?? "free";
+    const base = pkg === "diamond" ? 4 : pkg === "gold" ? 3 : pkg === "silver" ? 2 : 1;
+    return base + (l.store?.is_featured || l.store_is_featured ? 1 : 0);
+  };
+
   switch (params.sort_by) {
     case "price_asc":
       return filtered.sort((a, b) => Number(a.price ?? 0) - Number(b.price ?? 0));
@@ -276,20 +301,27 @@ function applyUnifiedFilters(listings: MarketplaceListingRecord[], params: Marke
     case "oldest":
       return filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     default:
-      return filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      // Default: tier-priority first, then newest
+      return filtered.sort((a, b) => {
+        const tw = tierWeight(b) - tierWeight(a);
+        if (tw !== 0) return tw;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
   }
 }
 
 function filterFallbackListings(params: MarketplaceListingsParams): MarketplaceListingRecord[] {
   const query = params.search?.toLowerCase().trim();
-  let listings = getFallbackMarketplaceListings().map((listing) =>
-    normalizeListing({
-      ...(listing as MarketplaceListingRecord),
-      owner_user_id: (listing as MarketplaceListingRecord).owner_user_id ?? listing.user_id ?? null,
+  let listings = getFallbackMarketplaceListings().map((raw) => {
+    const listing = raw as any;
+    return normalizeListing({
+      ...listing,
+      owner_user_id: listing.owner_user_id ?? listing.user_id ?? null,
+      store_id: listing.store_id ?? null,
       verified: false,
-      featured: Boolean((listing as MarketplaceListingRecord).featured ?? (listing as MarketplaceListingRecord).is_featured),
-    })
-  );
+      featured: Boolean(listing.featured ?? listing.is_featured),
+    } as MarketplaceListingRecord);
+  });
 
   if (params.store_id) listings = listings.filter((listing) => listing.store_id === params.store_id);
   if (params.category && params.category !== "all") listings = listings.filter((listing) => String(listing.category ?? "").toLowerCase().includes(params.category!.toLowerCase()));

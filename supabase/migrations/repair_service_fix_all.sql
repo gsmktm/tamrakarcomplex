@@ -149,6 +149,15 @@ CREATE POLICY "Anyone can view guide tools" ON public.repair_guide_tools FOR SEL
 CREATE POLICY "Anyone can view guide parts" ON public.repair_guide_parts FOR SELECT USING (true);
 
 -- Admin Manage Policies
+DROP POLICY IF EXISTS "Admins manage repair categories" ON public.repair_categories;
+DROP POLICY IF EXISTS "Admins manage repair devices" ON public.repair_devices;
+DROP POLICY IF EXISTS "Admins manage repair guides" ON public.repair_guides;
+DROP POLICY IF EXISTS "Admins manage repair steps" ON public.repair_steps;
+DROP POLICY IF EXISTS "Admins manage repair tools" ON public.repair_tools;
+DROP POLICY IF EXISTS "Admins manage repair parts" ON public.repair_parts;
+DROP POLICY IF EXISTS "Admins manage guide tools" ON public.repair_guide_tools;
+DROP POLICY IF EXISTS "Admins manage guide parts" ON public.repair_guide_parts;
+
 CREATE POLICY "Admins manage repair categories" ON public.repair_categories FOR ALL USING (public.is_admin());
 CREATE POLICY "Admins manage repair devices" ON public.repair_devices FOR ALL USING (public.is_admin());
 CREATE POLICY "Admins manage repair guides" ON public.repair_guides FOR ALL USING (public.is_admin());

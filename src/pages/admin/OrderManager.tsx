@@ -98,14 +98,14 @@ export default function OrderManager() {
           // Filter orders where any order_item.store_id is in myStoreIds
           const { data: relevantOrderIds, error: orderError } = await supabase
             .from("order_items")
-            .select("distinct order_id")
+            .select("order_id")
             .in("store_id", myStoreIds);
 
           if (orderError || !relevantOrderIds?.length) {
             return [];
           }
 
-          const orderIds = relevantOrderIds.map(oi => oi.order_id);
+          const orderIds = [...new Set(relevantOrderIds.map(oi => oi.order_id))];
           query = query.in("id", orderIds);
         }
 

@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route } from "react-router-dom";
 import { RouteFallback } from "@/components/routing/RouteFallback";
-import StoreAdminLayout from "@/layouts/StoreAdminLayout";
+const StoreAdminLayout = lazy(() => import("@/layouts/StoreAdminLayout"));
 import { RequireStaffAdmin } from "@/routes/RequireStaffAdmin";
 
 const StaffDashboard = lazy(() => import("@/pages/staffadmin/StaffDashboard"));

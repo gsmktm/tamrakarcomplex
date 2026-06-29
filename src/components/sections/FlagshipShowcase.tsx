@@ -84,14 +84,14 @@ function TrustBar() {
     { icon: <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />, text: "4.9/5 Rating" },
   ];
   return (
-    <div className="w-full bg-zinc-900/80 backdrop-blur border-y border-white/5 py-3 overflow-hidden">
+    <div className="w-full bg-secondary/60 backdrop-blur border-y border-border py-3 overflow-hidden">
       <div className="flex items-center justify-center gap-4 flex-wrap px-4">
         {items.map((item, i) => (
-          <div key={i} className="flex items-center gap-1.5 text-white/80 text-sm font-medium">
-            <span className="text-blue-400">{item.icon}</span>
+          <div key={i} className="flex items-center gap-1.5 text-foreground/80 text-sm font-medium">
+            <span className="text-primary">{item.icon}</span>
             <span>{item.text}</span>
             {i < items.length - 1 && (
-              <span className="hidden sm:inline ml-4 text-white/20">·</span>
+              <span className="hidden sm:inline ml-4 text-border">·</span>
             )}
           </div>
         ))}
@@ -117,7 +117,7 @@ function DecisionChips({
     { label: "Sell", value: "sell" },
   ];
   return (
-    <div className="w-full bg-zinc-950 py-4 px-4">
+    <div className="w-full bg-background border-b border-border py-4 px-4">
       <div className="container mx-auto flex gap-2 overflow-x-auto scrollbar-none pb-1">
         {chips.map((chip) => (
           <button
@@ -125,8 +125,8 @@ function DecisionChips({
             onClick={() => onChange(chip.value)}
             className={`flex-shrink-0 rounded-full px-5 py-2 text-sm font-semibold transition-all duration-200 ${
               active === chip.value
-                ? "hero-gradient text-white shadow-glow scale-105"
-                : "bg-white/8 text-white/70 border border-white/10 hover:bg-white/15 hover:text-white"
+                ? "bg-primary text-primary-foreground shadow-glow scale-105"
+                : "bg-secondary text-foreground/70 border border-border hover:bg-accent hover:text-accent-foreground"
             }`}
           >
             {chip.label}
@@ -524,33 +524,33 @@ function AlgorithmSection() {
     : JUST_IN_FALLBACK;
 
   return (
-    <section id="picked-for-you" className="bg-zinc-950 py-16">
+    <section id="picked-for-you" className="bg-background py-16 border-t border-border/40">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-white/60 text-xs font-medium mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+          <div className="inline-flex items-center gap-2 bg-secondary border border-border rounded-full px-4 py-1.5 text-muted-foreground text-xs font-medium mb-4">
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
             Smart Picks
           </div>
-          <h2 className="font-display text-3xl lg:text-4xl font-bold text-white mb-2">
+          <h2 className="font-display text-3xl lg:text-4xl font-bold text-foreground mb-2">
             Picked For You
           </h2>
-          <p className="text-white/40 text-sm">Based on what Nepal is browsing right now</p>
+          <p className="text-muted-foreground text-sm">Based on what Nepal is browsing right now</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Card 1: Trending */}
-          <div className="bg-zinc-900 border border-white/8 rounded-2xl p-6 flex flex-col gap-4">
+          <div className="bg-card border border-border rounded-2xl p-6 flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-orange-500/15 flex items-center justify-center">
                 <Flame className="w-5 h-5 text-orange-400" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-base">Trending Now</h3>
-                <p className="text-white/40 text-xs">Nepal searches this week</p>
+                <h3 className="text-foreground font-bold text-base">Trending Now</h3>
+                <p className="text-muted-foreground text-xs">Nepal searches this week</p>
               </div>
             </div>
-            <p className="text-white/60 text-sm">
+            <p className="text-muted-foreground text-sm">
               Galaxy S25 series & iPhone 16 are dominating Nepal searches this week.
             </p>
             <div className="flex flex-col gap-2">
@@ -565,42 +565,42 @@ function AlgorithmSection() {
                       item.rank === 1
                         ? "bg-orange-500/20 text-orange-400"
                         : item.rank === 2
-                        ? "bg-zinc-700 text-white/60"
-                        : "bg-zinc-800 text-white/40"
+                        ? "bg-muted text-muted-foreground"
+                        : "bg-muted/60 text-muted-foreground/60"
                     }`}
                   >
                     {item.rank}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white/80 text-sm font-medium group-hover:text-white transition-colors truncate">
+                    <p className="text-foreground text-sm font-medium group-hover:text-primary transition-colors truncate">
                       {item.name}
                     </p>
-                    <p className="text-white/40 text-xs">{item.price}</p>
+                    <p className="text-muted-foreground text-xs">{item.price}</p>
                   </div>
-                  <TrendingUp className="w-3.5 h-3.5 text-white/20 group-hover:text-orange-400 flex-shrink-0 transition-colors" />
+                  <TrendingUp className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-orange-400 flex-shrink-0 transition-colors" />
                 </Link>
               ))}
             </div>
             <Link
               to="/buy?sort=trending"
-              className="mt-auto flex items-center justify-center gap-1.5 text-xs text-orange-400 font-semibold hover:text-orange-300 transition-colors pt-2 border-t border-white/5"
+              className="mt-auto flex items-center justify-center gap-1.5 text-xs text-orange-400 font-semibold hover:text-orange-500 transition-colors pt-2 border-t border-border"
             >
               View all trending <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           {/* Card 2: Best Value */}
-          <div className="bg-zinc-900 border border-white/8 rounded-2xl p-6 flex flex-col gap-4">
+          <div className="bg-card border border-border rounded-2xl p-6 flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-green-500/15 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-green-400" />
+                <DollarSign className="w-5 h-5 text-green-500" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-base">Best Value Right Now</h3>
-                <p className="text-white/40 text-xs">Under NPR 30,000</p>
+                <h3 className="text-foreground font-bold text-base">Best Value Right Now</h3>
+                <p className="text-muted-foreground text-xs">Under NPR 30,000</p>
               </div>
             </div>
-            <p className="text-white/60 text-sm">
+            <p className="text-muted-foreground text-sm">
               Best phones under NPR 30,000 — more phone for your money.
             </p>
             <div className="flex flex-col gap-2">
@@ -610,24 +610,24 @@ function AlgorithmSection() {
             </div>
             <Link
               to="/buy?maxPrice=30000"
-              className="mt-auto flex items-center justify-center gap-1.5 text-xs text-green-400 font-semibold hover:text-green-300 transition-colors pt-2 border-t border-white/5"
+              className="mt-auto flex items-center justify-center gap-1.5 text-xs text-green-500 font-semibold hover:text-green-600 transition-colors pt-2 border-t border-border"
             >
               See all under 30K <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           {/* Card 3: Just In */}
-          <div className="bg-zinc-900 border border-white/8 rounded-2xl p-6 flex flex-col gap-4">
+          <div className="bg-card border border-border rounded-2xl p-6 flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-blue-400" />
+                <Clock className="w-5 h-5 text-blue-500" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-base">Just In</h3>
-                <p className="text-white/40 text-xs">Freshly added this week</p>
+                <h3 className="text-foreground font-bold text-base">Just In</h3>
+                <p className="text-muted-foreground text-xs">Freshly added this week</p>
               </div>
             </div>
-            <p className="text-white/60 text-sm">
+            <p className="text-muted-foreground text-sm">
               Hot off the shelf — newest arrivals at Tamrakar Complex.
             </p>
             <div className="flex flex-col gap-2">
@@ -637,7 +637,7 @@ function AlgorithmSection() {
             </div>
             <Link
               to="/buy?sort=newest"
-              className="mt-auto flex items-center justify-center gap-1.5 text-xs text-blue-400 font-semibold hover:text-blue-300 transition-colors pt-2 border-t border-white/5"
+              className="mt-auto flex items-center justify-center gap-1.5 text-xs text-blue-500 font-semibold hover:text-blue-600 transition-colors pt-2 border-t border-border"
             >
               See all new arrivals <ArrowRight className="w-3.5 h-3.5" />
             </Link>

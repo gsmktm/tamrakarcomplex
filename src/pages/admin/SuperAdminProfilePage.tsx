@@ -1,5 +1,1 @@
-import AdminModulePlaceholder from "@/pages/admin/AdminModulePlaceholder";
-
-export default function SuperAdminProfilePage() {
-  return <AdminModulePlaceholder title="Super Admin Profile" />;
-}
+export { default } from "@/pages/suadmin/SuperAdminProfilePage";

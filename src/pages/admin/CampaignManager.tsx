@@ -224,7 +224,7 @@ export default function CampaignManager() {
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(banner)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => deleteBannerMutation.mutate(banner.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => { if (confirm(`Delete campaign "${banner.title}"?`)) deleteBannerMutation.mutate(banner.id); }}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

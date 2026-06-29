@@ -151,34 +151,82 @@ CREATE INDEX IF NOT EXISTS idx_me_model     ON model_emi(model_id);
 
 -- 13. RLS — public read, admin write
 ALTER TABLE phone_variant_prices ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read_prices" ON phone_variant_prices FOR SELECT USING (true);
-CREATE POLICY "auth_write_prices" ON phone_variant_prices FOR ALL TO authenticated USING (public.is_admin());
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='phone_variant_prices' AND policyname='public_read_prices') THEN
+    CREATE POLICY "public_read_prices" ON phone_variant_prices FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='phone_variant_prices' AND policyname='auth_write_prices') THEN
+    CREATE POLICY "auth_write_prices" ON phone_variant_prices FOR ALL TO authenticated USING (public.is_admin());
+  END IF;
+END $$;
 
 ALTER TABLE expert_scores ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read_expert" ON expert_scores FOR SELECT USING (true);
-CREATE POLICY "auth_write_expert" ON expert_scores FOR ALL TO authenticated USING (public.is_admin());
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='expert_scores' AND policyname='public_read_expert') THEN
+    CREATE POLICY "public_read_expert" ON expert_scores FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='expert_scores' AND policyname='auth_write_expert') THEN
+    CREATE POLICY "auth_write_expert" ON expert_scores FOR ALL TO authenticated USING (public.is_admin());
+  END IF;
+END $$;
 
 ALTER TABLE model_images ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read_images" ON model_images FOR SELECT USING (true);
-CREATE POLICY "auth_write_images" ON model_images FOR ALL TO authenticated USING (public.is_admin());
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='model_images' AND policyname='public_read_images') THEN
+    CREATE POLICY "public_read_images" ON model_images FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='model_images' AND policyname='auth_write_images') THEN
+    CREATE POLICY "auth_write_images" ON model_images FOR ALL TO authenticated USING (public.is_admin());
+  END IF;
+END $$;
 
 ALTER TABLE model_user_reviews ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read_approved_reviews" ON model_user_reviews FOR SELECT USING (status = 'approved');
-CREATE POLICY "auth_write_reviews" ON model_user_reviews FOR ALL TO authenticated USING (public.is_admin());
-CREATE POLICY "users_insert_own_review" ON model_user_reviews
-  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id AND status = 'pending');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='model_user_reviews' AND policyname='public_read_approved_reviews') THEN
+    CREATE POLICY "public_read_approved_reviews" ON model_user_reviews FOR SELECT USING (status = 'approved');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='model_user_reviews' AND policyname='auth_write_reviews') THEN
+    CREATE POLICY "auth_write_reviews" ON model_user_reviews FOR ALL TO authenticated USING (public.is_admin());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='model_user_reviews' AND policyname='users_insert_own_review') THEN
+    CREATE POLICY "users_insert_own_review" ON model_user_reviews
+      FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id AND status = 'pending');
+  END IF;
+END $$;
 
 ALTER TABLE emi_plans ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read_emi_plans" ON emi_plans FOR SELECT USING (status = 'active');
-CREATE POLICY "auth_write_emi_plans" ON emi_plans FOR ALL TO authenticated USING (public.is_admin());
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='emi_plans' AND policyname='public_read_emi_plans') THEN
+    CREATE POLICY "public_read_emi_plans" ON emi_plans FOR SELECT USING (status = 'active');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='emi_plans' AND policyname='auth_write_emi_plans') THEN
+    CREATE POLICY "auth_write_emi_plans" ON emi_plans FOR ALL TO authenticated USING (public.is_admin());
+  END IF;
+END $$;
 
 ALTER TABLE model_emi ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read_model_emi" ON model_emi FOR SELECT USING (true);
-CREATE POLICY "auth_write_model_emi" ON model_emi FOR ALL TO authenticated USING (public.is_admin());
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='model_emi' AND policyname='public_read_model_emi') THEN
+    CREATE POLICY "public_read_model_emi" ON model_emi FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='model_emi' AND policyname='auth_write_model_emi') THEN
+    CREATE POLICY "auth_write_model_emi" ON model_emi FOR ALL TO authenticated USING (public.is_admin());
+  END IF;
+END $$;
 
 ALTER TABLE retailers ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read_retailers" ON retailers FOR SELECT USING (status = 'active');
-CREATE POLICY "auth_write_retailers" ON retailers FOR ALL TO authenticated USING (public.is_admin());
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='retailers' AND policyname='public_read_retailers') THEN
+    CREATE POLICY "public_read_retailers" ON retailers FOR SELECT USING (status = 'active');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='retailers' AND policyname='auth_write_retailers') THEN
+    CREATE POLICY "auth_write_retailers" ON retailers FOR ALL TO authenticated USING (public.is_admin());
+  END IF;
+END $$;
 
 ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_read_history" ON price_history FOR SELECT USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='price_history' AND policyname='public_read_history') THEN
+    CREATE POLICY "public_read_history" ON price_history FOR SELECT USING (true);
+  END IF;
+END $$;

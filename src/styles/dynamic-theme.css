@@ -1,7 +1,7 @@
 /* Dynamic theme overrides — only applied when body has .dynamic-theme class */
 /* Do NOT set :root vars here; base design tokens live in index.css */
 
---container-max-width: 1400px;
+:root { --container-max-width: 1400px; }
 
 body.dynamic-theme .text-primary { color: var(--primary) !important; }
 body.dynamic-theme .bg-primary { background-color: var(--primary) !important; }

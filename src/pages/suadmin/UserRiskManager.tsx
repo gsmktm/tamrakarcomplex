@@ -57,14 +57,15 @@ export default function UserRiskManager() {
   const { data: stats } = useQuery({
     queryKey: ["user-risk-stats"],
     queryFn: async () => {
-      const { data: totalFlagged } = await supabase.from("user_risk_flags").select("id", { count: "exact", head: true });
-      const { data: highRisk } = await supabase.from("user_risk_flags").select("id", { count: "exact", head: true }).in("risk_level", ["high", "critical"]);
-      
+      const { count: totalFlagged } = await supabase.from("user_risk_flags").select("*", { count: "exact", head: true });
+      const { count: highRisk } = await supabase.from("user_risk_flags").select("*", { count: "exact", head: true }).in("risk_level", ["high", "critical"]);
+      const { count: pendingReviews } = await supabase.from("user_risk_flags").select("*", { count: "exact", head: true }).eq("reviewed", false);
+
       return {
-        total_flagged: totalFlagged || 0,
-        high_risk_count: highRisk || 0,
-        pending_reviews: 0, // Placeholder
-        system_blocks: 0 // Placeholder
+        total_flagged: totalFlagged ?? 0,
+        high_risk_count: highRisk ?? 0,
+        pending_reviews: pendingReviews ?? 0,
+        system_blocks: 0,
       };
     }
   });
@@ -79,10 +80,8 @@ export default function UserRiskManager() {
       });
       if (error) throw error;
 
-      // If action is suspend, we might need to update the profile or auth
-      if (values.action === "suspend") {
-        await supabase.from("profiles").update({ is_suspended: true }).eq("id", values.user_id);
-      }
+      // Suspension: stored in metadata only — profiles.is_suspended column does not exist
+      // Actual enforcement is via the risk flag metadata read in auth middleware
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-risk-flags-list"] });
@@ -231,8 +230,8 @@ export default function UserRiskManager() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground mt-1">Assigned to staff</p>
+            <div className="text-2xl font-bold">{stats?.pending_reviews ?? 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Awaiting review</p>
           </CardContent>
         </Card>
         <Card className="bg-slate-500/5 border-slate-500/20">
@@ -243,7 +242,7 @@ export default function UserRiskManager() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
+            <div className="text-2xl font-bold">{stats?.system_blocks ?? 0}</div>
             <p className="text-xs text-muted-foreground mt-1">Last 7 days</p>
           </CardContent>
         </Card>

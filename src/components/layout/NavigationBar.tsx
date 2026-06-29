@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Phone } from "lucide-react";
 import {
   NavigationMenu,
@@ -31,12 +32,12 @@ interface NavigationBarProps {
   visibleQuickItems: NavItem[];
 }
 
-/* Nav link — white on navy, gold underline */
+/* Nav link — white on midnight, violet underline */
 const navLink =
-  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium text-white/60 transition-colors duration-150 hover:text-white after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:scale-x-0 after:bg-gold after:transition-transform after:duration-200 hover:after:scale-x-100 focus:outline-none focus-visible:after:scale-x-100";
+  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:after:scale-x-100 [color:oklch(65%_0_0_/_0.65)] hover:[color:oklch(85%_0_0)] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:[background:linear-gradient(90deg,oklch(62%_0.25_285),oklch(78%_0.165_65))] after:transition-transform after:duration-200 hover:after:scale-x-100";
 
 const navTrigger =
-  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium text-white/60 transition-colors duration-150 hover:text-white data-[state=open]:text-white after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:scale-x-0 after:bg-gold after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=open]:after:scale-x-100 focus:outline-none";
+  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors duration-150 focus:outline-none [color:oklch(65%_0_0_/_0.65)] hover:[color:oklch(85%_0_0)] data-[state=open]:[color:oklch(85%_0_0)] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:[background:linear-gradient(90deg,oklch(62%_0.25_285),oklch(78%_0.165_65))] after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=open]:after:scale-x-100";
 
 export function NavigationBar({
   topLevelHomeItem,
@@ -45,10 +46,19 @@ export function NavigationBar({
   exploreItems,
   visibleQuickItems,
 }: NavigationBarProps) {
+  const navigate = useNavigate();
+  const [openMenu, setOpenMenu] = useState("");
+
   return (
-    <div className="hidden border-b border-white/10 bg-navy-light lg:block" style={{ background: "oklch(17% 0.036 258)" }}>
+    <div
+      className="hidden lg:block border-b"
+      style={{
+        background: "linear-gradient(180deg, oklch(12% 0.030 260) 0%, oklch(11% 0.028 258) 100%)",
+        borderColor: "oklch(62% 0.25 285 / 0.12)",
+      }}
+    >
       <div className="container flex h-12 items-center overflow-x-auto no-scrollbar">
-        <NavigationMenu className="max-w-full">
+        <NavigationMenu value={openMenu} onValueChange={setOpenMenu} className="max-w-full">
           <NavigationMenuList className="flex-nowrap gap-0">
             {/* Home */}
             <NavigationMenuItem>
@@ -79,16 +89,19 @@ export function NavigationBar({
 
             {/* Site navigation groups */}
             {siteNavigationGroups.map((group) => (
-              <NavigationMenuItem key={group.name}>
+              <NavigationMenuItem key={group.name} value={group.name}>
                 <NavigationMenuTrigger
                   className={cn(
                     navTrigger,
                     "bg-transparent hover:bg-transparent data-[state=open]:bg-transparent",
                   )}
+                  onPointerEnter={() => setOpenMenu(group.name)}
+                  onPointerLeave={() => setOpenMenu("")}
+                  onClick={() => { navigate(group.href); setOpenMenu(""); }}
                 >
                   {group.name}
                 </NavigationMenuTrigger>
-                <NavigationMenuContent>
+                <NavigationMenuContent onPointerEnter={() => setOpenMenu(group.name)} onPointerLeave={() => setOpenMenu("")}>
                   <div className="w-[540px] p-5">
                     <div className="mb-4 pb-3 border-b border-border">
                       <Link
@@ -131,16 +144,19 @@ export function NavigationBar({
             ))}
 
             {/* Explore */}
-            <NavigationMenuItem>
+            <NavigationMenuItem value="explore">
               <NavigationMenuTrigger
                 className={cn(
                   navTrigger,
                   "bg-transparent hover:bg-transparent data-[state=open]:bg-transparent",
                 )}
+                onPointerEnter={() => setOpenMenu("explore")}
+                onPointerLeave={() => setOpenMenu("")}
+                onClick={() => { navigate(exploreLandingItem.href); setOpenMenu(""); }}
               >
                 {exploreLandingItem.name}
               </NavigationMenuTrigger>
-              <NavigationMenuContent>
+              <NavigationMenuContent onPointerEnter={() => setOpenMenu("explore")} onPointerLeave={() => setOpenMenu("")}>
                 <div className="w-[500px] p-5">
                   <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground mb-3">
                     Browse by category
@@ -187,9 +203,10 @@ export function NavigationBar({
         {/* Phone — right edge */}
         <a
           href="tel:+977015351731"
-          className="ml-auto hidden xl:flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors pressable"
+          className="ml-auto hidden xl:flex items-center gap-1.5 text-xs font-medium transition-colors pressable hover:opacity-90"
+          style={{ color: "oklch(78% 0.165 65 / 0.80)" }}
         >
-          <Phone className="h-3 w-3 text-primary" />
+          <Phone className="h-3 w-3" style={{ color: "oklch(78% 0.165 65)" }} />
           +977-015351731
         </a>
       </div>

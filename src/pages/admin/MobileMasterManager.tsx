@@ -11,20 +11,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Plus, 
-  Search, 
-  Smartphone, 
-  Tag, 
-  Layers, 
-  Pencil, 
-  Trash2, 
-  Loader2, 
+import {
+  Plus,
+  Search,
+  Smartphone,
+  Tag,
+  Layers,
+  Pencil,
+  Trash2,
+  Loader2,
   CheckCircle2,
   Settings2,
   Database,
   ExternalLink,
-  PlusCircle
+  PlusCircle,
+  Globe,
+  MapPin,
+  Phone,
+  Mail,
+  ChevronDown,
+  ChevronUp,
+  FileText
 } from "lucide-react";
 import { mobileMasterService, Brand, PhoneSeries, PhoneModel, PhoneVariant, VariantPrice, ExpertScore, ModelImage, EmiPlan, ModelEmi } from "@/services/mobileMasterService";
 import { toast } from "sonner";
@@ -83,7 +90,7 @@ export default function MobileMasterManager() {
 
   const deleteBrand = useMutation({
     mutationFn: (id: string) => mobileMasterService.deleteBrand(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ["master_brands"] });
       toast.success("Brand deleted");
       if (selectedBrandId === id) setSelectedBrandId(null);
@@ -102,7 +109,7 @@ export default function MobileMasterManager() {
 
   const deleteSeries = useMutation({
     mutationFn: (id: string) => mobileMasterService.deleteSeries(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ["master_series"] });
       toast.success("Series deleted");
       if (selectedSeriesId === id) setSelectedSeriesId(null);
@@ -112,7 +119,7 @@ export default function MobileMasterManager() {
 
   const deleteModel = useMutation({
     mutationFn: (id: string) => mobileMasterService.deleteModel(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ["master_models"] });
       toast.success("Model deleted");
       if (selectedModelId === id) setSelectedModelId(null);
@@ -150,8 +157,8 @@ export default function MobileMasterManager() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Select Brand</Label>
-              <Select value={selectedBrandId || ""} onValueChange={(v) => {
-                setSelectedBrandId(v);
+              <Select value={selectedBrandId || "all"} onValueChange={(v) => {
+                setSelectedBrandId(v === "all" ? null : v);
                 setSelectedSeriesId(null);
                 setSelectedModelId(null);
               }}>
@@ -170,8 +177,8 @@ export default function MobileMasterManager() {
             {selectedBrandId && (
               <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                 <Label>Select Series</Label>
-                <Select value={selectedSeriesId || ""} onValueChange={(v) => {
-                  setSelectedSeriesId(v);
+                <Select value={selectedSeriesId || "all"} onValueChange={(v) => {
+                  setSelectedSeriesId(v === "all" ? null : v);
                   setSelectedModelId(null);
                 }}>
                   <SelectTrigger>
@@ -226,6 +233,7 @@ export default function MobileMasterManager() {
                       <div className="ml-auto flex items-center gap-1">
                         {selectedBrandId === brand.id && <CheckCircle2 className="h-5 w-5 text-primary mr-2" />}
                         <EditBrandDialog brand={brand} onUpdate={(id, data) => updateBrand.mutate({ id, data })} />
+                        <BrandContentDialog brand={brand} onUpdate={(id, data) => updateBrand.mutate({ id, data })} />
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => {
                           e.stopPropagation();
                           if (confirm("Delete brand? This will fail if models exist.")) {
@@ -1184,6 +1192,157 @@ function GalleryEditor({ modelId }: { modelId: string }) {
         <Button size="sm" onClick={() => add.mutate()} disabled={!url || add.isPending}>Add</Button>
       </div>
     </div>
+  );
+}
+
+function BrandContentDialog({ brand, onUpdate }: { brand: Brand; onUpdate: (id: string, data: any) => void }) {
+  const [open, setOpen] = useState(false);
+  const [overview, setOverview] = useState(brand.overview_text ?? "");
+  const [country, setCountry] = useState((brand as any).country ?? "");
+  const [foundedYear, setFoundedYear] = useState(String((brand as any).founded_year ?? ""));
+  const [website, setWebsite] = useState((brand as any).website ?? "");
+  const [seriesDesc, setSeriesDesc] = useState<{ name: string; description: string }[]>((brand as any).series_descriptions ?? []);
+  const [centers, setCenters] = useState<{ name: string; address?: string; phone?: string; email?: string }[]>((brand as any).service_centers ?? []);
+  const [faq, setFaq] = useState<{ question: string; answer: string }[]>((brand as any).faq ?? []);
+  const [saving, setSaving] = useState(false);
+
+  const handleOpen = (v: boolean) => {
+    if (v) {
+      setOverview(brand.overview_text ?? "");
+      setCountry((brand as any).country ?? "");
+      setFoundedYear(String((brand as any).founded_year ?? ""));
+      setWebsite((brand as any).website ?? "");
+      setSeriesDesc((brand as any).series_descriptions ?? []);
+      setCenters((brand as any).service_centers ?? []);
+      setFaq((brand as any).faq ?? []);
+    }
+    setOpen(v);
+  };
+
+  const save = () => {
+    setSaving(true);
+    onUpdate(brand.id, {
+      overview_text: overview || null,
+      country: country || null,
+      founded_year: foundedYear ? parseInt(foundedYear) : null,
+      website: website || null,
+      series_descriptions: seriesDesc,
+      service_centers: centers,
+      faq,
+    });
+    setSaving(false);
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8" title="Brand Content & SEO" onClick={(e) => e.stopPropagation()}>
+          <FileText className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle>Brand Content — {brand.name}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          {/* Basic meta */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Country</Label>
+              <Input className="h-8 text-sm" value={country} onChange={e => setCountry(e.target.value)} placeholder="South Korea" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Founded Year</Label>
+              <Input className="h-8 text-sm" type="number" value={foundedYear} onChange={e => setFoundedYear(e.target.value)} placeholder="1969" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Official Website</Label>
+              <Input className="h-8 text-sm" value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://..." />
+            </div>
+          </div>
+
+          {/* Overview */}
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold">Brand Overview (shown on brand page)</Label>
+            <Textarea rows={5} value={overview} onChange={e => setOverview(e.target.value)} placeholder="Write a detailed brand overview..." />
+          </div>
+
+          {/* Series descriptions */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold">Series Descriptions</Label>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSeriesDesc(s => [...s, { name: "", description: "" }])}>
+                <Plus className="h-3 w-3 mr-1" />Add
+              </Button>
+            </div>
+            {seriesDesc.map((s, i) => (
+              <div key={i} className="grid grid-cols-[1fr_2fr_auto] gap-2 items-start">
+                <Input className="h-8 text-sm" placeholder="Series name" value={s.name} onChange={e => setSeriesDesc(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+                <Input className="h-8 text-sm" placeholder="Description" value={s.description} onChange={e => setSeriesDesc(prev => prev.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} />
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => setSeriesDesc(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-3 w-3" /></Button>
+              </div>
+            ))}
+            {seriesDesc.length === 0 && <p className="text-xs text-muted-foreground italic">No series descriptions yet.</p>}
+          </div>
+
+          {/* Service centers */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold">Service Centers</Label>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setCenters(c => [...c, { name: "" }])}>
+                <Plus className="h-3 w-3 mr-1" />Add
+              </Button>
+            </div>
+            {centers.map((c, i) => (
+              <div key={i} className="border rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">Center #{i + 1}</span>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-red-500" onClick={() => setCenters(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-3 w-3" /></Button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input className="h-7 text-xs" placeholder="Name" value={c.name} onChange={e => setCenters(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+                  <Input className="h-7 text-xs" placeholder="Address" value={c.address ?? ""} onChange={e => setCenters(prev => prev.map((x, j) => j === i ? { ...x, address: e.target.value } : x))} />
+                  <Input className="h-7 text-xs" placeholder="Phone" value={c.phone ?? ""} onChange={e => setCenters(prev => prev.map((x, j) => j === i ? { ...x, phone: e.target.value } : x))} />
+                  <Input className="h-7 text-xs" placeholder="Email" value={c.email ?? ""} onChange={e => setCenters(prev => prev.map((x, j) => j === i ? { ...x, email: e.target.value } : x))} />
+                </div>
+              </div>
+            ))}
+            {centers.length === 0 && <p className="text-xs text-muted-foreground italic">No service centers yet.</p>}
+          </div>
+
+          {/* FAQ */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold">FAQ Items</Label>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setFaq(f => [...f, { question: "", answer: "" }])}>
+                <Plus className="h-3 w-3 mr-1" />Add
+              </Button>
+            </div>
+            {faq.map((f, i) => (
+              <div key={i} className="border rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">Q #{i + 1}</span>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-red-500" onClick={() => setFaq(prev => prev.filter((_, j) => j !== i))}><Trash2 className="h-3 w-3" /></Button>
+                </div>
+                <Input className="h-7 text-xs" placeholder="Question" value={f.question} onChange={e => setFaq(prev => prev.map((x, j) => j === i ? { ...x, question: e.target.value } : x))} />
+                <Textarea className="text-xs" rows={2} placeholder="Answer" value={f.answer} onChange={e => setFaq(prev => prev.map((x, j) => j === i ? { ...x, answer: e.target.value } : x))} />
+              </div>
+            ))}
+            {faq.length === 0 && <p className="text-xs text-muted-foreground italic">No FAQ items yet.</p>}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            Save Brand Content
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -7,10 +7,13 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------------
--- 1. orders.order_status — expand to superset (adds pending_payment, paid, packed)
---    Old values (pending/confirmed/processing/shipped/delivered/completed/
---    cancelled/refunded) remain valid -> existing rows untouched.
+-- 1. orders.order_status — ensure column exists, then expand CHECK constraint
+--    Old values remain valid -> existing rows untouched.
 -- ---------------------------------------------------------------------------
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS order_status text DEFAULT 'pending'
+    CHECK (order_status IN ('pending','confirmed','processing','shipped','delivered','completed','cancelled','refunded'));
+
 ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_order_status_check;
 ALTER TABLE public.orders
   ADD CONSTRAINT orders_order_status_check
@@ -24,12 +27,19 @@ ALTER TABLE public.orders
 -- ---------------------------------------------------------------------------
 -- 2. store_payouts.status — add payable, disputed (keep existing values)
 -- ---------------------------------------------------------------------------
-ALTER TABLE public.store_payouts DROP CONSTRAINT IF EXISTS store_payouts_status_check;
-ALTER TABLE public.store_payouts
-  ADD CONSTRAINT store_payouts_status_check
-  CHECK (status IN (
-    'pending', 'payable', 'processing', 'paid', 'disputed', 'failed', 'cancelled'
-  ));
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema='public' AND table_name='store_payouts'
+  ) THEN
+    ALTER TABLE public.store_payouts DROP CONSTRAINT IF EXISTS store_payouts_status_check;
+    ALTER TABLE public.store_payouts
+      ADD CONSTRAINT store_payouts_status_check
+      CHECK (status IN (
+        'pending', 'payable', 'processing', 'paid', 'disputed', 'failed', 'cancelled'
+      ));
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- 3. Non-destructive backfill: brand-new unpaid orders -> 'pending_payment'

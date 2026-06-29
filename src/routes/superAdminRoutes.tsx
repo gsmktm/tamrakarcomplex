@@ -10,13 +10,16 @@ const w = (C: React.ComponentType) => (
 
 // Dashboard & Profile
 const SuperAdminDashboard = lazy(() => import("@/pages/suadmin/SuperAdminDashboard"));
-const SuperAdminProfilePage = lazy(() => import("@/pages/admin/SuperAdminProfilePage"));
+const SuperAdminProfilePage = lazy(() => import("@/pages/suadmin/SuperAdminProfilePage"));
 
 // Staff control
 const StaffAdminManager = lazy(() => import("@/pages/suadmin/StaffAdminManager"));
 const PermissionMatrix = lazy(() => import("@/pages/suadmin/PermissionMatrix"));
 const StaffTaskManager = lazy(() => import("@/pages/suadmin/StaffTaskManager"));
 const StaffPerformance = lazy(() => import("@/pages/suadmin/StaffPerformanceManager"));
+
+// Exchange oversight
+const ExchangeManager = lazy(() => import("@/pages/storeadmin/ExchangeManager"));
 
 // Store admin control
 const StoreAdminManager = lazy(() => import("@/pages/suadmin/StoreAdminManager"));
@@ -99,6 +102,7 @@ export const superAdminRoutes = [
   { path: "/suadmin/payouts", element: w(PayoutManager) },
   { path: "/suadmin/subscriptions", element: w(SubscriptionManager) },
   { path: "/suadmin/campaigns", element: w(CampaignManager) },
+  { path: "/suadmin/exchanges", element: w(ExchangeManager) },
 
   // Content
   { path: "/suadmin/articles", element: w(ArticleManager) },

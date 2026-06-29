@@ -7,7 +7,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import { CheckCircle2, MapPin, Search, Filter, X, Edit, Trash2, Store, ShieldCheck, ArrowRight, Tag, Clock } from "lucide-react";
+import { CheckCircle2, MapPin, Search, Filter, X, Edit, Trash2, Store, ShieldCheck, ArrowRight, Tag, Clock, Phone, Lock } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import type { SellListingRow } from "@/types/app";
 import { decodeListingDescription, formatCondition } from "@/lib/listingMeta";
 import { getPublicStorePath } from "@/lib/storeRoutes";
 import { getFallbackStoreCards } from "@/services/publicFallbackData";
+import { canShowPhoneNumber, getPackageBadgeLabel, getPackageBadgeClassName } from "@/lib/storePackages";
 
 import {
   Select,
@@ -86,7 +87,7 @@ export default function MarketplaceBrowse() {
   const [resolvedStoreId, setResolvedStoreId] = useState<string | null>(null);
   const [storeFilterName, setStoreFilterName] = useState<string | null>(null);
   
-  const { user, role, isLoading: isAuthLoading } = useAuth();
+  const { user, role } = useAuth();
   const isAdmin = isAdminRole(role);
   const navigate = useNavigate();
   const location = useLocation();
@@ -107,6 +108,8 @@ export default function MarketplaceBrowse() {
     catalog_product_id?: string | null;
     stock?: number | null;
     shop_name?: string;
+    store_package_slug?: string | null;
+    store_is_featured?: boolean | null;
     store?: {
       id: string;
       name: string;
@@ -115,6 +118,8 @@ export default function MarketplaceBrowse() {
       location: string;
       logo_url: string | null;
       is_verified: boolean | null;
+      is_featured?: boolean | null;
+      package_slug?: string | null;
       subscription_status: string | null;
     } | null;
   };
@@ -127,31 +132,39 @@ export default function MarketplaceBrowse() {
     location: string;
     logo_url: string | null;
     is_verified: boolean | null;
+    is_featured?: boolean | null;
+    package_slug?: string | null;
     services: string[] | null;
     subscription_status: string | null;
   };
 
-
+  const TIER_ORDER: Record<string, number> = { diamond: 4, gold: 3, silver: 2, free: 1 };
+  const sortStoresByTier = (stores: StoreCard[]) =>
+    [...stores].sort((a, b) => {
+      const wa = (TIER_ORDER[a.package_slug ?? "free"] ?? 1) + (a.is_featured ? 1 : 0);
+      const wb = (TIER_ORDER[b.package_slug ?? "free"] ?? 1) + (b.is_featured ? 1 : 0);
+      return wb - wa;
+    });
 
   const { data: featuredStores, isLoading: isStoresLoading } = useQuery({
     queryKey: ["marketplace_featured_stores"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stores")
-        .select("id,name,slug,seo_slug,location,logo_url,is_verified,services,subscription_status")
-        .order("is_verified", { ascending: false })
-        .limit(12);
+        .select("id,name,slug,seo_slug,location,logo_url,is_verified,is_featured,package_slug,services,subscription_status")
+        .eq("is_active", true)
+        .limit(20);
 
       if (error || !data?.length) {
         return getFallbackStoreCards(12);
       }
 
-      return data as StoreCard[];
+      return sortStoresByTier(data as StoreCard[]).slice(0, 12);
     },
     staleTime: 60_000,
   });
 
-  const { data: listingsData, isLoading: isListingsLoading } = useMarketplaceListings({
+  const { data: listingsData, loading: isListingsLoading } = useMarketplaceListings({
     category: activeCategory !== "all" ? activeCategory : undefined,
     condition: activeCondition !== "all" ? activeCondition : undefined,
     min_price: priceRange[0],
@@ -546,10 +559,17 @@ export default function MarketplaceBrowse() {
                           </h3>
                           {store.is_verified && <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />}
                         </div>
-                        <p className="text-xs text-muted-foreground truncate flex items-center mt-1">
-                          <MapPin className="h-3 w-3 mr-1 shrink-0" />
-                          {store.location || "Nepal"}
-                        </p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <p className="text-xs text-muted-foreground truncate flex items-center">
+                            <MapPin className="h-3 w-3 mr-1 shrink-0" />
+                            {store.location || "Nepal"}
+                          </p>
+                          {getPackageBadgeLabel(store.package_slug, store.is_featured ?? false) && (
+                            <span className={`text-[8px] px-1 py-0.5 rounded uppercase tracking-wide shrink-0 ${getPackageBadgeClassName(store.package_slug, store.is_featured ?? false)}`}>
+                              {getPackageBadgeLabel(store.package_slug, store.is_featured ?? false)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -651,9 +671,16 @@ export default function MarketplaceBrowse() {
                       listing.condition === "used" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
                       "bg-red-500/20 text-red-400 border-red-500/30";
 
-                    const tierBadge = store?.subscription_status === "active"
-                      ? <span className="text-[9px] bg-gradient-to-r from-amber-400 to-yellow-500 text-black font-black px-1.5 py-0.5 rounded uppercase tracking-wide">PRO</span>
-                      : null;
+                    const storePkg = store?.package_slug ?? listing.store_package_slug ?? "free";
+                    const storeIsFeatured = store?.is_featured ?? listing.store_is_featured ?? false;
+                    const badgeLabel = getPackageBadgeLabel(storePkg, storeIsFeatured);
+                    const badgeCn = getPackageBadgeClassName(storePkg, storeIsFeatured);
+                    const contact = canShowPhoneNumber(storePkg, {
+                      isActive: true,
+                      isFeatured: storeIsFeatured,
+                      featuredContactVisible: storeIsFeatured,
+                      isLoggedIn: !!user,
+                    });
 
                     return (
                       <Link to={`/marketplace/listing/${listing.id}`} key={listing.id} className="group block">
@@ -695,7 +722,11 @@ export default function MarketplaceBrowse() {
                               <span className="text-2xl font-black text-foreground tracking-tight">
                                 Rs.{listing.price.toLocaleString()}
                               </span>
-                              {tierBadge}
+                              {badgeLabel && (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${badgeCn}`}>
+                                  {badgeLabel}
+                                </span>
+                              )}
                             </div>
 
                             <h3 className="font-semibold text-sm text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
@@ -713,31 +744,60 @@ export default function MarketplaceBrowse() {
                             </div>
                           </CardContent>
 
-                          <CardFooter className="px-4 py-3 border-t flex items-center justify-between">
-                            <div className="flex items-center gap-2 overflow-hidden">
-                              {store ? (
-                                <>
-                                  <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                    <Store className="h-3 w-3 text-primary" />
-                                  </div>
-                                  <span className="text-xs font-semibold text-foreground truncate">{store.name}</span>
-                                  {store.is_verified && <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
-                                </>
-                              ) : listing.shop_name ? (
-                                <>
-                                  <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                    <Store className="h-3 w-3 text-muted-foreground" />
-                                  </div>
-                                  <span className="text-xs font-medium text-foreground truncate">{listing.shop_name}</span>
-                                </>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Private Seller</span>
-                              )}
+                          <CardFooter className="px-4 py-3 border-t flex flex-col gap-2">
+                            <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                {store ? (
+                                  <>
+                                    <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                      <Store className="h-3 w-3 text-primary" />
+                                    </div>
+                                    <span className="text-xs font-semibold text-foreground truncate">{store.name}</span>
+                                    {store.is_verified && <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
+                                  </>
+                                ) : listing.shop_name ? (
+                                  <>
+                                    <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                      <Store className="h-3 w-3 text-muted-foreground" />
+                                    </div>
+                                    <span className="text-xs font-medium text-foreground truncate">{listing.shop_name}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">Private Seller</span>
+                                )}
+                              </div>
+                              <div className="flex items-center text-xs text-muted-foreground shrink-0 ml-2">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {postedOn}
+                              </div>
                             </div>
-                            <div className="flex items-center text-xs text-muted-foreground shrink-0 ml-2">
-                              <Clock className="h-3 w-3 mr-1" />
-                              {postedOn}
-                            </div>
+                            {/* Contact button — visibility controlled by package tier */}
+                            {store && (
+                              <div
+                                className="w-full"
+                                onClick={(e) => e.preventDefault()}
+                              >
+                                {contact.showPhone ? (
+                                  <a
+                                    href={`/stores/${store.seo_slug || store.slug || store.id}`}
+                                    className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Phone className="h-3 w-3" />
+                                    {contact.buttonText}
+                                  </a>
+                                ) : (
+                                  <Link
+                                    to="/auth"
+                                    className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground text-xs font-medium transition-colors border border-dashed"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Lock className="h-3 w-3" />
+                                    {contact.buttonText}
+                                  </Link>
+                                )}
+                              </div>
+                            )}
                           </CardFooter>
                         </Card>
                       </Link>

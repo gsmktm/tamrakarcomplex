@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "jetro": {
+      "command": "/Users/sc/.jetro/runtime/node-darwin-x64",
+      "args": [
+        "/Users/sc/.jetro/mcp-server/index.js"
+      ],
+      "env": {
+        "JET_WORKSPACE": "/Users/sc/Downloads/tamrakar-main",
+        "JET_API_URL": "https://api.jetro.ai",
+        "PATH": "/Users/sc/.jetro/runtime:/Users/sc/.codeium/windsurf/bin:/Users/sc/.local/bin:/usr/local/opt/postgresql@16/bin:/usr/local/bin:/usr/local/sbin:/Library/Frameworks/Python.framework/Versions/3.13/bin:/Library/Frameworks/Python.framework/Versions/3.12/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      }
+    }
+  }
+}

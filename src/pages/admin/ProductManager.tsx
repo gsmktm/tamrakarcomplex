@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { formatEdgeFunctionError, cn } from "@/lib/utils";
 import { assertEdgeFunctionAvailable } from "@/lib/edgeFunctions";
-import { Loader2, Plus, Pencil, Trash2, Search, Download, ExternalLink, Smartphone, ArrowUpDown, Filter, MoreHorizontal, CheckCircle2, XCircle, Star, Package, Store, RefreshCw, AlertCircle } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Search, Download, ExternalLink, Smartphone, ArrowUpDown, Filter, MoreHorizontal, CheckCircle2, XCircle, Star, Package, Store, RefreshCw, AlertCircle, AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { gsmArenaService, GsmArenaProduct } from "@/services/gsmArenaService";
@@ -46,6 +46,7 @@ interface ProductFormValues {
   featured: boolean;
   in_stock: boolean;
   store_id: string;
+  video_url: string;
 }
 
 interface DBProduct {
@@ -165,10 +166,7 @@ const ProductManager = () => {
     queryKey: ["products", role, user?.id],
     queryFn: async () => {
       try {
-        let query = supabase.from("products").select(`
-          *,
-          stores (id, name)
-        `);
+        let query = supabase.from("products").select("*");
         
         if (isStoreAdmin && user?.id && !isPlatformAdmin) {
           // Get store IDs from store_admins or owner_id
@@ -424,20 +422,59 @@ const ProductManager = () => {
     }
   };
 
-  const { data: storesData } = useQuery({
-    queryKey: ["stores-with-packages"],
-    queryFn: async () => {
+  // ── Master Catalog Auto-Fill ──────────────────────────────────────────────
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogResults, setCatalogResults] = useState<{ id: string; name: string; brand: string; image: string | null; specs: Record<string, unknown> | null; release_year: number | null }[]>([]);
+  const [isCatalogSearching, setIsCatalogSearching] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+
+  const searchMasterCatalog = async (q: string) => {
+    if (q.length < 2) { setCatalogResults([]); return; }
+    setIsCatalogSearching(true);
+    try {
       const { data } = await supabase
-        .from("stores")
-        .select("id, name, package_id, store_packages(name, product_limit)");
-      return data || [];
+        .from("phone_models")
+        .select("id, name, image, release_year, specs, brand:brands(name)")
+        .ilike("name", `%${q}%`)
+        .eq("status", "active")
+        .limit(10);
+      setCatalogResults(
+        (data ?? []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          brand: r.brand?.name ?? "",
+          image: r.image ?? null,
+          specs: r.specs ?? null,
+          release_year: r.release_year ?? null,
+        }))
+      );
+      setCatalogOpen(true);
+    } catch { /* silent */ } finally {
+      setIsCatalogSearching(false);
     }
-  });
+  };
+
+  const applyMasterCatalogEntry = (entry: typeof catalogResults[0]) => {
+    const specsObj = entry.specs ?? {};
+    setValue("name", entry.name);
+    setValue("brand", entry.brand);
+    setValue("category", "Smartphones");
+    if (entry.image) setValue("image", entry.image);
+    setValue("specs", JSON.stringify(specsObj, null, 2));
+    const slug = `${entry.brand}-${entry.name}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    setValue("slug", slug);
+    const desc = `${entry.brand} ${entry.name}${entry.release_year ? ` (${entry.release_year})` : ""}. Available at Tamrakar Complex — Nepal's premier mobile marketplace.`;
+    setValue("description", desc);
+    setCatalogQuery(entry.name);
+    setCatalogOpen(false);
+    setCatalogResults([]);
+    toast.success("Auto-filled from master catalog");
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   const selectedStoreId = watch("store_id");
-  const activeStorePackage = storesData?.find(s => s.id === selectedStoreId);
   const currentStoreProductCount = products?.filter(p => p.store_id === selectedStoreId).length || 0;
-  const productLimit = (activeStorePackage?.store_packages as any)?.product_limit ?? -1;
+  const productLimit = -1; // enforced server-side in createMutation
   const isAtLimit = productLimit >= 0 && currentStoreProductCount >= productLimit;
 
   const onSubmit = (values: ProductFormValues) => {
@@ -527,7 +564,7 @@ const ProductManager = () => {
         `"${p.price}"`,
         p.category,
         p.brand || "-",
-        p.stores?.name || "Platform",
+        allStores?.find((s: {id:string;name:string}) => s.id === p.store_id)?.name || "Platform",
         p.in_stock === false ? "Out of Stock" : "In Stock",
         p.created_at
       ].join(","))
@@ -856,6 +893,51 @@ const ProductManager = () => {
               </DialogHeader>
               <ScrollArea className="pr-4">
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
+                  {/* Master Catalog Auto-Fill */}
+                  {!editingProduct && (
+                    <div className="grid gap-2 relative">
+                      <Label className="flex items-center gap-2">
+                        <Search className="h-3.5 w-3.5 text-primary" />
+                        Search Master Catalog (Auto-Fill)
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Type model name e.g. iPhone 15 Pro…"
+                          value={catalogQuery}
+                          onChange={(e) => {
+                            setCatalogQuery(e.target.value);
+                            searchMasterCatalog(e.target.value);
+                          }}
+                        />
+                        {isCatalogSearching && <Loader2 className="h-4 w-4 animate-spin self-center shrink-0 text-muted-foreground" />}
+                      </div>
+                      {catalogOpen && catalogResults.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border bg-popover shadow-lg overflow-hidden">
+                          {catalogResults.map((entry) => (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
+                              onClick={() => applyMasterCatalogEntry(entry)}
+                            >
+                              {entry.image && (
+                                <img src={entry.image} alt={entry.name} className="h-8 w-8 rounded object-contain bg-muted shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{entry.name}</div>
+                                <div className="text-xs text-muted-foreground">{entry.brand}{entry.release_year ? ` · ${entry.release_year}` : ""}</div>
+                              </div>
+                              <Package className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {catalogOpen && catalogResults.length === 0 && catalogQuery.length >= 2 && !isCatalogSearching && (
+                        <p className="text-xs text-muted-foreground px-1">No master catalog results — fill form manually.</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">Select a model to auto-fill name, brand, image, and specs.</p>
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     <Label htmlFor="name">Product Name</Label>
                     <Input id="name" {...register("name", { required: true })} />
@@ -1223,15 +1305,18 @@ const ProductManager = () => {
                   <TableCell className="text-xs">{product.brand || "-"}</TableCell>
                   {isPlatformAdmin && (
                     <TableCell>
-                      {product.stores ? (
+                      {product.store_id ? (
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100 max-w-[120px] truncate cursor-help">
-                                <Store className="h-3 w-3 mr-1" /> {product.stores.name}
+                                <Store className="h-3 w-3 mr-1" />
+                                {allStores?.find((s: {id:string;name:string}) => s.id === product.store_id)?.name || "Store"}
                               </Badge>
                             </TooltipTrigger>
-                            <TooltipContent>Managed by {product.stores.name}</TooltipContent>
+                            <TooltipContent>
+                              Managed by {allStores?.find((s: {id:string;name:string}) => s.id === product.store_id)?.name || "Store"}
+                            </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       ) : (

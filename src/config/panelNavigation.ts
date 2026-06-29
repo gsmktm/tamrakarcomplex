@@ -29,6 +29,7 @@ import {
   RefreshCw,
   Smartphone,
   Star,
+  Megaphone,
 } from "lucide-react";
 
 type NavItem = {
@@ -76,24 +77,36 @@ export const PANEL_NAVIGATION: Record<string, NavGroup[]> = {
       ],
     },
     {
-      title: "Commerce Control",
+      title: "Catalog & Pricing",
+      items: [
+        { label: "Mobile Master", href: "/suadmin/master-data", icon: Database, requiredRole: "suadmin", enabled: true },
+        { label: "Brands", href: "/suadmin/brands", icon: Tag, requiredRole: "suadmin", enabled: true },
+        { label: "Products", href: "/suadmin/products", icon: Package, requiredRole: "suadmin", enabled: true },
+        { label: "Price List", href: "/suadmin/price-list", icon: DollarSign, requiredRole: "suadmin", enabled: true },
+        { label: "EMI Plans", href: "/suadmin/emi-plans", icon: CreditCard, requiredRole: "suadmin", enabled: true },
+        { label: "Device Verification", href: "/suadmin/device-verification", icon: CheckCircle, requiredRole: "suadmin", enabled: true },
+      ],
+    },
+    {
+      title: "Commerce Ops",
       items: [
         { label: "Stores", href: "/suadmin/stores", icon: Store, requiredRole: "suadmin", enabled: true },
         { label: "Store Applications", href: "/suadmin/store-applications", icon: FileText, requiredRole: "suadmin", enabled: true },
-        { label: "Products", href: "/suadmin/products", icon: Package, requiredRole: "suadmin", enabled: true },
-        { label: "Mobile Master", href: "/suadmin/master-data", icon: Database, requiredRole: "suadmin", enabled: true },
-        { label: "Price List", href: "/suadmin/price-list", icon: DollarSign, requiredRole: "suadmin", enabled: true },
-        { label: "Price List Manager", href: "/suadmin/price-list-simple", icon: Database, requiredRole: "suadmin", enabled: true },
-        { label: "Brands", href: "/suadmin/brands", icon: Tag, requiredRole: "suadmin", enabled: true },
-        { label: "Device Verification", href: "/suadmin/device-verification", icon: CheckCircle, requiredRole: "suadmin", enabled: true },
         { label: "Orders", href: "/suadmin/orders", icon: CreditCard, requiredRole: "suadmin", enabled: true },
         { label: "Leads", href: "/suadmin/leads", icon: User, requiredRole: "suadmin", enabled: true },
         { label: "Payouts", href: "/suadmin/payouts", icon: DollarSign, requiredRole: "suadmin", enabled: true },
         { label: "Subscriptions", href: "/suadmin/subscriptions", icon: Calendar, requiredRole: "suadmin", enabled: true },
+        { label: "Community Listings", href: "/suadmin/listings", icon: ShoppingBag, requiredRole: "suadmin", enabled: true },
+        { label: "Exchange Requests", href: "/suadmin/exchanges", icon: RefreshCw, requiredRole: "suadmin", enabled: true },
+        { label: "Campaigns", href: "/suadmin/campaigns", icon: Megaphone, requiredRole: "suadmin", enabled: true },
+      ],
+    },
+    {
+      title: "Content",
+      items: [
         { label: "Articles", href: "/suadmin/articles", icon: FileText, requiredRole: "suadmin", enabled: true },
         { label: "Guides & FAQs", href: "/suadmin/guides", icon: FileText, requiredRole: "suadmin", enabled: true },
         { label: "Content Pages", href: "/suadmin/content", icon: FileText, requiredRole: "suadmin", enabled: true },
-        { label: "Community Listings", href: "/suadmin/listings", icon: ShoppingBag, requiredRole: "suadmin", enabled: true },
         { label: "Repair Requests", href: "/suadmin/repairs", icon: Wrench, requiredRole: "suadmin", enabled: true },
         { label: "Unlocking Requests", href: "/suadmin/unlocking", icon: Unlock, requiredRole: "suadmin", enabled: true },
       ],
@@ -198,6 +211,7 @@ export const PANEL_NAVIGATION: Record<string, NavGroup[]> = {
         { label: "Payout Settings", href: "/storeadmin/payout-settings", icon: Settings, requiredRole: "storeadmin", enabled: true },
         { label: "Repair Services", href: "/storeadmin/repair-services", icon: Wrench, requiredRole: "storeadmin", enabled: true },
         { label: "Repair Requests", href: "/storeadmin/repairs", icon: Wrench, requiredRole: "storeadmin", enabled: true },
+        { label: "Unlocking Requests", href: "/storeadmin/unlocking", icon: Unlock, requiredRole: "storeadmin", enabled: true },
         { label: "Store Staff", href: "/storeadmin/staff", icon: Users, requiredRole: "storeadmin", enabled: true },
         { label: "Subscription", href: "/storeadmin/my-subscription", icon: CreditCard, requiredRole: "storeadmin", enabled: true },
         { label: "Messages", href: "/storeadmin/messages", icon: MessageSquare, requiredRole: "storeadmin", enabled: true },
@@ -207,6 +221,8 @@ export const PANEL_NAVIGATION: Record<string, NavGroup[]> = {
       title: "Account",
       items: [
         { label: "My Profile", href: "/storeadmin/me", icon: User, requiredRole: "storeadmin", enabled: true },
+        { label: "Notifications", href: "/storeadmin/notifications", icon: Bell, requiredRole: "storeadmin", enabled: true },
+        { label: "Security", href: "/storeadmin/security", icon: Lock, requiredRole: "storeadmin", enabled: true },
       ],
     },
   ],

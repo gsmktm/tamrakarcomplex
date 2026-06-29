@@ -553,6 +553,73 @@ export function getPackageLimit(packageSlug: string | null | undefined, limit: P
   return map[limit];
 }
 
+export type ContactVisibility = {
+  showPhone: boolean;
+  showWhatsApp: boolean;
+  requiresLogin: boolean;
+  buttonText: string;
+  whatsappButtonText: string;
+};
+
+/**
+ * Determines whether phone/WhatsApp should be visible to a given user.
+ * Featured tick with featuredContactVisible=true overrides package rules.
+ */
+export function canShowPhoneNumber(
+  packageSlug: string | null | undefined,
+  opts: {
+    isActive?: boolean;
+    isFeatured?: boolean;
+    featuredContactVisible?: boolean;
+    isLoggedIn?: boolean;
+  } = {}
+): ContactVisibility {
+  const { isActive = true, isFeatured = false, featuredContactVisible = false, isLoggedIn = false } = opts;
+
+  if (!isActive) {
+    return { showPhone: false, showWhatsApp: false, requiresLogin: false, buttonText: "Contact Hidden", whatsappButtonText: "Contact Hidden" };
+  }
+
+  const slug = normalizeStorePackageSlug(packageSlug);
+
+  if (isFeatured && featuredContactVisible) {
+    return { showPhone: true, showWhatsApp: true, requiresLogin: false, buttonText: "Call Now", whatsappButtonText: "WhatsApp Now" };
+  }
+
+  if (slug === "diamond") {
+    return { showPhone: true, showWhatsApp: true, requiresLogin: false, buttonText: "Call Now", whatsappButtonText: "WhatsApp Now" };
+  }
+
+  if (slug === "gold") {
+    return { showPhone: isLoggedIn, showWhatsApp: isLoggedIn, requiresLogin: !isLoggedIn, buttonText: isLoggedIn ? "Call Now" : "Login to View Number", whatsappButtonText: isLoggedIn ? "WhatsApp Now" : "Login to View Number" };
+  }
+
+  if (slug === "silver") {
+    return { showPhone: isLoggedIn, showWhatsApp: isLoggedIn, requiresLogin: !isLoggedIn, buttonText: isLoggedIn ? "Call Now" : "Login to View Contact", whatsappButtonText: isLoggedIn ? "WhatsApp Now" : "Login to View Contact" };
+  }
+
+  // free
+  return { showPhone: isLoggedIn, showWhatsApp: isLoggedIn, requiresLogin: !isLoggedIn, buttonText: isLoggedIn ? "Call Now" : "Login to View Contact", whatsappButtonText: isLoggedIn ? "WhatsApp Now" : "Login to View Contact" };
+}
+
+export function getPackageBadgeLabel(packageSlug: string | null | undefined, isFeatured?: boolean): string | null {
+  const slug = normalizeStorePackageSlug(packageSlug);
+  if (isFeatured) return "FEATURED";
+  if (slug === "diamond") return "DIAMOND";
+  if (slug === "gold") return "GOLD";
+  if (slug === "silver") return "SILVER";
+  return null;
+}
+
+export function getPackageBadgeClassName(packageSlug: string | null | undefined, isFeatured?: boolean): string {
+  const slug = normalizeStorePackageSlug(packageSlug);
+  if (isFeatured) return "bg-gradient-to-r from-amber-400 to-yellow-300 text-black font-black";
+  if (slug === "diamond") return "bg-gradient-to-r from-cyan-400 to-sky-300 text-black font-black";
+  if (slug === "gold") return "bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-bold";
+  if (slug === "silver") return "bg-gradient-to-r from-slate-400 to-zinc-300 text-black font-bold";
+  return "";
+}
+
 export function validateStoreAgainstPackage(store: Partial<Store>, packageSlug: string | null | undefined): { valid: boolean; violations: string[] } {
   const entitlements = getStoreEntitlements(packageSlug);
   const violations: string[] = [];

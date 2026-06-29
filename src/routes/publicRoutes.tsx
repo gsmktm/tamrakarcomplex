@@ -42,7 +42,6 @@ const CustomRepairRequest = lazy(() => import("@/pages/CustomRepairRequest"));
 const ContentPage = lazy(() => import("@/pages/ContentPage"));
 const ContactUs = lazy(() => import("@/pages/ContactUs"));
 const SellYourPhone = lazy(() => import("@/pages/sell/SellYourPhone"));
-const ExchangeYourPhone = lazy(() => import("@/pages/sell/ExchangeYourPhone"));
 const ValuationEstimator = lazy(() => import("@/pages/ValuationEstimator"));
 const Checkout = lazy(() => import("@/pages/Checkout"));
 const OrderSuccess = lazy(() => import("@/pages/OrderSuccess"));
@@ -91,7 +90,7 @@ export const publicRoutes = (
     <Route path="/wishlist" element={withSuspense(Wishlist)} />
     <Route path="/marketplace" element={withSuspense(MarketplaceBrowse)} />
     <Route path="/sell-your-phone" element={withSuspense(SellYourPhone)} />
-    <Route path="/exchange-your-phone" element={withSuspense(ExchangeYourPhone)} />
+    <Route path="/exchange-your-phone" element={<Navigate to="/sell-your-phone?mode=exchange" replace />} />
     <Route path="/valuation-estimator" element={withSuspense(ValuationEstimator)} />
     <Route path="/services" element={withSuspense(ServicesHub)} />
     <Route path="/marketplace/sell" element={<RequireAuth>{withSuspense(SellWizard)}</RequireAuth>} />
@@ -136,12 +135,12 @@ export const publicRoutes = (
     <Route path="/repair/custom" element={withSuspense(CustomRepairRequest)} />
     <Route path="/news" element={withSuspense(News)} />
     <Route path="/reviews" element={withSuspense(Reviews)} />
-    <Route path="/buy" element={withSuspense(Products)} />
-    <Route path="/products" element={<Navigate to="/buy" replace />} />
+    <Route path="/buy" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
+    <Route path="/products" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
     <Route path="/brands" element={withSuspense(Brands)} />
-    <Route path="/cat/mobiles/" element={withSuspense(MobileCategoryPage)} />
+    <Route path="/cat/mobiles" element={withSuspense(MobileCategoryPage)} />
     <Route path="/cat/mobiles/:brand" element={withSuspense(MobileBrandPage)} />
-    <Route path="/mobile-price" element={<Navigate to="/cat/mobiles/" replace />} />
+    <Route path="/mobile-price" element={<Navigate to="/cat/mobiles" replace />} />
     <Route path="/mobile-price/brand/:brand" element={<RedirectBrandToNew />} />
     <Route path="/mobile-price/:slug" element={<RedirectModelToNew />} />
     <Route path="/laptop-price" element={withSuspense(LaptopPrice)} />
@@ -176,10 +175,10 @@ export const publicRoutes = (
     <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
     <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
     <Route path="/sell" element={<Navigate to="/sell-your-phone" replace />} />
-    <Route path="/exchange" element={<Navigate to="/exchange-your-phone" replace />} />
+    <Route path="/exchange" element={<Navigate to="/sell-your-phone?mode=exchange" replace />} />
     <Route path="/repairs" element={<Navigate to="/repair" replace />} />
-    <Route path="/shop" element={<Navigate to="/buy" replace />} />
-    <Route path="/explore" element={<Navigate to="/buy" replace />} />
+    <Route path="/shop" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
+    <Route path="/explore" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
     <Route path="/prices" element={<Navigate to="/mobile-price" replace />} />
     <Route path="/newsroom" element={<Navigate to="/news" replace />} />
     <Route path="/guides" element={<Navigate to="/mobile-guides" replace />} />

@@ -1,7 +1,53 @@
 # Changelog - Tamrakar Complex Platform
 
-**Last Updated:** May 13, 2026  
-**Version:** 1.0.0 (Production Ready)
+**Last Updated:** June 12, 2026  
+**Version:** 1.2.0
+
+---
+
+## v1.2.0 — June 12, 2026
+
+### Mobile Hub Catalog (Full Implementation)
+- New DB tables: `brands`, `phone_series`, `phone_models`, `phone_variants`, `phone_specs`, `phone_variant_prices`, `price_history`, `expert_scores`, `model_images`, `exchange_values`, and 10+ supporting tables
+- Seeded 18 brands (Samsung, Apple, Xiaomi, POCO, Honor, Vivo, Nothing, OnePlus, Realme, OPPO, Infinix, Motorola, ZTE, Ai+, Tecno, Itel, Coolpad, Benco) with ~290 variant price rows and exchange values at good/average/poor grades
+- `mobileMasterService` — full CRUD for brands/series/models/variants with price aggregation and client-side filter/sort
+- `MobileCategoryPage` — paginated phone listing with search, brand/price/feature filter chips, sort, compare-mode drawer
+- `MobileBrandPage` — per-brand phone listing with hero, SEO head, and filter chips
+- `MobileMasterManager` admin — brand/series/model hierarchy editor with inline add/edit/delete
+
+### Sell & Exchange Unified Flow
+- Merged `/exchange-your-phone` into `/sell-your-phone?mode=exchange` — single unified SellYourPhone page
+- `mode` state initialised from URL param; hero and step-5 CTAs set mode inline without navigation
+- Lead submission `source` field reflects mode (`sell_your_phone` vs `exchange_your_phone`)
+- `/exchange-your-phone` and `/exchange` routes redirect to `/sell-your-phone?mode=exchange`
+- Deleted dead `ExchangeYourPhone.tsx` file
+
+### Mobile-First UI Redesign
+- Global bottom nav with glass-card styling, 44px touch targets, `matchPrefix` active detection
+- Header and NavigationBar updated with glass tokens and mobile-responsive breakpoints
+- `ModelCard` component polish — image, price badge, rating strip
+- Bottom nav hidden on admin/checkout/auth paths; admin paths now include `staffadmin`, `storeadmin`
+
+### Commerce Hardening (Phase 2 & 3)
+- Additive order/repair statuses — no destructive enum changes
+- Mandatory `store_id` on commerce records, payout tracking
+- Security tests suite + extracted shared pure logic layer
+
+### Bug Fixes
+- `MobileMasterManager` — `deleteBrand/deleteSeries/deleteModel` `onSuccess` callbacks now correctly use `(_, id)` signature (React Query v5); `id` was an undefined free variable, silently preventing selection clear after deletion
+- `MobileMasterManager` — Brand/Series Select `"all"` sentinel now maps to `null` (`v === "all" ? null : v`); previously passed literal string `"all"` to UUID Supabase queries
+- `mobileMasterService` — `minPriceMap` building uses `!(key in map)` instead of `!existing` (falsy-zero for price=0)
+- `mobileMasterService` — `filters.minPrice` guard uses `!== undefined` instead of truthy check
+- `publicRoutes` — `/cat/mobiles/` trailing slash removed; canonical `/cat/mobiles` now correctly matches `MobileCategoryPage` (was falling through to wildcard `StoreRedirect`)
+- `BottomNav` — removed dead `pathname.startsWith(matchPrefix + "?")` branch (pathname never contains query string)
+- `ArticleManager` — added missing `handleSupabaseError` import
+
+### Dead Code Removed
+- `src/pages/admin/storeadmin/StoreProfile.tsx`
+- `src/pages/admin/storeadmin/StoreSubscription.tsx`
+- `src/pages/admin/staffadmin/StoresManagement.tsx`
+- `src/pages/admin/supadmin/StoresManagement.tsx`
+- `src/pages/sell/ExchangeYourPhone.tsx`
 
 ---
 

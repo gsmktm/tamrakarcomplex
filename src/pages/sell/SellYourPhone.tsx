@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, LogIn, Smartphone, Search, Store, UserCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, LogIn, Smartphone, Search, Store, UserCheck, RefreshCw, MessageCircle, MapPin, Package, Shield, Wrench, Droplets, Battery, Camera, Eye, Fingerprint } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Header } from "@/components/layout/Header";
@@ -60,20 +60,22 @@ const BRAND_LOGOS: Record<string, string> = {
   Xiaomi: "https://cdn.simpleicons.org/xiaomi/FF6700",
   OnePlus: "https://cdn.simpleicons.org/oneplus/F3122E",
   Google: "https://cdn.simpleicons.org/google/4285F4",
-  Realme: "https://cdn.simpleicons.org/realme/FFCD00",
+  Realme: "https://cdn.simpleicons.org/realme",
+  OPPO: "https://cdn.simpleicons.org/oppo/05BA4B",
   Oppo: "https://cdn.simpleicons.org/oppo/05BA4B",
   Vivo: "https://cdn.simpleicons.org/vivo/415FFF",
   Honor: "https://cdn.simpleicons.org/honor/000000",
   Huawei: "https://cdn.simpleicons.org/huawei/FF0000",
-  Infinix: "https://cdn.simpleicons.org/infinix/000000",
-  Tecno: "https://cdn.simpleicons.org/tecnomobile/00529B",
-  Poco: "https://cdn.simpleicons.org/poco/000000",
-  Nothing: "https://cdn.simpleicons.org/nothing/000000",
+  Infinix: "https://cdn.simpleicons.org/infinix",
+  Tecno: "https://cdn.simpleicons.org/tecno",
+  POCO: "https://cdn.simpleicons.org/poco",
+  Poco: "https://cdn.simpleicons.org/poco",
+  Nothing: "https://cdn.simpleicons.org/nothing",
   Motorola: "https://cdn.simpleicons.org/motorola/000000",
   Nokia: "https://cdn.simpleicons.org/nokia/001135",
   Sony: "https://cdn.simpleicons.org/sony/000000",
   Asus: "https://cdn.simpleicons.org/asus/00539B",
-  ZTE: "https://cdn.simpleicons.org/zte/005EB4",
+  ZTE: "https://cdn.simpleicons.org/zte",
   Lenovo: "https://cdn.simpleicons.org/lenovo/E2231A"
 };
 
@@ -101,6 +103,20 @@ export default function SellYourPhone() {
   const defectsSectionRef = useRef<HTMLDivElement>(null);
   const routePrefillRef = useRef(false);
 
+  // Extended device condition fields
+  const [batteryHealth, setBatteryHealth] = useState<number>(90);
+  const [displayCondition, setDisplayCondition] = useState<string>("perfect");
+  const [cameraCondition, setCameraCondition] = useState<string>("perfect");
+  const [faceIdStatus, setFaceIdStatus] = useState<string>("working");
+  const [boxAvailable, setBoxAvailable] = useState<boolean>(false);
+  const [billAvailable, setBillAvailable] = useState<boolean>(false);
+  const [warrantyAvailable, setWarrantyAvailable] = useState<boolean>(false);
+  const [isRepaired, setIsRepaired] = useState<boolean>(false);
+  const [waterDamage, setWaterDamage] = useState<boolean>(false);
+  const [accessoriesAvailable, setAccessoriesAvailable] = useState<boolean>(false);
+  const [customerLocation, setCustomerLocation] = useState<string>("");
+
+  const [mode, setMode] = useState<"sell" | "exchange">(searchParams.get("mode") === "exchange" ? "exchange" : "sell");
   const [sellDialogOpen, setSellDialogOpen] = useState(false);
   const [storePickerOpen, setStorePickerOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string>("");
@@ -115,7 +131,7 @@ export default function SellYourPhone() {
   useEffect(() => {
     async function fetchSourceStore() {
       if (submissionTargetStoreId) {
-        const { data, error } = await storeDirectoryService.getStoreById(submissionTargetStoreId);
+        const { data, error } = await storeDirectoryService.getStoreByIdentifier({ type: "id", value: submissionTargetStoreId });
         if (data) {
           setSourceStore(data as unknown as StoreDirectoryItem);
           setSelectedStoreId(data.id);
@@ -239,22 +255,8 @@ export default function SellYourPhone() {
   // Queries
   const { data: brands, isLoading: loadingBrands } = useQuery({
     queryKey: ["sell-brands"],
-    queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("device_catalog")
-          .select("brand")
-          .order("brand", { ascending: true });
-        if (error) throw error;
-        
-        const unique = Array.from(new Set((data ?? []).map((row) => row.brand).filter(Boolean))).sort();
-        if (unique.length > 0) return unique.map(name => ({ id: name, name, slug: name.toLowerCase() }));
-        
-        return await sellPhoneService.getBrands();
-      } catch (error) {
-        console.error("Error loading brands:", error);
-        return await sellPhoneService.getBrands();
-      }
+    queryFn: async (): Promise<Array<{ id: string; name: string; slug: string; logo_url?: string }>> => {
+      return await sellPhoneService.getBrands();
     }
   });
 
@@ -262,29 +264,7 @@ export default function SellYourPhone() {
     queryKey: ["sell-models", selectedBrand],
     enabled: !!selectedBrand,
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("device_catalog")
-          .select("id, brand, model, canonical_slug, release_year")
-          .ilike("brand", selectedBrand)
-          .order("release_year", { ascending: false });
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          return data.map(row => ({
-            id: row.id,
-            name: row.model,
-            slug: row.canonical_slug,
-            model: { name: row.model },
-            brand: { name: row.brand },
-            release_year: row.release_year
-          }));
-        }
-        
-        return await sellPhoneService.getDevicesByBrand(selectedBrand);
-      } catch {
-        return await sellPhoneService.getDevicesByBrand(selectedBrand);
-      }
+      return await sellPhoneService.getDevicesByBrand(selectedBrand);
     },
   });
 
@@ -310,19 +290,31 @@ export default function SellYourPhone() {
     enabled: step === 5,
   });
 
-  const filteredSellStores = (sellStores || []).filter((store) => {
-    const query = storeSearch.trim().toLowerCase();
-    if (!query) return true;
-    return [
-      store.name,
-      store.location,
-      store.address,
-      store.shop_no,
-      store.floor,
-      store.package_slug,
-      ...(store.services || []),
-    ].filter(Boolean).join(" ").toLowerCase().includes(query);
-  });
+  const TIER_ORDER: Record<string, number> = { diamond: 4, gold: 3, silver: 2, free: 1 };
+  const getTierOrder = (store: { package_slug?: string | null; subscription_tier?: string | null }) =>
+    TIER_ORDER[(store.package_slug || store.subscription_tier || "free").toLowerCase()] ?? 1;
+
+  const filteredSellStores = (sellStores || [])
+    .filter((store) => {
+      const query = storeSearch.trim().toLowerCase();
+      if (!query) return true;
+      return [
+        store.name,
+        store.location,
+        store.address,
+        store.shop_no,
+        store.floor,
+        store.package_slug,
+        ...(store.services || []),
+      ].filter(Boolean).join(" ").toLowerCase().includes(query);
+    })
+    .sort((a, b) => {
+      const tierDiff = getTierOrder(b) - getTierOrder(a);
+      if (tierDiff !== 0) return tierDiff;
+      const aFeat = a.is_featured ? 1 : 0;
+      const bFeat = b.is_featured ? 1 : 0;
+      return bFeat - aFeat;
+    });
 
   const selectedStore = (sellStores || []).find((store) => store.id === selectedStoreId);
 
@@ -409,7 +401,7 @@ export default function SellYourPhone() {
         customer_email: contactEmail,
         imei: deviceImei,
         assigned_store_id: storeId,
-        source: "sell_your_phone"
+        source: mode === "exchange" ? "exchange_your_phone" : "sell_your_phone"
       }, userId);
     },
     onSuccess: () => {
@@ -430,6 +422,50 @@ export default function SellYourPhone() {
       toast.error("Submission failed", { description });
     }
   });
+
+  // Viboscope score calculation
+  const viboScore = (() => {
+    let score = 0;
+    // Battery (20 pts)
+    if (batteryHealth >= 95) score += 20;
+    else if (batteryHealth >= 85) score += 16;
+    else if (batteryHealth >= 75) score += 11;
+    else score += 5;
+    // Display (15 pts)
+    if (displayCondition === "perfect") score += 15;
+    else if (displayCondition === "minor") score += 10;
+    else score += 3;
+    // Camera (12 pts)
+    if (cameraCondition === "perfect") score += 12;
+    else if (cameraCondition === "minor") score += 7;
+    else score += 2;
+    // Face ID / Touch ID (10 pts)
+    if (faceIdStatus === "working") score += 10;
+    else if (faceIdStatus === "na") score += 7;
+    else score += 0;
+    // Body condition from main "condition" field (15 pts)
+    if (condition === "new") score += 15;
+    else if (condition === "like_new") score += 12;
+    else if (condition === "used") score += 7;
+    else score += 3;
+    // Box (5 pts), Bill (5 pts), Warranty (5 pts)
+    if (boxAvailable) score += 5;
+    if (billAvailable) score += 5;
+    if (warrantyAvailable) score += 5;
+    // Repair history (-8 pts)
+    if (isRepaired) score -= 8;
+    // Water damage (-15 pts)
+    if (waterDamage) score -= 15;
+    // Defects penalty
+    score -= defects.length * 4;
+    // Accessories (+3 pts)
+    if (accessoriesAvailable) score += 3;
+    return Math.max(10, Math.min(100, score));
+  })();
+
+  const viboGrade = viboScore >= 85 ? "Premium Used" : viboScore >= 70 ? "Good Condition" : viboScore >= 50 ? "Fair Condition" : "Poor Condition";
+  const viboDemand = viboScore >= 80 ? "High" : viboScore >= 60 ? "Medium" : "Low";
+  const viboRecommendation = viboScore >= 80 ? "Exchange & Upgrade" : viboScore >= 60 ? "Sell for Best Price" : "Sell for Quick Cash";
 
   const openPlatformSubmit = () => {
     setSubmissionTargetStoreId(undefined);
@@ -470,18 +506,73 @@ export default function SellYourPhone() {
       <Header />
       <main className="flex-1">
         {/* Hero banner */}
-        <div className="relative bg-slate-950 border-b overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,hsl(var(--primary)/0.15),transparent_60%)] pointer-events-none" />
-          <div className="container py-12 md:py-16 relative text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest mb-6">
-              <Smartphone className="h-3.5 w-3.5" /> Instant Cash Offer
+        <div className="sell-hero border-b">
+          {/* Decorative diagonal light slashes */}
+          <div className="sell-hero-slash" aria-hidden="true" />
+          <div className="sell-hero-slash-2" aria-hidden="true" />
+
+          <div className="container py-14 md:py-24 relative text-center max-w-3xl mx-auto">
+            {/* Badge chip */}
+            <div className="flex justify-center mb-7">
+              <span className="sell-badge animate-fade-in">
+                <Smartphone className="h-3 w-3" />
+                Sell &amp; Exchange at TamrakarComplex
+              </span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-display font-extrabold mb-3 tracking-tight text-white">{content.headline}</h1>
-            <p className="text-lg text-white/60">{content.subheadline}</p>
+
+            {/* Headline */}
+            <h1 className="text-4xl md:text-6xl font-display font-extrabold mb-4 tracking-tight leading-tight text-white animate-fade-up">
+              Turn Your Phone<br />
+              <span className="sell-headline-accent">Into Cash or Upgrade</span>
+            </h1>
+            <p className="text-base md:text-lg text-white/55 mb-10 max-w-xl mx-auto animate-fade-up delay-100">
+              {content.subheadline || "Check live market value, compare store offers, and get paid — in minutes at TamrakarComplex."}
+            </p>
+
+            {/* CTA row */}
+            <div className="flex flex-wrap items-center justify-center gap-3 animate-fade-up delay-200">
+              <Button
+                size="lg"
+                className="hero-gradient shadow-gold font-bold h-12 px-7 pressable"
+                onClick={() => { setStep(1); document.getElementById("sell-wizard")?.scrollIntoView({ behavior: "smooth" }); }}
+              >
+                <Smartphone className="h-4 w-4 mr-2" /> Sell My Phone
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="bg-transparent border-[oklch(72%_0.20_280/0.55)] text-[oklch(78%_0.16_285)] hover:bg-[oklch(25%_0.20_280/0.18)] font-bold h-12 px-7 pressable"
+                onClick={() => { setMode("exchange"); setStep(1); document.getElementById("sell-wizard")?.scrollIntoView({ behavior: "smooth" }); }}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" /> Exchange &amp; Upgrade
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="bg-transparent border-white/20 text-white/65 hover:bg-white/8 font-bold h-12 px-7 pressable"
+                onClick={() => navigate("/cat/mobiles")}
+              >
+                <Search className="h-4 w-4 mr-2" /> Check Market Price
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="bg-transparent border-[oklch(64%_0.118_70/0.45)] text-[oklch(82%_0.10_72)] hover:bg-[oklch(64%_0.118_70/0.10)] font-bold h-12 px-7 pressable"
+                onClick={() => { setStep(1); document.getElementById("sell-wizard")?.scrollIntoView({ behavior: "smooth" }); }}
+              >
+                <Store className="h-4 w-4 mr-2" /> Compare Store Offers
+              </Button>
+            </div>
+
+            {/* Trust line */}
+            <p className="text-[11px] text-white/25 mt-8 tracking-widest uppercase animate-fade-in delay-400">
+              Trusted by 10,000+ Nepal sellers &nbsp;·&nbsp; Instant quote &nbsp;·&nbsp; No hidden fees
+            </p>
           </div>
         </div>
 
-        <div className="container mx-auto px-4 py-10 max-w-3xl">
+        <div id="sell-wizard" className="bg-[oklch(10%_0.028_258)] py-12">
+        <div className="container mx-auto px-4 max-w-3xl sell-wizard-wrap">
         {/* Progress Steps */}
         <div className="flex items-center mb-10 max-w-xl mx-auto gap-0">
           {[
@@ -494,20 +585,26 @@ export default function SellYourPhone() {
             <div key={n} className="flex items-center flex-1">
               <div className="flex flex-col items-center flex-1">
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 border-2 ${
-                  step > n ? "bg-primary border-primary text-white" :
-                  step === n ? "bg-primary/10 border-primary text-primary shadow-glow" :
+                  step > n ? "sell-step-dot-done text-white border-transparent" :
+                  step === n ? "bg-primary/10 border-primary text-primary sell-step-dot-active" :
                   "bg-muted border-border text-muted-foreground"
                 }`}>
                   {step > n ? <CheckCircle2 className="h-4 w-4" /> : n}
                 </div>
-                <span className={`text-[10px] mt-1 font-semibold uppercase tracking-wider ${step >= n ? "text-primary" : "text-muted-foreground"}`}>{label}</span>
+                <span className={`text-[10px] mt-1 font-bold uppercase tracking-wider ${step >= n ? "text-gold" : "text-muted-foreground"}`}>{label}</span>
               </div>
-              {idx < 4 && <div className={`h-0.5 flex-1 mb-4 transition-colors ${step > n ? "bg-primary" : "bg-border"}`} />}
+              {idx < 4 && (
+                <div className={`h-px flex-1 mb-5 transition-all duration-500 ${
+                  step > n
+                    ? "bg-gradient-to-r from-[oklch(64%_0.118_70)] to-[oklch(72%_0.20_280)]"
+                    : "bg-border/40"
+                }`} />
+              )}
             </div>
           ))}
         </div>
 
-        <Card className="p-6 sm:p-8 shadow-lg border-border/50">
+        <Card className="p-6 sm:p-8 sell-wizard-card [&_input]:bg-[oklch(18%_0.028_258)] [&_input]:border-[oklch(30%_0.030_258)] [&_input]:text-white [&_input::placeholder]:text-white/40 [&_label]:text-white/80 [&_h2]:text-white">
           {step === 1 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 className="text-2xl font-bold text-center text-primary">{content.step1_title}</h2>
@@ -533,8 +630,8 @@ export default function SellYourPhone() {
                     <Button
                       key={brand.id}
                       variant="outline"
-                      className={`h-28 flex flex-col gap-3 items-center justify-center p-4 hover:border-primary hover:shadow-md transition-all ${
-                        selectedBrand === brand.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-card"
+                      className={`h-28 flex flex-col gap-3 items-center justify-center p-4 sell-brand-btn transition-all ${
+                        selectedBrand === brand.id ? "sell-brand-btn-active bg-primary/5" : "bg-card"
                       }`}
                       onClick={() => {
                         setSelectedBrand(brand.id);
@@ -552,6 +649,14 @@ export default function SellYourPhone() {
                             alt={brand.name}
                             className="h-full w-auto max-w-[80%] object-contain opacity-90 group-hover:opacity-100"
                             loading="lazy"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = "none";
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = `<div class="h-10 w-10 rounded-full bg-secondary flex items-center justify-center"><span class="font-bold text-lg">${brand.name.slice(0, 1)}</span></div>`;
+                              }
+                            }}
                           />
                         </div>
                       ) : (
@@ -773,8 +878,103 @@ export default function SellYourPhone() {
               <p className="text-xs text-muted-foreground text-center">Select all that apply. Leave empty if none.</p>
             </div>
 
-            <Button 
-              className="w-full mt-8 h-12 text-lg hero-gradient shadow-lg hover:shadow-xl transition-all" 
+            {/* Battery Health */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <Label className="text-lg font-semibold flex items-center gap-2"><Battery className="h-4 w-4 text-primary" /> Battery Health</Label>
+                <span className="bg-secondary px-3 py-1 rounded-full text-sm font-mono font-medium">{batteryHealth}%</span>
+              </div>
+              <div className="px-2">
+                <Slider value={[batteryHealth]} onValueChange={(v) => setBatteryHealth(v[0])} min={40} max={100} step={1} className="py-4" />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>40% (Replace)</span><span>80% Good</span><span>100% Perfect</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Display Condition */}
+            <div className="space-y-3">
+              <Label className="text-lg font-semibold flex items-center gap-2"><Eye className="h-4 w-4 text-primary" /> Display Condition</Label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { id: "perfect", label: "Perfect", desc: "No scratches" },
+                  { id: "minor", label: "Minor Marks", desc: "Light scratches" },
+                  { id: "cracked", label: "Cracked", desc: "Broken glass" },
+                ].map((item) => (
+                  <div key={item.id} onClick={() => setDisplayCondition(item.id)}
+                    className={`cursor-pointer rounded-xl border-2 p-3 flex flex-col gap-1 transition-all ${displayCondition === item.id ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/50 hover:bg-secondary/50"}`}>
+                    <span className="font-bold text-sm">{item.label}</span>
+                    <span className="text-xs text-muted-foreground">{item.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Camera Condition */}
+            <div className="space-y-3">
+              <Label className="text-lg font-semibold flex items-center gap-2"><Camera className="h-4 w-4 text-primary" /> Camera Condition</Label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { id: "perfect", label: "Perfect", desc: "Clear photos" },
+                  { id: "minor", label: "Minor Issue", desc: "Slight blur/spots" },
+                  { id: "faulty", label: "Faulty", desc: "Not working well" },
+                ].map((item) => (
+                  <div key={item.id} onClick={() => setCameraCondition(item.id)}
+                    className={`cursor-pointer rounded-xl border-2 p-3 flex flex-col gap-1 transition-all ${cameraCondition === item.id ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/50 hover:bg-secondary/50"}`}>
+                    <span className="font-bold text-sm">{item.label}</span>
+                    <span className="text-xs text-muted-foreground">{item.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Face ID / Touch ID */}
+            <div className="space-y-3">
+              <Label className="text-lg font-semibold flex items-center gap-2"><Fingerprint className="h-4 w-4 text-primary" /> Face ID / Touch ID</Label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { id: "working", label: "Working" },
+                  { id: "not_working", label: "Not Working" },
+                  { id: "na", label: "N/A" },
+                ].map((item) => (
+                  <div key={item.id} onClick={() => setFaceIdStatus(item.id)}
+                    className={`cursor-pointer rounded-xl border-2 p-3 flex items-center justify-center text-center transition-all ${faceIdStatus === item.id ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/50"}`}>
+                    <span className="font-bold text-sm">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Checkbox grid: Box, Bill, Warranty, Repaired, Water Damage, Accessories */}
+            <div className="space-y-3">
+              <Label className="text-lg font-semibold flex items-center gap-2"><Package className="h-4 w-4 text-primary" /> Accessories & Documents</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {[
+                  { id: "box", label: "📦 Box Available", val: boxAvailable, set: setBoxAvailable },
+                  { id: "bill", label: "🧾 Bill Available", val: billAvailable, set: setBillAvailable },
+                  { id: "warranty", label: "🛡️ Under Warranty", val: warrantyAvailable, set: setWarrantyAvailable },
+                  { id: "accessories", label: "🔌 Accessories", val: accessoriesAvailable, set: setAccessoriesAvailable },
+                  { id: "repaired", label: "🔧 Previously Repaired", val: isRepaired, set: setIsRepaired },
+                  { id: "water", label: "💧 Water Damage", val: waterDamage, set: setWaterDamage },
+                ].map(({ id, label, val, set }) => (
+                  <div key={id} onClick={() => set(!val)}
+                    className={`cursor-pointer rounded-xl border-2 p-3 flex items-center justify-center text-center transition-all text-sm font-medium ${val
+                      ? (id === "repaired" || id === "water") ? "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" : "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700"
+                      : "border-border hover:border-primary/50 hover:bg-secondary/50"}`}>
+                    {label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Location */}
+            <div className="space-y-2">
+              <Label className="text-lg font-semibold flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" /> Your Location <span className="text-sm font-normal text-muted-foreground">(optional)</span></Label>
+              <Input value={customerLocation} onChange={(e) => setCustomerLocation(e.target.value)} placeholder="e.g. Kathmandu, Lalitpur, Bhaktapur..." className="h-11" />
+            </div>
+
+            <Button
+              className="w-full mt-8 h-12 text-lg hero-gradient shadow-lg hover:shadow-xl transition-all"
               size="lg"
               disabled={!storage}
               onClick={() => {
@@ -872,91 +1072,119 @@ export default function SellYourPhone() {
 
         {step === 5 && valuation && (
           <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-            {/* Premium valuation card */}
-            <div className="relative rounded-2xl overflow-hidden border border-primary/30 bg-gradient-to-br from-slate-950 via-slate-900 to-primary/5">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,hsl(var(--primary)/0.2),transparent_60%)] pointer-events-none" />
-              <div className="relative p-8 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 mb-4">
-                  <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-                </div>
-                <p className="text-sm font-semibold uppercase tracking-widest text-primary/80 mb-2">Your Phone's Market Value</p>
-                <div className="text-5xl font-black text-white mb-1">
-                  {valuation.currency} {valuation.estimated_price.toLocaleString()}
-                </div>
-                <div className="flex items-center justify-center gap-4 mt-3">
-                  <span className="text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-3 py-1 rounded-full font-semibold">
-                    Instant: {valuation.currency} {Math.floor(valuation.estimated_price * 0.9).toLocaleString()}
-                  </span>
-                  <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full font-semibold">
-                    Best: {valuation.currency} {valuation.estimated_price.toLocaleString()}
-                  </span>
-                </div>
-                <p className="text-xs text-white/40 mt-3">
-                  Quote valid until {new Date(valuation.valid_until).toLocaleDateString()} · Subject to physical inspection
-                </p>
-              </div>
 
-              {/* Breakdown */}
-              <div className="border-t border-white/10 px-8 py-4 space-y-2 text-sm">
-                <div className="flex justify-between text-white/60">
-                  <span>Base market price</span>
-                  <span className="text-white">{valuation.currency} {valuation.breakdown.base_price.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-white/60">
-                  <span>Condition ({condition})</span>
-                  <span className={valuation.breakdown.condition_adjustment >= 0 ? "text-emerald-400" : "text-red-400"}>
-                    {valuation.breakdown.condition_adjustment >= 0 ? "+" : ""}{valuation.breakdown.condition_adjustment.toLocaleString()}
-                  </span>
-                </div>
-                {defects.length > 0 && (
-                  <div className="flex justify-between text-white/60">
-                    <span>{defects.length} issue(s) noted</span>
-                    <span className="text-red-400">Deducted</span>
+            {/* Viboscope Score Card */}
+            <div className="relative rounded-2xl overflow-hidden border border-violet-500/40 bg-gradient-to-br from-violet-950 via-slate-900 to-primary/5">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,hsl(270deg_60%_40%/0.25),transparent_60%)] pointer-events-none" />
+              <div className="relative p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-violet-300 mb-1">Viboscope™ Device Score</p>
+                    <div className="text-6xl font-black text-white leading-none">{viboScore}<span className="text-2xl text-white/40">/100</span></div>
                   </div>
-                )}
-                <div className="border-t border-white/10 pt-2 flex justify-between font-bold text-white">
-                  <span>Final Offer</span>
-                  <span className="text-primary">{valuation.currency} {valuation.estimated_price.toLocaleString()}</span>
+                  <div className="text-right space-y-1.5 mt-1">
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="text-xs text-white/50">Grade</span>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${viboScore >= 85 ? "bg-emerald-500/20 text-emerald-300" : viboScore >= 70 ? "bg-blue-500/20 text-blue-300" : viboScore >= 50 ? "bg-amber-500/20 text-amber-300" : "bg-red-500/20 text-red-300"}`}>{viboGrade}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="text-xs text-white/50">Demand</span>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${viboDemand === "High" ? "bg-emerald-500/20 text-emerald-300" : viboDemand === "Medium" ? "bg-amber-500/20 text-amber-300" : "bg-red-500/20 text-red-300"}`}>{viboDemand}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="text-xs text-white/50">Recommended</span>
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-violet-500/20 text-violet-200">{viboRecommendation}</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Score bar */}
+                <div className="mt-4 h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-primary transition-all duration-1000" style={{ width: `${viboScore}%` }} />
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs text-white/40">
+                  <span>Battery: {batteryHealth}%</span>
+                  <span>Display: {displayCondition}</span>
+                  <span>Camera: {cameraCondition}</span>
                 </div>
               </div>
             </div>
 
-            {/* Want to upgrade? CTA */}
-            <div className="flex items-center gap-3 bg-muted/50 border rounded-xl px-4 py-3 text-sm">
-              <Store className="h-5 w-5 text-primary shrink-0" />
-              <span className="text-muted-foreground">Want to upgrade to a new phone?</span>
-              <Button size="sm" variant="link" className="text-primary ml-auto p-0 h-auto font-bold" onClick={() => navigate("/exchange-your-phone")}>
-                Exchange Instead →
-              </Button>
+            {/* 4 Price Cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/10 bg-slate-900 p-4 text-center">
+                <p className="text-xs text-white/40 uppercase tracking-widest mb-1">Market Price</p>
+                <p className="text-2xl font-black text-white">{valuation.currency} {valuation.estimated_price.toLocaleString()}</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-center">
+                <p className="text-xs text-emerald-400/80 uppercase tracking-widest mb-1">Instant Sell</p>
+                <p className="text-2xl font-black text-emerald-300">{valuation.currency} {Math.floor(valuation.estimated_price * 0.93).toLocaleString()}</p>
+              </div>
+              <div className="rounded-2xl border border-violet-500/30 bg-violet-950/30 p-4 text-center">
+                <p className="text-xs text-violet-300/80 uppercase tracking-widest mb-1">Exchange Value</p>
+                <p className="text-2xl font-black text-violet-200">{valuation.currency} {Math.floor(valuation.estimated_price * 0.97).toLocaleString()}</p>
+              </div>
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-4 text-center">
+                <p className="text-xs text-amber-300/80 uppercase tracking-widest mb-1">Best Store Offer</p>
+                <p className="text-2xl font-black text-amber-200">{valuation.currency} {Math.floor(valuation.estimated_price * 1.02).toLocaleString()}</p>
+                <p className="text-[10px] text-amber-400/60 mt-1">Subject to store acceptance</p>
+              </div>
             </div>
 
-            {/* Market price comparison CTA */}
-            <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 text-sm">
-              <Search className="h-5 w-5 text-primary shrink-0" />
-              <span className="text-muted-foreground">Compare with current market prices</span>
-              <Button size="sm" variant="link" className="text-primary ml-auto p-0 h-auto font-bold" onClick={() => navigate(`/mobile-price?brand=${encodeURIComponent(selectedBrandName)}`)}>
-                View Price List →
-              </Button>
-            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Quote valid until {new Date(valuation.valid_until).toLocaleDateString()} · Subject to physical inspection
+            </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button
-                size="lg"
-                className="h-14 hero-gradient shadow-glow font-bold"
-                onClick={openPlatformSubmit}
-              >
-                {sourceStore ? `Sell at ${sourceStore.name}` : "Sell Now at Tamrakar Complex"}
+            {/* 3 Main Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Button size="lg" className="h-14 hero-gradient shadow-glow font-bold flex-col gap-0.5 py-2" onClick={openPlatformSubmit}>
+                <span className="text-sm font-bold">{sourceStore ? `Sell at ${sourceStore.name}` : "Sell Now for Cash"}</span>
+                <span className="text-[11px] opacity-80">{valuation.currency} {Math.floor(valuation.estimated_price * 0.93).toLocaleString()}</span>
               </Button>
-              {!sourceStore && (
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="h-14 border-primary/40 hover:border-primary font-bold"
-                  onClick={() => setStorePickerOpen(true)}
-                >
-                  Choose a Store
+              <Button size="lg" variant="outline" className="h-14 border-violet-400/60 text-violet-300 hover:bg-violet-950/30 font-bold flex-col gap-0.5 py-2" onClick={() => { setMode("exchange"); openPlatformSubmit(); }}>
+                <span className="text-sm font-bold">Exchange & Upgrade</span>
+                <span className="text-[11px] opacity-80">{valuation.currency} {Math.floor(valuation.estimated_price * 0.97).toLocaleString()} credit</span>
+              </Button>
+              {!sourceStore ? (
+                <Button size="lg" variant="outline" className="h-14 border-amber-400/60 text-amber-300 hover:bg-amber-950/20 font-bold flex-col gap-0.5 py-2" onClick={() => setStorePickerOpen(true)}>
+                  <span className="text-sm font-bold">Choose a Store</span>
+                  <span className="text-[11px] opacity-80">Compare {Math.floor(valuation.estimated_price * 1.02).toLocaleString()} offers</span>
+                </Button>
+              ) : (
+                <Button size="lg" variant="outline" className="h-14 border-primary/40 hover:border-primary font-bold" onClick={() => navigate("/stores")}>
+                  <Store className="h-4 w-4 mr-2" /> Browse All Stores
                 </Button>
               )}
+            </div>
+
+            {/* Pickup / Contact options */}
+            <div className="grid grid-cols-3 gap-3">
+              <Button variant="outline" size="sm" className="h-11 flex-col gap-0.5 border-dashed" onClick={openPlatformSubmit}>
+                <Package className="h-4 w-4" />
+                <span className="text-[10px]">Book Pickup</span>
+              </Button>
+              <Button variant="outline" size="sm" className="h-11 flex-col gap-0.5 border-dashed" onClick={() => navigate("/stores")}>
+                <Store className="h-4 w-4" />
+                <span className="text-[10px]">Visit Store</span>
+              </Button>
+              <Button variant="outline" size="sm" className="h-11 flex-col gap-0.5 border-dashed text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-700"
+                onClick={() => {
+                  const phone = contactPhone.replace(/\D/g, "");
+                  const target = phone.length >= 10 ? `977${phone}` : "9779851091542";
+                  window.open(`https://wa.me/${target}?text=${encodeURIComponent(`Hi, I want to sell my ${selectedBrandName} ${selectedModel}. Viboscope Score: ${viboScore}/100. Quote: Rs. ${valuation.estimated_price.toLocaleString()}`)}`, "_blank");
+                }}>
+                <MessageCircle className="h-4 w-4" />
+                <span className="text-[10px]">WhatsApp</span>
+              </Button>
+            </div>
+
+            {/* Trust section */}
+            <div className="rounded-xl border border-border/40 bg-muted/30 p-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">TamrakarComplex Trust Guarantee</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-muted-foreground">
+                {["✓ IMEI Verified", "✓ No Stolen Phones", "✓ Face ID Check", "✓ Data Erase Guarantee", "✓ Verified Stores Only", "✓ Payment Proof"].map((t) => (
+                  <span key={t} className="flex items-center gap-1">{t}</span>
+                ))}
+              </div>
             </div>
 
             <Dialog open={storePickerOpen} onOpenChange={setStorePickerOpen}>
@@ -996,16 +1224,30 @@ export default function SellYourPhone() {
                       No store matched your search. Try shop number, location, or service keyword.
                     </div>
                   ) : (
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {filteredSellStores.map((store) => {
-                        const isSelected = selectedStoreId === store.id;
-                        return (
+                    <div className="space-y-4">
+                      {(() => {
+                        const premium = filteredSellStores.filter(s => ["diamond","gold"].includes((s.package_slug||s.subscription_tier||"").toLowerCase()));
+                        const standard = filteredSellStores.filter(s => !["diamond","gold"].includes((s.package_slug||s.subscription_tier||"").toLowerCase()));
+                        const renderGrid = (stores: typeof filteredSellStores) => (
+                          <div className="grid gap-3 md:grid-cols-2">
+                            {stores.map((store) => {
+                              const isSelected = selectedStoreId === store.id;
+                              const slug = (store.package_slug || store.subscription_tier || "free").toLowerCase();
+                              const isDiamond = slug === "diamond";
+                              const isGold = slug === "gold";
+                              return (
                           <button
                             key={store.id}
                             type="button"
                             onClick={() => setSelectedStoreId(store.id)}
-                            className={`rounded-2xl border p-4 text-left transition-all hover:border-primary/60 hover:bg-primary/5 ${
-                              isSelected ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"
+                            className={`rounded-2xl border p-4 text-left transition-all ${
+                              isSelected
+                                ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                : isDiamond
+                                ? "border-violet-300 bg-violet-50/30 hover:border-violet-400 hover:bg-violet-50/50 dark:bg-violet-950/10"
+                                : isGold
+                                ? "border-amber-300 bg-amber-50/30 hover:border-amber-400 hover:bg-amber-50/50 dark:bg-amber-950/10"
+                                : "border-border bg-card hover:border-primary/60 hover:bg-primary/5"
                             }`}
                           >
                             <div className="flex items-start gap-3">
@@ -1027,12 +1269,25 @@ export default function SellYourPhone() {
                                   {[store.location, store.floor, store.shop_no ? `Shop ${store.shop_no}` : null].filter(Boolean).join(" · ")}
                                 </p>
                                 <div className="mt-2 flex flex-wrap gap-1">
-                                  <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase">
-                                    {store.subscription_tier_name || store.package_slug || "Basic"}
-                                  </span>
+                                  {(() => {
+                                    const slug = (store.package_slug || store.subscription_tier || "free").toLowerCase();
+                                    const label = store.subscription_tier_name || (slug === "free" ? "Basic" : slug.charAt(0).toUpperCase() + slug.slice(1));
+                                    const cls = slug === "diamond"
+                                      ? "bg-violet-500/15 text-violet-700 border border-violet-300"
+                                      : slug === "gold"
+                                      ? "bg-amber-400/15 text-amber-700 border border-amber-300"
+                                      : slug === "silver"
+                                      ? "bg-slate-200 text-slate-700 border border-slate-300"
+                                      : "bg-secondary text-muted-foreground";
+                                    return (
+                                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${cls}`}>
+                                        {slug === "diamond" ? "💎 " : slug === "gold" ? "⭐ " : ""}{label}
+                                      </span>
+                                    );
+                                  })()}
                                   {store.is_verified ? (
                                     <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                                      Verified
+                                      ✓ Verified
                                     </span>
                                   ) : null}
                                   {store.is_featured ? (
@@ -1052,8 +1307,35 @@ export default function SellYourPhone() {
                               </div>
                             </div>
                           </button>
+                              );
+                            })}
+                          </div>
                         );
-                      })}
+                        return (
+                          <>
+                            {premium.length > 0 && (
+                              <>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-bold uppercase tracking-widest text-violet-600">💎 Premium Stores</span>
+                                  <div className="flex-1 h-px bg-violet-200" />
+                                </div>
+                                {renderGrid(premium)}
+                              </>
+                            )}
+                            {standard.length > 0 && (
+                              <>
+                                {premium.length > 0 && (
+                                  <div className="flex items-center gap-2 mt-2 mb-1">
+                                    <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">All Stores</span>
+                                    <div className="flex-1 h-px bg-border" />
+                                  </div>
+                                )}
+                                {renderGrid(standard)}
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1076,7 +1358,7 @@ export default function SellYourPhone() {
             <Dialog open={sellDialogOpen} onOpenChange={setSellDialogOpen}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{submissionTargetStoreId ? "Submit to Selected Store" : "Sell It Now"}</DialogTitle>
+                  <DialogTitle>{mode === "exchange" ? "Exchange & Upgrade" : submissionTargetStoreId ? "Submit to Selected Store" : "Sell It Now"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   {/* Device + quote summary */}
@@ -1238,7 +1520,8 @@ export default function SellYourPhone() {
           </div>
         )}
       </Card>
-        </div>
+        </div>{/* sell-wizard-wrap */}
+        </div>{/* sell-wizard dark section */}
       </main>
       <Footer />
     </div>

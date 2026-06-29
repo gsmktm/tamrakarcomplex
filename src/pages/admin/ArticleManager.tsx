@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { formatEdgeFunctionError } from "@/lib/utils";
 import { assertEdgeFunctionAvailable } from "@/lib/edgeFunctions";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Loader2, Plus, Pencil, Trash2, Search, Download, ExternalLink } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useForm } from "react-hook-form";

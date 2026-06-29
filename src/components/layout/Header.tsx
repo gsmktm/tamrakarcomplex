@@ -29,12 +29,12 @@ try {
 }
 
 const exploreItems = [
-  { name: "Smartphones", description: "Latest mobile phones and prices", href: "/mobile-price" },
+  { name: "Smartphones", description: "Latest mobile phones and prices", href: "/cat/mobiles" },
   { name: "Laptops", description: "Notebooks, ultrabooks, and gaming laptops", href: "/laptop-price" },
-  { name: "Tablets", description: "iPad, Android tablets, and hybrid devices", href: "/buy?category=Tablets" },
-  { name: "Audio", description: "Earbuds, headphones, speakers, and accessories", href: "/buy?category=Audio" },
-  { name: "Smartwatches", description: "Wearables and fitness trackers", href: "/buy?category=Watch" },
-  { name: "Gaming", description: "Consoles, PCs, and gaming accessories", href: "/buy?category=Gaming" },
+  { name: "Tablets", description: "iPad, Android tablets, and hybrid devices", href: "/cat/mobiles?tab=buy&category=Tablets" },
+  { name: "Audio", description: "Earbuds, headphones, speakers, and accessories", href: "/cat/mobiles?tab=buy&category=Earbuds" },
+  { name: "Smartwatches", description: "Wearables and fitness trackers", href: "/cat/mobiles?tab=buy&category=Smartwatches" },
+  { name: "Gaming", description: "Consoles, PCs, and gaming accessories", href: "/cat/mobiles?tab=buy&category=Gaming" },
 ];
 
 export function Header() {
@@ -124,33 +124,46 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full">
+    <header className="sticky top-0 z-50 w-full dark">
       {/* ── Trust bar ──────────────────────────────────────────────────────── */}
-      <div className="bg-navy text-white/70 text-[11px] font-medium border-b border-white/10 hidden md:block">
+      <div
+        className="text-[11px] font-medium hidden md:block border-b"
+        style={{
+          background: "linear-gradient(90deg, oklch(8% 0.022 258) 0%, oklch(10% 0.028 265) 100%)",
+          borderColor: "oklch(62% 0.25 285 / 0.20)",
+        }}
+      >
         <div className="container flex items-center justify-between h-8 gap-4">
           <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 text-gold" aria-hidden />
+            <span className="inline-flex items-center gap-1.5" style={{ color: "oklch(75% 0 0 / 0.70)" }}>
+              <MapPin className="h-3.5 w-3.5" style={{ color: "oklch(78% 0.165 65)" }} aria-hidden />
               New Road, Kathmandu - Nepal's Mobile Mega Market
             </span>
-            <span className="text-white/30">|</span>
-            <span className="inline-flex items-center gap-1.5">
-              <BadgeCheck className="h-3.5 w-3.5 text-gold" aria-hidden />
+            <span style={{ color: "oklch(62% 0.25 285 / 0.40)" }}>◆</span>
+            <span className="inline-flex items-center gap-1.5" style={{ color: "oklch(75% 0 0 / 0.70)" }}>
+              <BadgeCheck className="h-3.5 w-3.5" style={{ color: "oklch(62% 0.25 285)" }} aria-hidden />
               Verified Stores Only
             </span>
           </div>
-          <div className="flex items-center gap-4">
-            <a href="/stores" className="hover:text-gold transition-colors">Find Stores</a>
-            <span className="text-white/30">|</span>
-            <a href="/repair" className="hover:text-gold transition-colors">Book Repair</a>
-            <span className="text-white/30">|</span>
-            <a href="/sell-your-phone" className="hover:text-gold transition-colors">Sell Phone</a>
+          <div className="flex items-center gap-4" style={{ color: "oklch(65% 0 0 / 0.60)" }}>
+            <a href="/stores" className="transition-colors hover:text-white" style={{ color: "inherit" }}>Find Stores</a>
+            <span style={{ color: "oklch(62% 0.25 285 / 0.35)" }}>◆</span>
+            <a href="/repair" className="transition-colors hover:text-white" style={{ color: "inherit" }}>Book Repair</a>
+            <span style={{ color: "oklch(62% 0.25 285 / 0.35)" }}>◆</span>
+            <a href="/sell-your-phone" className="transition-colors font-semibold" style={{ color: "oklch(78% 0.165 65)" }}>Sell Phone</a>
           </div>
         </div>
       </div>
 
       {/* ── Main bar ─────────────────────────────────────────────────────── */}
-      <div className="border-b border-white/10 bg-navy shadow-navy">
+      <div
+        className="border-b"
+        style={{
+          background: "linear-gradient(180deg, oklch(10% 0.026 258) 0%, oklch(9% 0.023 256) 100%)",
+          borderColor: "oklch(62% 0.25 285 / 0.15)",
+          boxShadow: "0 4px 24px oklch(62% 0.25 285 / 0.06)",
+        }}
+      >
         <div className="container flex h-14 items-center gap-4">
           {/* Wordmark */}
           <Link
@@ -158,24 +171,47 @@ export function Header() {
             className="flex shrink-0 items-center gap-2.5 pressable"
             aria-label="Tamrakar Complex home"
           >
-            <div className="flex h-8 w-8 items-center justify-center bg-white/10 border border-white/20 rounded-md">
+            <div
+              className="flex h-8 w-8 items-center justify-center"
+              style={{
+                background: "oklch(62% 0.25 285 / 0.15)",
+                border: "1px solid oklch(62% 0.25 285 / 0.35)",
+                clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
+              }}
+            >
               <img src={logo} alt="" className="h-full w-full object-contain p-0.5" />
             </div>
             <span className="hidden font-display text-base font-bold tracking-tight sm:block text-white">
-              Tamrakar<span className="text-gold">.</span>
+              Tamrakar<span style={{ color: "oklch(62% 0.25 285)" }}>.</span>
             </span>
           </Link>
 
           {/* Search bar — desktop */}
           <button
             onClick={() => setIsSearchDialogOpen(true)}
-            className="hidden lg:flex flex-1 max-w-md ml-4 items-center gap-2 h-9 px-3 rounded-lg border border-white/20 bg-white/8 text-sm text-white/50 hover:bg-white/12 hover:border-white/30 transition-all pressable"
+            className="hidden lg:flex flex-1 max-w-lg ml-4 items-center gap-2 h-9 px-3 text-sm transition-all pressable"
             aria-label="Open search"
-            style={{ background: "rgba(255,255,255,0.06)" }}
+            style={{
+              background: "oklch(100% 0 0 / 0.05)",
+              border: "1px solid oklch(62% 0.25 285 / 0.22)",
+              clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
+              color: "oklch(65% 0 0 / 0.50)",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "oklch(100% 0 0 / 0.08)";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "oklch(62% 0.25 285 / 0.40)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "oklch(100% 0 0 / 0.05)";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "oklch(62% 0.25 285 / 0.22)";
+            }}
           >
-            <Search className="h-3.5 w-3.5 shrink-0 text-white/40" />
-            <span className="truncate flex-1 text-left text-white/40">Search iPhone, Samsung, MacBook, repair…</span>
-            <kbd className="hidden xl:inline-flex border border-white/20 bg-white/10 rounded px-1.5 py-0.5 text-[10px] font-medium text-white/40">
+            <Search className="h-3.5 w-3.5 shrink-0" style={{ color: "oklch(62% 0.25 285 / 0.70)" }} />
+            <span className="truncate flex-1 text-left">Search iPhone, Samsung, MacBook, repair…</span>
+            <kbd
+              className="hidden xl:inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium"
+              style={{ border: "1px solid oklch(62% 0.25 285 / 0.30)", background: "oklch(62% 0.25 285 / 0.10)", color: "oklch(62% 0.25 285 / 0.70)" }}
+            >
               ⌘K
             </kbd>
           </button>
@@ -187,17 +223,20 @@ export function Header() {
               <Search className="h-4 w-4" />
             </Button>
 
-            <ThemeToggle />
-            <CartSheet />
+            <ThemeToggle className="h-9 w-9 text-white/70 hover:text-white hover:bg-white/10" />
+            <CartSheet triggerClassName="h-9 w-9 text-white/70 hover:text-white hover:bg-white/10" />
 
-            {user && <NotificationBell />}
+            {user && <NotificationBell triggerClassName="h-9 w-9 text-white/70 hover:text-white hover:bg-white/10" />}
 
             {/* Wishlist */}
             <Button variant="ghost" size="icon" className="relative hidden md:flex h-9 w-9 text-white/70 hover:text-white hover:bg-white/10" asChild>
               <Link to="/wishlist" aria-label="Wishlist">
                 <Heart className="h-4 w-4" />
                 {wishlistCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[9px] font-bold text-navy">
+                  <span
+                    className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center px-1 text-[9px] font-bold"
+                    style={{ background: "oklch(78% 0.165 65)", color: "oklch(9% 0.022 258)", clipPath: "polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 0 100%)" }}
+                  >
                     {wishlistCount > 9 ? "9+" : wishlistCount}
                   </span>
                 )}
@@ -209,43 +248,49 @@ export function Header() {
               href={`https://api.whatsapp.com/send?phone=${contactInfo.whatsapp}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden md:flex h-9 w-9 items-center justify-center rounded-lg bg-[#25D366] text-white hover:bg-[#1aab56] transition-colors pressable"
+              className="hidden md:flex h-9 w-9 items-center justify-center text-white hover:opacity-90 transition-opacity pressable"
               aria-label="WhatsApp"
+              style={{ background: "#25D366", clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)" }}
             >
               <MessageCircle className="h-4 w-4" />
             </a>
 
-            {/* Gold CTA */}
-            <Button
-              size="sm"
-              className="hidden xl:inline-flex h-8 text-xs font-bold rounded-lg bg-gold text-navy hover:bg-gold/90 shadow-gold pressable"
-              asChild
+            {/* Amber Sell CTA */}
+            <Link
+              to="/sell-your-phone"
+              className="hidden xl:inline-flex h-8 items-center px-4 text-xs font-bold transition-opacity hover:opacity-90 pressable"
+              style={{
+                background: "linear-gradient(90deg, oklch(78% 0.165 65), oklch(72% 0.18 55))",
+                color: "oklch(9% 0.022 258)",
+                clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)",
+              }}
             >
-              <Link to="/sell-your-phone">Sell Phone</Link>
-            </Button>
+              Sell Phone
+            </Link>
 
             {/* Admin console */}
             {user && (role === "suadmin" || role === "staffadmin" || isStoreAdminUser) && (
-              <Button
-                size="sm"
-                className="hidden xl:inline-flex h-8 text-xs font-semibold rounded-lg bg-white/10 text-white border border-white/20 hover:bg-white/20 pressable"
-                asChild
+              <Link
+                to={
+                  role === "suadmin"
+                    ? "/suadmin/console"
+                    : role === "staffadmin"
+                      ? "/staffadmin/console"
+                      : "/storeadmin/console"
+                }
+                className="hidden xl:inline-flex h-8 items-center px-4 text-xs font-semibold transition-all hover:opacity-90 pressable"
+                style={{
+                  background: "oklch(62% 0.25 285 / 0.15)",
+                  color: "oklch(72% 0.20 285)",
+                  border: "1px solid oklch(62% 0.25 285 / 0.35)",
+                  clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)",
+                }}
               >
-                <Link
-                  to={
-                    role === "suadmin"
-                      ? "/suadmin/console"
-                      : role === "staffadmin"
-                        ? "/staffadmin/console"
-                        : "/storeadmin/console"
-                  }
-                >
-                  Console
-                </Link>
-              </Button>
+                Console
+              </Link>
             )}
 
-            <UserMenuDropdown user={user} onSignOut={handleSignOut} />
+            <UserMenuDropdown user={user} onSignOut={handleSignOut} triggerClassName="text-white/70 hover:text-white hover:bg-white/10" />
 
             {/* Mobile menu toggle */}
             <Button

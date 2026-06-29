@@ -186,7 +186,7 @@ export const sellPhoneService = {
     const { data, error } = await supabase
       .from("brands")
       .select("id, name, slug, logo_url, sort_order")
-      .eq("active", true)
+      .eq("is_active", true)
       .order("sort_order", { ascending: true });
 
     // If DB fails or returns empty, use fallback

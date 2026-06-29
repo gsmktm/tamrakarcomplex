@@ -167,7 +167,7 @@ export default function Analytics() {
       };
       } catch (err) {
         handleSupabaseError(err, "Analytics: Failed to fetch analytics data");
-        return null;
+        throw err;
       }
     },
     retry: 1,

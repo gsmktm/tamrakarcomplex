@@ -14,9 +14,10 @@ import { useAuth } from "@/hooks/useAuth";
 interface UserMenuDropdownProps {
   user: SupabaseUser | null;
   onSignOut: () => void;
+  triggerClassName?: string;
 }
 
-export function UserMenuDropdown({ user, onSignOut }: UserMenuDropdownProps) {
+export function UserMenuDropdown({ user, onSignOut, triggerClassName }: UserMenuDropdownProps) {
   const { role } = useAuth();
   const location = useLocation();
   const currentPath = `${location.pathname}${location.search}${location.hash}`;
@@ -28,7 +29,7 @@ export function UserMenuDropdown({ user, onSignOut }: UserMenuDropdownProps) {
   if (!user) {
     return (
       <Link to="/auth" state={{ from: currentPath }}>
-        <Button variant="ghost" size="sm" className="gap-2">
+        <Button variant="ghost" size="sm" className={triggerClassName ? `gap-2 ${triggerClassName}` : "gap-2"}>
           <User className="h-4 w-4" />
           <span className="hidden sm:inline">Login</span>
         </Button>
@@ -39,7 +40,7 @@ export function UserMenuDropdown({ user, onSignOut }: UserMenuDropdownProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2">
+        <Button variant="ghost" size="sm" className={triggerClassName ? `gap-2 ${triggerClassName}` : "gap-2"}>
           <User className="h-4 w-4" />
           <span className="hidden sm:inline">Account</span>
         </Button>

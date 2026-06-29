@@ -25,7 +25,7 @@ const ValuationManager = lazy(() => import("@/pages/admin/ValuationManager"));
 const SubscriptionManager = lazy(() => import("@/pages/admin/SubscriptionManager"));
 const StoreApplicationManager = lazy(() => import("@/pages/admin/StoreApplicationManager"));
 const Settings = lazy(() => import("@/pages/admin/Settings"));
-const UserManager = lazy(() => import("../pages/admin/UserManager"));
+const UserManager = lazy(() => import("@/pages/admin/UserManager"));
 const StaffAdminConsole = lazy(() => import("@/pages/console/StaffAdminConsole"));
 const PriceList = lazy(() => import("@/pages/suadmin/PriceList"));
 const PriceListManager = lazy(() => import("@/pages/admin/PriceListManager"));
