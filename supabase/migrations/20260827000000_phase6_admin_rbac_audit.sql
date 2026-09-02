@@ -97,7 +97,8 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_store_id uuid := NULL;
+  v_store_id  uuid := NULL;
+  v_target_id uuid := NULL;
   v_actor    text := auth.uid()::text;
   v_action   text := TG_OP;
 BEGIN
@@ -107,6 +108,22 @@ BEGIN
     v_store_id := (NEW).store_id;
   EXCEPTION WHEN OTHERS THEN
     -- column doesn't exist, leave NULL
+  END;
+
+  -- Derive a target id from the row: prefer id, fall back to store_id or
+  -- user_id for composite-PK tables (e.g. store_admins has no id column).
+  BEGIN
+    v_target_id := CASE WHEN TG_OP = 'DELETE' THEN (OLD).id ELSE (NEW).id END;
+  EXCEPTION WHEN undefined_column THEN
+    BEGIN
+      v_target_id := CASE WHEN TG_OP = 'DELETE' THEN (OLD).store_id ELSE (NEW).store_id END;
+    EXCEPTION WHEN undefined_column THEN
+      BEGIN
+        v_target_id := CASE WHEN TG_OP = 'DELETE' THEN (OLD).user_id ELSE (NEW).user_id END;
+      EXCEPTION WHEN undefined_column THEN
+        v_target_id := NULL;
+      END;
+    END;
   END;
 
   INSERT INTO public.audit_logs (
@@ -130,7 +147,7 @@ BEGIN
          ELSE TG_OP END,
     TG_TABLE_NAME,
     TG_TABLE_NAME,
-    CASE WHEN TG_OP = 'DELETE' THEN (OLD).id ELSE (NEW).id END,
+    v_target_id,
     v_store_id,
     CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN row_to_json(OLD) ELSE NULL END,
     CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN row_to_json(NEW) ELSE NULL END
