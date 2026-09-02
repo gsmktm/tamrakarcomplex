@@ -11,7 +11,7 @@
 CREATE OR REPLACE FUNCTION public.respond_to_repair_quote(
   p_repair_id   uuid DEFAULT NULL,
   p_tracking_id text  DEFAULT NULL,
-  p_approve     boolean,
+  p_approve     boolean DEFAULT NULL,
   p_note        text  DEFAULT NULL
 )
 RETURNS public.repair_requests

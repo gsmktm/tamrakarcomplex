@@ -1,4 +1,6 @@
 -- Canonical repair state machine, immutable status history, and safe public tracking.
+-- Note: gen_random_bytes is schema-qualified because on hosted Supabase pgcrypto
+-- installs into the `extensions` schema, not `public` (unlike fresh local DBs).
 
 ALTER TABLE public.repair_requests
   ADD COLUMN IF NOT EXISTS public_tracking_token text,
@@ -7,11 +9,11 @@ ALTER TABLE public.repair_requests
   ADD COLUMN IF NOT EXISTS completed_at timestamptz;
 
 UPDATE public.repair_requests
-SET public_tracking_token = upper(encode(gen_random_bytes(16), 'hex'))
+SET public_tracking_token = upper(encode(extensions.gen_random_bytes(16), 'hex'))
 WHERE public_tracking_token IS NULL;
 
 ALTER TABLE public.repair_requests
-  ALTER COLUMN public_tracking_token SET DEFAULT upper(encode(gen_random_bytes(16), 'hex')),
+  ALTER COLUMN public_tracking_token SET DEFAULT upper(encode(extensions.gen_random_bytes(16), 'hex')),
   ALTER COLUMN public_tracking_token SET NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_repair_requests_public_tracking_token
@@ -177,6 +179,9 @@ $$;
 REVOKE ALL ON FUNCTION public.transition_repair_status(uuid, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.transition_repair_status(uuid, text, text) TO authenticated;
 
+-- Drop the legacy-signature function first: earlier deployments created it with
+-- a different return shape, and CREATE OR REPLACE cannot change a return type.
+DROP FUNCTION IF EXISTS public.get_repair_tracking(p_tracking_id text);
 CREATE OR REPLACE FUNCTION public.get_repair_tracking(p_tracking_id text)
 RETURNS TABLE (
   tracking_id text,

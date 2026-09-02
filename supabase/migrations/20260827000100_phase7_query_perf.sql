@@ -11,7 +11,7 @@ CREATE INDEX IF NOT EXISTS idx_repair_requests_status_created
 -- order_items: filtered by store_id to derive relevant order IDs
 CREATE INDEX IF NOT EXISTS idx_order_items_store_id
   ON order_items (store_id);
-CREATE INDEX IF NOT NULL idx_order_items_order_id
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id
   ON order_items (order_id);
 
 -- orders: ordered by created_at desc (already likely has an index, but ensure)

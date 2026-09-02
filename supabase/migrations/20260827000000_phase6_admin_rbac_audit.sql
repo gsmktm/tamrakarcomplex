@@ -55,23 +55,12 @@ STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-  SELECT role FROM public.user_roles
+  SELECT role::text FROM public.user_roles
   WHERE user_id = auth.uid()
-  ORDER BY CASE (
-    role,
-    ARRAY['suadmin', 'staffadmin', 'storeadmin', 'storestaff', 'user', 'storeowner']::text[]
+  ORDER BY array_position(
+    ARRAY['suadmin', 'staffadmin', 'storeadmin', 'storestaff', 'storeowner', 'user']::text[],
+    role::text
   )
-  -- higher priority = earlier in the array
-  SELECT
-    -- 0 = highest, 5 = lowest
-    CASE role
-      WHEN 'suadmin'       THEN 0
-      WHEN 'staffadmin'    THEN 1
-      WHEN 'storeadmin'    THEN 2
-      WHEN 'storestaff'    THEN 3
-      WHEN 'storeowner'    THEN 4
-      ELSE 5
-    END
   LIMIT 1;
 $$;
 
