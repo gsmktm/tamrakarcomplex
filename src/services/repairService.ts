@@ -5,7 +5,10 @@ export const REPAIR_STATUSES = [
   "new",
   "assigned",
   "inspection",
+  "quote_pending",
+  "quote_approved",
   "repairing",
+  "quality_check",
   "ready",
   "completed",
   "cancelled",
@@ -30,6 +33,8 @@ export type RepairRequestInput = {
   preferred_date?: string | null;
   guide_id?: string | null;
   device_id?: string | null;
+  repair_pricing_id?: string | null;
+  part_quality?: string | null;
 };
 
 export type RepairRequestRecord = RepairRequestInput & {
@@ -58,11 +63,42 @@ export function repairStatusLabel(status: string | null | undefined) {
   if (normalized === "new") return "New";
   if (normalized === "assigned") return "Assigned";
   if (normalized === "inspection") return "Inspection";
+  if (normalized === "quote_pending") return "Quote pending";
+  if (normalized === "quote_approved") return "Quote approved";
   if (normalized === "repairing") return "Repairing";
+  if (normalized === "quality_check") return "Quality check";
   if (normalized === "ready") return "Ready";
   if (normalized === "completed") return "Completed";
   if (normalized === "cancelled") return "Cancelled";
   return "New";
+}
+
+const REPAIR_TRANSITIONS: Record<RepairStatus, readonly RepairStatus[]> = {
+  new: ["assigned", "inspection", "cancelled"],
+  assigned: ["new", "inspection", "cancelled"],
+  inspection: ["quote_pending", "repairing", "cancelled"],
+  quote_pending: ["quote_approved", "inspection", "cancelled"],
+  quote_approved: ["repairing", "cancelled"],
+  repairing: ["quality_check", "ready", "cancelled"],
+  quality_check: ["repairing", "ready"],
+  ready: ["completed", "repairing"],
+  completed: [],
+  cancelled: [],
+};
+
+export function getAllowedRepairTransitions(status: string | null | undefined): readonly RepairStatus[] {
+  const normalized = status === "pending" ? "new" : status === "in_progress" ? "repairing" : status;
+  return REPAIR_TRANSITIONS[normalized as RepairStatus] ?? [];
+}
+
+export async function transitionRepairStatus(id: string, status: RepairStatus, note?: string | null) {
+  const { data, error } = await supabase.rpc("transition_repair_status", {
+    p_repair_id: id,
+    p_to_status: status,
+    p_note: note ?? null,
+  });
+  if (error) throw error;
+  return data;
 }
 
 export async function createRepairRequest(values: RepairRequestInput): Promise<RepairRequestRecord> {
@@ -86,7 +122,33 @@ export async function createRepairRequest(values: RepairRequestInput): Promise<R
     estimated_cost: values.estimated_cost ?? null,
     final_cost: values.final_cost ?? null,
     status: values.status ?? "new",
+    repair_pricing_id: values.repair_pricing_id ?? null,
+    part_quality: values.part_quality ?? null,
   };
+
+  const rpc = await supabase.rpc("submit_repair_request" as any, {
+    p_name: payload.name,
+    p_phone: payload.phone,
+    p_email: payload.email,
+    p_device_brand: payload.device_brand,
+    p_device_model: payload.device_model,
+    p_issue_type: payload.issue_type,
+    p_description: payload.description,
+    p_assigned_store_id: payload.assigned_store_id,
+    p_images: payload.images,
+    p_preferred_date: payload.preferred_date ?? null,
+    p_guide_id: payload.guide_id ?? null,
+    p_device_id: payload.device_id ?? null,
+    p_repair_pricing_id: payload.repair_pricing_id,
+    p_part_quality: payload.part_quality,
+  } as any);
+  if (!rpc.error && rpc.data) {
+    return { ...payload, ...(rpc.data as object) } as RepairRequestRecord;
+  }
+
+  // Compatibility while the additive RPC migration is being deployed.
+  const rpcMissing = !rpc.error || rpc.error.code === "PGRST202" || (rpc.error.message ?? "").includes("submit_repair_request");
+  if (!rpcMissing) throw rpc.error;
 
   const attempt = await supabase.from("repair_requests").insert(payload).select("*").single();
   if (!attempt.error) return attempt.data as RepairRequestRecord;

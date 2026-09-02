@@ -19,8 +19,6 @@ interface MobileMenuProps {
   onClose: () => void;
   topLevelHomeItem: NavItem;
   siteNavigationGroups: NavGroup[];
-  exploreLandingItem: NavItem;
-  exploreItems: NavItem[];
   visibleQuickItems: NavItem[];
   user: SupabaseUser | null;
 }
@@ -30,8 +28,6 @@ export function MobileMenu({
   onClose,
   topLevelHomeItem,
   siteNavigationGroups,
-  exploreLandingItem,
-  exploreItems,
   visibleQuickItems,
   user,
 }: MobileMenuProps) {
@@ -76,6 +72,38 @@ export function MobileMenu({
           {topLevelHomeItem.name}
         </Link>
 
+        <Link
+          to="/stores"
+          className="block rounded-xl px-4 py-3 text-sm font-semibold transition-colors hover:bg-secondary"
+          onClick={onClose}
+        >
+          Stores
+        </Link>
+
+        <Link
+          to="/marketplace"
+          className="block rounded-xl px-4 py-3 text-sm font-semibold transition-colors hover:bg-secondary"
+          onClick={onClose}
+        >
+          Marketplace
+        </Link>
+
+        <Link
+          to="/repair"
+          className="block rounded-xl px-4 py-3 text-sm font-semibold transition-colors hover:bg-secondary"
+          onClick={onClose}
+        >
+          Repair
+        </Link>
+
+        <Link
+          to="/unlocking"
+          className="block rounded-xl px-4 py-3 text-sm font-semibold transition-colors hover:bg-secondary"
+          onClick={onClose}
+        >
+          Unlocking
+        </Link>
+
         {siteNavigationGroups.map((group) => (
           <div key={group.name}>
             <Link
@@ -101,26 +129,6 @@ export function MobileMenu({
               ))}
             </div>
           </div>
-        ))}
-
-        <div className="my-3 border-t border-border" />
-        <div className="px-4 py-2 text-xs font-semibold uppercase text-muted-foreground">Explore</div>
-        <Link
-          to={exploreLandingItem.href}
-          className="block rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-secondary"
-          onClick={onClose}
-        >
-          {exploreLandingItem.name}
-        </Link>
-        {exploreItems.map((item) => (
-          <Link
-            key={item.name}
-            to={item.href}
-            className="block rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-secondary"
-            onClick={onClose}
-          >
-            {item.name}
-          </Link>
         ))}
 
         {visibleQuickItems.length > 0 ? (

@@ -54,7 +54,7 @@ export const staffAdminRoutes = (
     <Route
       index
       element={
-        <RequireStaffAdmin module="analytics" action="view">
+        <RequireStaffAdmin>
           <Suspense fallback={<RouteFallback />}>
             <StaffAdminDashboard />
           </Suspense>
@@ -64,7 +64,7 @@ export const staffAdminRoutes = (
     <Route
       path="products"
       element={
-        <RequireStaffAdmin module="marketplace" action="view">
+        <RequireStaffAdmin module="products" action="view">
           <Suspense fallback={<RouteFallback />}>
             <ProductManager />
           </Suspense>
@@ -104,7 +104,7 @@ export const staffAdminRoutes = (
     <Route
       path="mobile-master"
       element={
-        <RequireStaffAdmin module="brands" action="view">
+        <RequireStaffAdmin module="products" action="view">
           <Suspense fallback={<RouteFallback />}>
             <MobileMasterManager />
           </Suspense>
@@ -114,7 +114,7 @@ export const staffAdminRoutes = (
     <Route
       path="accessories"
       element={
-        <RequireStaffAdmin module="brands" action="view">
+        <RequireStaffAdmin module="products" action="view">
           <Suspense fallback={<RouteFallback />}>
             <AccessoryManager />
           </Suspense>
@@ -144,7 +144,7 @@ export const staffAdminRoutes = (
     <Route
       path="leads"
       element={
-        <RequireStaffAdmin module="valuation" action="view">
+        <RequireStaffAdmin module="leads" action="view">
           <Suspense fallback={<RouteFallback />}>
             <LeadManager />
           </Suspense>
@@ -164,7 +164,7 @@ export const staffAdminRoutes = (
     <Route
       path="articles"
       element={
-        <RequireStaffAdmin module="content" action="view">
+        <RequireStaffAdmin module="articles" action="view">
           <Suspense fallback={<RouteFallback />}>
             <ArticleManager />
           </Suspense>
@@ -174,7 +174,7 @@ export const staffAdminRoutes = (
     <Route
       path="guides"
       element={
-        <RequireStaffAdmin module="content" action="view">
+        <RequireStaffAdmin module="guides" action="view">
           <Suspense fallback={<RouteFallback />}>
             <GuideManager />
           </Suspense>
@@ -184,7 +184,7 @@ export const staffAdminRoutes = (
     <Route
       path="comments"
       element={
-        <RequireStaffAdmin module="content" action="view">
+        <RequireStaffAdmin module="content_pages" action="view">
           <Suspense fallback={<RouteFallback />}>
             <CommentManager />
           </Suspense>
@@ -194,7 +194,7 @@ export const staffAdminRoutes = (
     <Route
       path="listings"
       element={
-        <RequireStaffAdmin module="marketplace" action="view">
+        <RequireStaffAdmin module="community_listings" action="view">
           <Suspense fallback={<RouteFallback />}>
             <ListingManager />
           </Suspense>
@@ -224,7 +224,7 @@ export const staffAdminRoutes = (
     <Route
       path="repairs"
       element={
-        <RequireStaffAdmin module="repairs" action="view">
+        <RequireStaffAdmin module="repair_requests" action="view">
           <Suspense fallback={<RouteFallback />}>
             <RepairManager />
           </Suspense>
@@ -234,7 +234,7 @@ export const staffAdminRoutes = (
     <Route
       path="unlocking"
       element={
-        <RequireStaffAdmin module="unlocking" action="view">
+        <RequireStaffAdmin module="unlocking_requests" action="view">
           <Suspense fallback={<RouteFallback />}>
             <UnlockingManager />
           </Suspense>
@@ -244,7 +244,7 @@ export const staffAdminRoutes = (
     <Route
       path="content"
       element={
-        <RequireStaffAdmin module="content" action="view">
+        <RequireStaffAdmin module="content_pages" action="view">
           <Suspense fallback={<RouteFallback />}>
             <ContentManager />
           </Suspense>
@@ -254,7 +254,7 @@ export const staffAdminRoutes = (
     <Route
       path="messages"
       element={
-        <RequireStaffAdmin module="content" action="view">
+        <RequireStaffAdmin module="mailbox" action="view">
           <Suspense fallback={<RouteFallback />}>
             <ContactManager />
           </Suspense>
@@ -274,7 +274,7 @@ export const staffAdminRoutes = (
     <Route
       path="chatbot"
       element={
-        <RequireStaffAdmin module="content" action="view">
+        <RequireStaffAdmin module="chatbot_config" action="view">
           <Suspense fallback={<RouteFallback />}>
             <ChatBotManager />
           </Suspense>
@@ -284,7 +284,7 @@ export const staffAdminRoutes = (
     <Route
       path="polls"
       element={
-        <RequireStaffAdmin module="content" action="view">
+        <RequireStaffAdmin module="user_polls" action="view">
           <Suspense fallback={<RouteFallback />}>
             <PollManager />
           </Suspense>
@@ -304,7 +304,7 @@ export const staffAdminRoutes = (
     <Route
       path="seo"
       element={
-        <RequireStaffAdmin module="content" action="edit">
+        <RequireStaffAdmin module="seo_growth" action="edit">
           <Suspense fallback={<RouteFallback />}>
             <SeoManager />
           </Suspense>
@@ -314,7 +314,7 @@ export const staffAdminRoutes = (
     <Route
       path="me"
       element={
-        <RequireStaffAdmin module="settings" action="view">
+        <RequireStaffAdmin>
           <Suspense fallback={<RouteFallback />}>
             <StaffAdminProfilePage />
           </Suspense>
@@ -324,7 +324,7 @@ export const staffAdminRoutes = (
     <Route
       path="me/*"
       element={
-        <RequireStaffAdmin module="settings" action="view">
+        <RequireStaffAdmin>
           <Suspense fallback={<RouteFallback />}>
             <StaffAdminProfilePage />
           </Suspense>
@@ -334,7 +334,7 @@ export const staffAdminRoutes = (
     <Route
       path="themes"
       element={
-        <RequireStaffAdmin module="content" action="view">
+        <RequireStaffAdmin module="content_pages" action="view">
           <Suspense fallback={<RouteFallback />}>
             <ThemeManager />
           </Suspense>
@@ -344,7 +344,7 @@ export const staffAdminRoutes = (
     <Route
       path="valuation"
       element={
-        <RequireStaffAdmin module="valuation" action="view">
+        <RequireStaffAdmin module="valuation_manager" action="view">
           <Suspense fallback={<RouteFallback />}>
             <ValuationManager />
           </Suspense>
@@ -404,7 +404,7 @@ export const staffAdminRoutes = (
     <Route
       path="tasks"
       element={
-        <RequireStaffAdmin module="settings" action="view">
+        <RequireStaffAdmin module="dashboard" action="view">
           <Suspense fallback={<RouteFallback />}>
             <StaffTaskManager />
           </Suspense>

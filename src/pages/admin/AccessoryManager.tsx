@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ACCESSORIES_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,7 @@ export default function AccessoryManager() {
     queryKey: ["admin_accessories", searchTerm, activeStoreId],
     queryFn: async () => {
       try {
-        let query = supabase.from("store_accessories").select("*");
+         let query = supabase.from("store_accessories").select(ACCESSORIES_COLUMNS.join(","));
         if (searchTerm) {
           query = query.ilike("title", `%${searchTerm}%`);
         }

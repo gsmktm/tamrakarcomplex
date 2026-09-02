@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
+import { SEO } from "@/components/common/SEO";
+import { breadcrumbSchema, absoluteUrl } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +52,7 @@ export default function MobileBrandPage() {
     search: search || undefined,
   }), [activeChip, sort, search]);
 
-  const allModels = brandDetail?.models ?? [];
+  const allModels = useMemo(() => brandDetail?.models ?? [], [brandDetail?.models]);
 
   const filteredModels = useMemo(() => {
     let items = allModels;
@@ -78,13 +79,27 @@ export default function MobileBrandPage() {
 
   return (
     <>
-      <Helmet>
-        <title>{brandName} Phone Price in Nepal 2026 | Tamrakar Complex</title>
-        <meta
-          name="description"
-          content={`All ${brandName} phone prices in Nepal. Compare ${brandName} models, specs, and buy online.`}
-        />
-      </Helmet>
+      <SEO
+        title={`${brandName} Phone Price in Nepal 2026`}
+        description={`All ${brandName} phone prices in Nepal. Compare ${brandName} models, specs, variants, and buy from verified stores at Tamrakar Complex.`}
+        url={`/mobile-price/brand/${brandSlug}`}
+        keywords={[`${brandName} price Nepal`, `${brandName} mobile price`, `buy ${brandName} Nepal`, `${brandName} phone specs`]}
+        image={brand?.logo ?? undefined}
+        structuredData={[
+          breadcrumbSchema([
+            { name: "Home", url: "/" },
+            { name: "Mobile Phones", url: "/cat/mobiles" },
+            { name: `${brandName} Phones`, url: `/mobile-price/brand/${brandSlug}` },
+          ]),
+          {
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: `${brandName} Phones`,
+            description: `All ${brandName} phone prices in Nepal`,
+            url: absoluteUrl(`/mobile-price/brand/${brandSlug}`),
+          },
+        ]}
+      />
 
       <Header />
 

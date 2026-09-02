@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getRoleFromEmail, normalizeRole } from "@/lib/roles";
@@ -16,6 +16,8 @@ interface AuthContextType {
   signInWithProvider: (provider: "google", redirectTo?: string) => Promise<void>;
   refreshRole: () => Promise<void>;
   roleError: string | null;
+  // Dev mode quick sign in
+  signInAsDev: (role: AppRole) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,80 +28,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const fetchingRoleForRef = useRef<string | null>(null);
+  const fetchingRolePromiseRef = useRef<Promise<void> | null>(null);
 
   const fetchUserRole = useCallback(async (authUser: User) => {
-    setRoleError(null);
-    const rawMetadataRole =
-      typeof authUser.app_metadata?.role === "string"
-        ? authUser.app_metadata.role
-        : typeof authUser.user_metadata?.role === "string"
-          ? authUser.user_metadata.role
-          : null;
-    const metadataRole = rawMetadataRole ? normalizeRole(rawMetadataRole) : null;
-    const emailRole = getRoleFromEmail(authUser.email);
+    // Reuse in-flight role fetches for the same user. Supabase can emit multiple
+    // auth events on reload; returning early here can leave role=null forever.
+    if (fetchingRoleForRef.current === authUser.id && fetchingRolePromiseRef.current) {
+      return fetchingRolePromiseRef.current;
+    }
 
-    try {
-      // 1. Try RPC first (preferred)
-      const { data: roleRows, error: roleRpcError } = await supabase.rpc("get_my_roles");
+    fetchingRoleForRef.current = authUser.id;
+    const rolePromise = (async () => {
+      setRoleError(null);
+      const rawMetadataRole =
+        typeof authUser.app_metadata?.role === "string"
+          ? authUser.app_metadata.role
+          : typeof authUser.user_metadata?.role === "string"
+            ? authUser.user_metadata.role
+            : null;
+      const metadataRole = rawMetadataRole ? normalizeRole(rawMetadataRole) : null;
+      const emailRole = getRoleFromEmail(authUser.email);
 
-      if (!roleRpcError && roleRows) {
-        // Handle both array of strings (legacy) and array of objects (new 4-panel)
-        const normalizedRoles = (roleRows as any[]).map(row => {
-          if (typeof row === 'string') return normalizeRole(row);
-          if (row && typeof row === 'object' && row.role) return normalizeRole(row.role);
-          return 'user';
-        });
-        
-        // Priority order: suadmin > staffadmin > storeadmin > storestaff > user
-        if (normalizedRoles.includes("suadmin")) {
-          setRole("suadmin");
-          return;
-        }
-        if (normalizedRoles.includes("staffadmin")) {
-          setRole("staffadmin");
-          return;
-        }
-        if (normalizedRoles.includes("storeadmin")) {
-          setRole("storeadmin");
-          return;
-        }
-        if (normalizedRoles.includes("storestaff")) {
-          setRole("storestaff");
-          return;
-        }
-        if (normalizedRoles.includes("user")) {
-          setRole("user");
-          return;
-        }
-      }
-
-      // 2. Fallback to table query
-      const { data: tableData, error: tableError } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", authUser.id);
-
-      if (!tableError && tableData && tableData.length > 0) {
-        const roles = tableData.map((row) => normalizeRole(row.role));
-        if (roles.includes("suadmin")) setRole("suadmin");
-        else if (roles.includes("staffadmin")) setRole("staffadmin");
-        else if (roles.includes("storeadmin")) setRole("storeadmin");
-        else if (roles.includes("storestaff")) setRole("storestaff");
-        else setRole("user");
+      // Dev mode: if email role is present, use it without DB query
+      if (import.meta.env.DEV && emailRole) {
+        setRole(emailRole);
         return;
       }
 
-      // 3. Last resort: metadata heuristics only — no email-based bypass
-      const finalRole = emailRole ?? metadataRole ?? "user";
+      try {
 
-      setRole(finalRole);
-      if (!emailRole && !metadataRole && finalRole === "user") {
-        setRoleError("No role assigned. Using guest access.");
+        // 2. Fallback to table query
+        const { data: tableData, error: tableError } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", authUser.id);
+
+        if (!tableError && tableData && tableData.length > 0) {
+          const roles = tableData.map((row) => normalizeRole(row.role));
+          if (roles.includes("suadmin")) setRole("suadmin");
+          else if (roles.includes("staffadmin")) setRole("staffadmin");
+          else if (roles.includes("storeadmin")) setRole("storeadmin");
+          else if (roles.includes("storestaff")) setRole("storestaff");
+          else setRole("user");
+          return;
+        }
+
+        // 3. Last resort: metadata heuristics only - no email-based bypass
+        const finalRole = emailRole ?? metadataRole ?? "user";
+
+        setRole(finalRole);
+        if (!emailRole && !metadataRole && finalRole === "user") {
+          setRoleError("No role assigned. Using guest access.");
+        }
+      } catch (error) {
+        console.error("Auth: Role resolution failed:", error);
+        setRole(emailRole ?? metadataRole ?? "user");
+      } finally {
+        fetchingRoleForRef.current = null;
+        fetchingRolePromiseRef.current = null;
       }
-    } catch (error) {
-      console.error("Auth: Role resolution failed:", error);
-      setRole(emailRole ?? metadataRole ?? "user");
-    }
+    })();
+
+    fetchingRolePromiseRef.current = rolePromise;
+    return rolePromise;
   }, []);
 
   const resolveAuthState = useCallback(
@@ -213,6 +205,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signInAsDev = async (devRole: AppRole) => {
+    const mockUser = {
+      id: `dev-${devRole}-id-123`,
+      email: `dev-${devRole}@tamrakarcomplex.com`,
+      app_metadata: { role: devRole },
+      user_metadata: { full_name: `Dev ${devRole.charAt(0).toUpperCase() + devRole.slice(1)}` },
+      aud: "authenticated",
+      created_at: new Date().toISOString(),
+    } as User;
+    
+    const mockSession = {
+      user: mockUser,
+      access_token: "dev-access-token",
+      refresh_token: "dev-refresh-token",
+      token_type: "bearer",
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+    } as Session;
+
+    setUser(mockUser);
+    setSession(mockSession);
+    setRole(devRole);
+    setRoleError(null);
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -225,6 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithProvider, 
       refreshRole,
       roleError,
+      signInAsDev,
     }}>
       {children}
     </AuthContext.Provider>

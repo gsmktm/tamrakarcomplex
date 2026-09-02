@@ -8,11 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getRoleBadgeVariant, getRoleLabel } from "@/lib/roles";
+import { getErrorMessage } from "@/lib/utils";
 
 export default function StaffAdminManager() {
   const queryClient = useQueryClient();
   const [newStaffEmail, setNewStaffEmail] = useState("");
+  const [roleToGrant, setRoleToGrant] = useState<"staffadmin" | "suadmin">("staffadmin");
 
   const { data: staff, isLoading } = useQuery({
     queryKey: ["staff-admins"],
@@ -34,8 +37,10 @@ export default function StaffAdminManager() {
 
   const addStaffMutation = useMutation({
     mutationFn: async ({ email, role }: { email: string, role: string }) => {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail) throw new Error("Email address is required.");
       const { error } = await supabase.rpc("grant_role_by_email", {
-        p_email: email,
+        p_email: cleanEmail,
         p_role: role
       });
       if (error) throw error;
@@ -44,19 +49,23 @@ export default function StaffAdminManager() {
       queryClient.invalidateQueries({ queryKey: ["staff-admins"] });
       toast.success("Staff admin added successfully");
       setNewStaffEmail("");
+      setRoleToGrant("staffadmin");
     },
     onError: (error: any) => {
-      toast.error(`Failed to add staff: ${error.message}`);
+      toast.error("Failed to add staff", { description: getErrorMessage(error) });
     }
   });
 
   const removeStaffMutation = useMutation({
-    mutationFn: async (userId: string) => {
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      if (role === "suadmin") {
+        throw new Error("Super admin access cannot be revoked from this screen.");
+      }
       const { error } = await supabase
         .from("user_roles")
         .delete()
         .eq("user_id", userId)
-        .in("role", ["suadmin", "staffadmin"]);
+        .eq("role", "staffadmin");
       
       if (error) throw error;
     },
@@ -65,7 +74,7 @@ export default function StaffAdminManager() {
       toast.success("Staff access revoked");
     },
     onError: (error: any) => {
-      toast.error(`Failed to revoke access: ${error.message}`);
+      toast.error("Failed to revoke access", { description: getErrorMessage(error) });
     }
   });
 
@@ -87,20 +96,34 @@ export default function StaffAdminManager() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Email Address</label>
-              <div className="flex gap-2">
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px_auto]">
                 <Input 
                   placeholder="staff@tamrakar.com" 
                   value={newStaffEmail}
                   onChange={(e) => setNewStaffEmail(e.target.value)}
                 />
+                <Select value={roleToGrant} onValueChange={(value) => setRoleToGrant(value as "staffadmin" | "suadmin")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="staffadmin">Staff Admin</SelectItem>
+                    <SelectItem value="suadmin">Super Admin</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button 
-                  onClick={() => addStaffMutation.mutate({ email: newStaffEmail, role: "staffadmin" })}
-                  disabled={addStaffMutation.isPending || !newStaffEmail}
+                  onClick={() => addStaffMutation.mutate({ email: newStaffEmail, role: roleToGrant })}
+                  disabled={addStaffMutation.isPending || !newStaffEmail.trim()}
                 >
                   {addStaffMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
                   Add
                 </Button>
               </div>
+              {roleToGrant === "suadmin" ? (
+                <p className="text-xs text-amber-600">Super Admin grants full platform control. Use only for trusted owners.</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Staff Admins should receive permissions in the Permissions tab after the role is granted.</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -142,8 +165,13 @@ export default function StaffAdminManager() {
                             variant="ghost" 
                             size="icon" 
                             className="text-destructive"
-                            onClick={() => removeStaffMutation.mutate(s.user_id)}
-                            disabled={removeStaffMutation.isPending}
+                            onClick={() => {
+                              if (confirm(`Revoke staff access for ${s.auth_users?.email || s.user_id}?`)) {
+                                removeStaffMutation.mutate({ userId: s.user_id, role: s.role });
+                              }
+                            }}
+                            disabled={removeStaffMutation.isPending || s.role === "suadmin"}
+                            title={s.role === "suadmin" ? "Super Admin cannot be revoked here" : "Revoke staff access"}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

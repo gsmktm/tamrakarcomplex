@@ -97,7 +97,7 @@ export function UserRepairDashboard() {
   }
 
   return (
-    <Card className="border-slate-100 shadow-sm">
+    <Card className="border-border shadow-sm">
       <CardHeader>
         <CardTitle className="text-xl flex items-center gap-2">
           <Smartphone className="h-5 w-5 text-primary" />
@@ -107,7 +107,7 @@ export function UserRepairDashboard() {
       </CardHeader>
       <CardContent>
         {repairs?.length === 0 ? (
-          <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed">
+          <div className="text-center py-12 bg-muted rounded-xl border border-dashed">
             <Smartphone className="h-12 w-12 text-slate-300 mx-auto mb-4" />
             <h3 className="font-medium text-lg">No repairs yet</h3>
             <p className="text-muted-foreground mb-6">You haven't booked any repairs yet.</p>
@@ -118,7 +118,7 @@ export function UserRepairDashboard() {
         ) : (
           <div className="border rounded-xl overflow-hidden">
             <Table>
-              <TableHeader className="bg-slate-50">
+              <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead>Tracking ID</TableHead>
                   <TableHead>Device</TableHead>

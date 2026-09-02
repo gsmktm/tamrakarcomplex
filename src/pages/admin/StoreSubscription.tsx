@@ -1,54 +1,28 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { useAuth } from "@/hooks/useAuth";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { 
-  Calendar, Check, ShieldCheck, Zap, 
+  Calendar, Check, ShieldCheck,
   ArrowRight, CreditCard, Package, Users, Store, Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { Link, useSearchParams } from "react-router-dom";
-import { getStorePackageMeta } from "@/lib/storePackages";
+import { getStorePackageMeta, STORE_SUBSCRIPTION_PACKAGES } from "@/lib/storePackages";
 import { cn } from "@/lib/utils";
-import type { StoreRow, StoreSubscriptionRow, PackageRow } from "@/types/app";
+import { resolveStorePackageContext } from "@/lib/storePackageRuntime";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 
 
 // --- COMPONENTS ---
-
-const StatusBadge = ({ status, enabled }: { status: string; enabled: boolean }) => {
-  if (!enabled) return <Badge variant="destructive">Disabled by Admin</Badge>;
-  
-  switch (status) {
-    case "active": return <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>;
-    case "pending": return <Badge className="bg-yellow-500 hover:bg-yellow-600">Pending Payment</Badge>;
-    case "expired": return <Badge variant="destructive">Expired</Badge>;
-    case "suspended": return <Badge variant="destructive">Suspended</Badge>;
-    case "cancelled": return <Badge variant="secondary">Cancelled</Badge>;
-    default: return <Badge variant="outline">{status}</Badge>;
-  }
-};
-
-const UsageBar = ({ label, current, max }: { label: string; current: number; max: number }) => {
-  const percentage = Math.min((current / max) * 100, 100);
-  const isCritical = percentage > 90;
-  
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">{label}</span>
-        <span className={cn("font-medium", isCritical && "text-red-500")}>
-          {current} / {max === 10000 ? "Unl." : max}
-        </span>
-      </div>
-      <Progress value={percentage} className={cn("h-2", isCritical && "bg-red-100")} />
-    </div>
-  );
-};
 
 const formatLimitValue = (value: number) => {
   if (value >= 10000) return "Unlimited";
@@ -60,6 +34,12 @@ export default function StoreSubscription() {
   const [searchParams] = useSearchParams();
   const storeIdParam = searchParams.get("storeId");
   const isSuperAdmin = role === "suadmin";
+  const queryClient = useQueryClient();
+  const { storeIds: myStoreIds } = useStoreMembership(user?.id);
+  const [requestedPlan, setRequestedPlan] = useState("silver");
+  const [billingCycle, setBillingCycle] = useState("monthly");
+  const [paymentMethod, setPaymentMethod] = useState("esewa");
+  const [transactionReference, setTransactionReference] = useState("");
 
   const { data: storeWithSub, isLoading } = useQuery({
     queryKey: ["store-subscription", user?.id, role, storeIdParam],
@@ -68,10 +48,8 @@ export default function StoreSubscription() {
         .from("stores")
         .select(`
           *,
-          store_subscriptions (
-            *,
-            packages (*)
-          )
+          package:store_packages (*),
+          store_subscriptions (*)
         `);
 
       if (isSuperAdmin && storeIdParam) {
@@ -80,24 +58,9 @@ export default function StoreSubscription() {
         query = query.limit(1);
       } else {
         // Fetch stores where user is an admin/owner
-        const { data: memberships } = await supabase
-          .from("store_admins")
-          .select("store_id")
-          .eq("user_id", user?.id)
-          .eq("status", "active");
-        
-        const storeIds = memberships?.map(m => m.store_id) || [];
-        
-        // Also check legacy owner_id
-        const { data: ownedStores } = await supabase
-          .from("stores")
-          .select("id")
-          .eq("owner_id", user?.id);
-        
-        const allStoreIds = Array.from(new Set([...storeIds, ...(ownedStores?.map(s => s.id) || [])]));
+        if (myStoreIds.length === 0) return null;
 
-        if (allStoreIds.length === 0) return null;
-        query = query.in("id", allStoreIds).limit(1);
+        query = query.in("id", myStoreIds).limit(1);
       }
 
       const { data: store, error: storeError } = await query.maybeSingle();
@@ -112,11 +75,44 @@ export default function StoreSubscription() {
       return {
         ...store,
         store_subscriptions: activeSub
-      } as StoreRow & { 
-        store_subscriptions: (StoreSubscriptionRow & { packages: PackageRow }) | null 
       };
     },
     enabled: !!user?.id,
+  });
+
+  const storeId = storeWithSub?.id;
+  const { data: payments = [] } = useQuery({
+    queryKey: ["store-subscription-payments", storeId],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from as any)("subscription_payments")
+        .select("id, invoice_no, amount, status, payment_method, billing_cycle, created_at, paid_at, package:store_packages(name,slug)")
+        .eq("store_id", storeId).order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!storeId,
+  });
+
+  const requestPayment = useMutation({
+    mutationFn: async () => {
+      if (!storeId) throw new Error("Store not found");
+      const { data, error } = await (supabase.rpc as any)("request_store_subscription_payment", {
+        p_store_id: storeId,
+        p_package_slug: requestedPlan,
+        p_billing_cycle: billingCycle,
+        p_payment_method: paymentMethod,
+        p_transaction_reference: transactionReference || null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Payment submitted for verification");
+      setTransactionReference("");
+      queryClient.invalidateQueries({ queryKey: ["store-subscription-payments", storeId] });
+      queryClient.invalidateQueries({ queryKey: ["store-subscription", user?.id] });
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   if (isLoading) {
@@ -141,8 +137,11 @@ export default function StoreSubscription() {
   }
 
   const sub = storeWithSub.store_subscriptions;
-  const pkg = sub?.packages;
-  const meta = getStorePackageMeta(pkg?.slug || "free");
+  const packageContext = resolveStorePackageContext(storeWithSub);
+  const pkg = packageContext.package;
+  const packageSlug = packageContext.effectivePackageSlug;
+  const builtinPackage = STORE_SUBSCRIPTION_PACKAGES.find((item) => item.slug === packageSlug) ?? STORE_SUBSCRIPTION_PACKAGES[0];
+  const meta = getStorePackageMeta(packageSlug);
 
   return (
     <div className="space-y-8">
@@ -161,13 +160,13 @@ export default function StoreSubscription() {
                 <CardDescription>Your store's active subscription</CardDescription>
               </div>
               <Badge className={meta?.badgeClassName}>
-                {pkg?.name || "Basic Store"}
+                {packageContext.isActivePaid ? pkg?.name || meta.displayName : "Basic Store"}
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-bold">Rs. {(pkg?.monthly_price || 0).toLocaleString()}</span>
+              <span className="text-4xl font-bold">Rs. {(packageContext.isActivePaid ? pkg?.price ?? builtinPackage.monthly_price : 0).toLocaleString()}</span>
               <span className="text-muted-foreground">/ month</span>
             </div>
 
@@ -176,14 +175,16 @@ export default function StoreSubscription() {
                 <div className="text-xs text-muted-foreground uppercase font-semibold">Status</div>
                 <div className={cn("flex items-center gap-1.5 font-medium capitalize", sub?.status === "active" ? "text-green-600" : "text-muted-foreground")}>
                   <ShieldCheck className="h-4 w-4" />
-                  {sub?.status || "Active (Free)"}
+                  {packageContext.isActivePaid ? packageContext.subscriptionStatus : "Active (Free)"}
                 </div>
               </div>
               <div className="space-y-1">
                 <div className="text-xs text-muted-foreground uppercase font-semibold">Plan Type</div>
                 <div className="flex items-center gap-1.5 font-medium">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  {pkg ? (sub?.end_date ? format(new Date(sub.end_date), "MMM d, yyyy") : "No expiry") : "Permanent Free"}
+                  {packageContext.isActivePaid
+                    ? (packageContext.subscriptionEndDate ? format(new Date(packageContext.subscriptionEndDate), "MMM d, yyyy") : "No expiry")
+                    : "Permanent Free"}
                 </div>
               </div>
             </div>
@@ -193,25 +194,25 @@ export default function StoreSubscription() {
               <div className="grid grid-cols-3 gap-2">
                 <div className="p-3 rounded-lg bg-background border flex flex-col items-center gap-1">
                   <Package className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-bold">{formatLimitValue(pkg?.product_limit || 10)}</span>
+                  <span className="text-sm font-bold">{formatLimitValue(packageContext.entitlements.productListingLimit)}</span>
                   <span className="text-[10px] text-muted-foreground uppercase">Products</span>
                 </div>
                 <div className="p-3 rounded-lg bg-background border flex flex-col items-center gap-1">
                   <Users className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-bold">{pkg?.admin_limit || 1}</span>
+                  <span className="text-sm font-bold">{packageContext.entitlements.adminUserLimit}</span>
                   <span className="text-[10px] text-muted-foreground uppercase">Admins</span>
                 </div>
                 <div className="p-3 rounded-lg bg-background border flex flex-col items-center gap-1">
                   <Store className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-bold">{pkg?.branch_limit || 1}</span>
+                  <span className="text-sm font-bold">{packageContext.entitlements.branchLimit}</span>
                   <span className="text-[10px] text-muted-foreground uppercase">Branches</span>
                 </div>
               </div>
             </div>
 
-            {!pkg && (
+            {!packageContext.isActivePaid && (
               <Button className="w-full mt-4" asChild>
-                <Link to="/contact-us">Upgrade to Premium</Link>
+                <Link to="/stores/pricing">Compare Premium Plans</Link>
               </Button>
             )}
           </CardContent>
@@ -225,8 +226,8 @@ export default function StoreSubscription() {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2">
-                {pkg ? (
-                  (pkg.features_json as string[]).map((feature, i) => (
+                {builtinPackage.features_json.length > 0 ? (
+                  builtinPackage.features_json.map((feature, i) => (
                     <li key={i} className="flex items-center gap-2 text-sm">
                       <Check className="h-4 w-4 text-green-500 shrink-0" />
                       {feature}
@@ -244,21 +245,27 @@ export default function StoreSubscription() {
               <CardTitle className="text-lg">Billing History</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                <div className="flex items-center gap-3">
-                  <CreditCard className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <div className="text-sm font-medium">Automatic Renewal</div>
-                    <div className="text-xs text-muted-foreground">{sub?.auto_renew ? "Enabled" : "Disabled"}</div>
-                  </div>
+              {payments.length === 0 ? <p className="text-sm text-muted-foreground">No invoices yet.</p> : payments.slice(0, 5).map((payment: any) => (
+                <div key={payment.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div><div className="text-sm font-medium">{payment.invoice_no || "Subscription payment"}</div>
+                    <div className="text-xs text-muted-foreground">NPR {Number(payment.amount).toLocaleString()} · {payment.payment_method}</div></div>
+                  <Badge variant={payment.status === "completed" ? "default" : "secondary"}>{payment.status}</Badge>
                 </div>
-                <Button variant="ghost" size="sm" className="text-xs">Update</Button>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-lg">Upgrade or renew</CardTitle><CardDescription>Submit a provider reference. Admin verification activates the plan.</CardDescription></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Package</Label><Select value={requestedPlan} onValueChange={setRequestedPlan}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{STORE_SUBSCRIPTION_PACKAGES.filter(p => p.monthly_price > 0).map(p => <SelectItem key={p.slug} value={p.slug}>{p.name}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Billing</Label><Select value={billingCycle} onValueChange={setBillingCycle}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem></SelectContent></Select></div>
               </div>
-              
-              <Button variant="outline" className="w-full gap-2" asChild>
-                <Link to="/contact-us">
-                  View Invoices <ArrowRight className="h-4 w-4" />
-                </Link>
+              <div className="space-y-2"><Label>Payment method</Label><Select value={paymentMethod} onValueChange={setPaymentMethod}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="esewa">eSewa</SelectItem><SelectItem value="bank_transfer">Bank transfer</SelectItem><SelectItem value="cash">Cash at office</SelectItem></SelectContent></Select></div>
+              <div className="space-y-2"><Label>Transaction/reference ID</Label><Input value={transactionReference} onChange={e => setTransactionReference(e.target.value)} placeholder="Required for eSewa or bank transfer" /></div>
+              <Button className="w-full" disabled={requestPayment.isPending || (paymentMethod !== "cash" && !transactionReference.trim())} onClick={() => requestPayment.mutate()}>
+                {requestPayment.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}Submit payment for verification
               </Button>
             </CardContent>
           </Card>

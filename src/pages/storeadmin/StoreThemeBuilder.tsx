@@ -6,6 +6,7 @@ import { Camera, ExternalLink, ImagePlus, Loader2, Lock, Palette, Save, Sparkles
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -102,6 +103,7 @@ export default function StoreThemeBuilder() {
   const { id: routeStoreId } = useParams();
   const { user, role } = useAuth();
   const queryClient = useQueryClient();
+  const { storeIds: myStoreIds } = useStoreMembership(user?.id);
   const [logoUploading, setLogoUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
 
@@ -112,22 +114,28 @@ export default function StoreThemeBuilder() {
     queryFn: async () => {
       if (!user?.id) throw new Error("Not signed in");
 
+      const storeCols = [
+        "id", "owner_id", "owner_user_id", "name", "slug", "seo_slug", "location",
+        "address", "phone", "whatsapp", "email", "website", "description",
+        "logo_url", "cover_image_url", "services", "services_json", "opening_hours",
+        "social_links_json", "featured_product_ids", "theme_slug", "theme_color",
+        "banner_json", "custom_design_json", "package_slug", "subscription_status",
+        "subscription_end_date",
+      ].join(",");
+
       if (platformMode && routeStoreId) {
-        const { data, error } = await supabase.from("stores").select("*").eq("id", routeStoreId).single();
+        const { data, error } = await supabase.from("stores").select(storeCols).eq("id", routeStoreId).single();
         if (error) throw error;
         return data as BuilderStore;
       }
 
-      const { data: membership } = await supabase
-        .from("store_admins")
-        .select("store_id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle(); // no status filter — store_admins.status column added in later migration
+      const membership = myStoreIds.length > 0
+        ? { store_id: myStoreIds[0] }
+        : null;
 
       const query = membership?.store_id
-        ? supabase.from("stores").select("*").eq("id", membership.store_id)
-        : supabase.from("stores").select("*").or(`owner_id.eq.${user.id},owner_user_id.eq.${user.id}`);
+        ? supabase.from("stores").select(storeCols).eq("id", membership.store_id)
+        : supabase.from("stores").select(storeCols).in("id", myStoreIds);
 
       const { data, error } = await query.limit(1).single();
       if (error) throw error;
@@ -484,11 +492,11 @@ export default function StoreThemeBuilder() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                 <div className="relative flex min-h-[220px] items-end p-6 text-white">
                   <div className="flex items-end gap-4">
-                    <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/15">
+                    <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-card/15">
                       {activeStore.logo_url ? <img src={activeStore.logo_url} alt="" className="h-full w-full object-cover" /> : <StoreIcon className="h-8 w-8" />}
                     </div>
                     <div>
-                      <Badge className="mb-2 bg-white/15 text-white hover:bg-white/15">{allowedThemes.find((theme) => theme.slug === selectedTheme)?.label ?? "Theme"}</Badge>
+                      <Badge className="mb-2 bg-card/15 text-white hover:bg-card/15">{allowedThemes.find((theme) => theme.slug === selectedTheme)?.label ?? "Theme"}</Badge>
                       <h2 className="text-3xl font-bold">{activeStore.name}</h2>
                       <p className="mt-1 max-w-md text-sm text-white/75">{activeStore.description || "Store description preview appears here."}</p>
                     </div>

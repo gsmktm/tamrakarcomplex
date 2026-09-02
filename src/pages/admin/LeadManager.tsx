@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 
 interface Lead {
@@ -42,6 +43,7 @@ export default function LeadManager() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const isSuperAdmin = role === "suadmin";
   const isStoreAdmin = role === "storeadmin";
+  const { storeIds: myStoreIds } = useStoreMembership(user?.id);
 
   const [showLeadDialog, setShowLeadDialog] = useState(false);
   const [filters, setFilters] = useState({
@@ -63,24 +65,10 @@ export default function LeadManager() {
           `)
           .order("created_at", { ascending: false });
 
-        if (isStoreAdmin && !isSuperAdmin && user?.id) {
-          // Get store IDs from store_admins or owner_id
-          const { data: memberships } = await supabase
-            .from("store_admins")
-            .select("store_id")
-            .eq("user_id", user.id)
-            .eq("status", "active");
-          
-          const { data: ownedStores } = await supabase
-            .from("stores")
-            .select("id")
-            .or(`owner_id.eq.${user.id},owner_user_id.eq.${user.id}`);
-          
-          const myStoreIds = Array.from(new Set([
-            ...(memberships || []).map(m => m.store_id),
-            ...(ownedStores || []).map(s => s.id)
-          ]));
-          
+        if (isStoreAdmin && !isSuperAdmin) {
+          if (myStoreIds.length === 0) {
+            return [];
+          }
           query = query.in("assigned_store_id", myStoreIds);
         }
 
@@ -155,13 +143,13 @@ export default function LeadManager() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'new': return 'bg-blue-100 text-blue-800';
-      case 'contacted': return 'bg-yellow-100 text-yellow-800';
-      case 'inspection_booked': return 'bg-purple-100 text-purple-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'cancelled': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'new': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'contacted': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+      case 'inspection_booked': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      case 'rejected': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'cancelled': return 'bg-muted text-muted-foreground';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 

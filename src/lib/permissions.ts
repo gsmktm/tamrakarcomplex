@@ -135,9 +135,57 @@ export async function getStaffPermissions(userId: string): Promise<StaffPermissi
   }
 }
 
-export function canAccessModule(role: AppRole, moduleKey: string, permissions?: StaffPermissions | null, action: StaffPermissionAction = "view"): boolean {
+// Module keys suadmin can grant to store admins (store_admins.permissions).
+export const STORE_ADMIN_PERMISSION_MODULES = [
+  "products",
+  "orders",
+  "leads",
+  "settings",
+  "branding",
+  "staff",
+  "payouts",
+] as const;
+
+export type StoreAdminPermissionModule = (typeof STORE_ADMIN_PERMISSION_MODULES)[number];
+
+export async function getStoreAdminPermissions(userId: string): Promise<string[]> {
+  if (!userId) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from("store_admins")
+      .select("permissions")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .limit(1);
+
+    if (error) {
+      console.error("Error fetching store admin permissions:", error);
+      return [];
+    }
+
+    const first = data?.[0] as { permissions?: string[] } | undefined;
+    if (!first || !Array.isArray(first.permissions)) return [];
+
+    return first.permissions.filter((p): p is string => typeof p === "string");
+  } catch (err) {
+    console.error("Unexpected error in getStoreAdminPermissions:", err);
+    return [];
+  }
+}
+
+export function canAccessModule(role: AppRole, moduleKey: string, permissions?: StaffPermissions | null, action: StaffPermissionAction = "view", storeAdminPermissions?: string[]): boolean {
   if (role === "suadmin") return true;
-  if (role === "storeadmin" || role === "user") return false;
+
+  // Store admins: gate by the module keys suadmin granted them.
+  // `undefined` means grants are still loading — allow through so the menu
+  // does not flash hidden; `[]` means loaded with no grants — deny.
+  if (role === "storeadmin") {
+    if (storeAdminPermissions === undefined) return true;
+    return storeAdminPermissions.includes(moduleKey);
+  }
+
+  if (role === "user") return false;
 
   const perms = permissions || DEFAULT_PERMISSIONS[role];
   if (!perms) return false;
@@ -148,7 +196,7 @@ export function canAccessModule(role: AppRole, moduleKey: string, permissions?: 
   return modulePerms[action] === true;
 }
 
-export function canSeeMenuItem(role: AppRole, item: { href: string; requiredRole?: AppRole; requiredModule?: string | null; enabled: boolean }, permissions?: StaffPermissions | null): boolean {
+export function canSeeMenuItem(role: AppRole, item: { href: string; requiredRole?: AppRole; requiredModule?: string | null; enabled: boolean }, permissions?: StaffPermissions | null, storeAdminPermissions?: string[]): boolean {
   if (!item.enabled) return false;
   if (role === "suadmin") return true;
 
@@ -160,17 +208,22 @@ export function canSeeMenuItem(role: AppRole, item: { href: string; requiredRole
     return canAccessModule(role, item.requiredModule, permissions, "view");
   }
 
+  // If it's a storeadmin and item requires a module, check granted module keys
+  if (role === "storeadmin" && item.requiredModule) {
+    return canAccessModule(role, item.requiredModule, undefined, "view", storeAdminPermissions);
+  }
+
   return true;
 }
 
 type PanelNavigationGroup = (typeof PANEL_NAVIGATION)[string][number];
 
-export function getFilteredMenu(role: AppRole, permissions?: StaffPermissions | null): PanelNavigationGroup[] {
+export function getFilteredMenu(role: AppRole, permissions?: StaffPermissions | null, storeAdminPermissions?: string[]): PanelNavigationGroup[] {
   const navConfig = PANEL_NAVIGATION[role];
   if (!navConfig) return [];
 
   return navConfig.map(group => ({
     ...group,
-    items: group.items.filter(item => canSeeMenuItem(role, item, permissions))
+    items: group.items.filter(item => canSeeMenuItem(role, item, permissions, storeAdminPermissions))
   })).filter(group => group.items.length > 0);
 }

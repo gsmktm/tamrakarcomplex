@@ -237,7 +237,7 @@ export default function UserRiskManager() {
         <Card className="bg-slate-500/5 border-slate-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-slate-500" />
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
               Auto-Blocks
             </CardTitle>
           </CardHeader>
@@ -310,7 +310,7 @@ export default function UserRiskManager() {
                           flag.risk_level === 'critical' ? "bg-red-100 text-red-700 border-red-200" :
                           flag.risk_level === 'high' ? "bg-orange-100 text-orange-700 border-orange-200" :
                           flag.risk_level === 'medium' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
-                          "bg-slate-100 text-slate-700 border-slate-200"
+                          "bg-slate-100 text-slate-700 border-border"
                         )}>
                           {flag.risk_level}
                         </Badge>

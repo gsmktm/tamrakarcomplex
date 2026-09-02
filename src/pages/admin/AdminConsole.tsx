@@ -1,14 +1,10 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Terminal, Play, Trash2, RefreshCw, ShieldAlert, Database, Server, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 
@@ -17,17 +13,20 @@ export default function AdminConsole() {
   const [results, setResults] = useState<any[] | null>(null);
   const [executing, setExecuting] = useState(false);
 
-  const { data: stats, error: statsError } = useQuery({
+  const { data: stats } = useQuery({
     queryKey: ["admin-console-stats"],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase.rpc("get_super_admin_stats");
-        if (error) throw error;
-        return data;
-      } catch (err) {
-        handleSupabaseError(err, "AdminConsole: Failed to fetch stats");
-        return null;
-      }
+      const yesterday = new Date(Date.now() - 86400000).toISOString();
+      const [ordersAll, orders24h, stores] = await Promise.all([
+        supabase.from("orders").select("*", { count: "exact", head: true }),
+        supabase.from("orders").select("*", { count: "exact", head: true }).gte("created_at", yesterday),
+        supabase.from("stores").select("*", { count: "exact", head: true }),
+      ]);
+      return {
+        orders_count: ordersAll.count ?? 0,
+        activity_24h: { orders: orders24h.count ?? 0 },
+        stores_count: stores.count ?? 0,
+      };
     },
     retry: 1,
   });
@@ -77,36 +76,36 @@ export default function AdminConsole() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Database className="h-4 w-4" />
-              DB Connections
+              Total Orders
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Active</div>
-            <p className="text-xs text-muted-foreground mt-1">Pool: 20/100</p>
+            <div className="text-2xl font-bold">{(stats as any)?.orders_count ?? "—"}</div>
+            <p className="text-xs text-muted-foreground mt-1">All time</p>
           </CardContent>
         </Card>
         <Card className="bg-amber-500/5 border-amber-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Activity className="h-4 w-4" />
-              Request Rate
+              Orders (24h)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">42 req/s</div>
-            <p className="text-xs text-muted-foreground mt-1">Normal load</p>
+            <div className="text-2xl font-bold">{(stats as any)?.activity_24h?.orders ?? "—"}</div>
+            <p className="text-xs text-muted-foreground mt-1">New last 24 hours</p>
           </CardContent>
         </Card>
         <Card className="bg-blue-500/5 border-blue-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Server className="h-4 w-4" />
-              Memory Usage
+              Active Stores
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1.2 GB</div>
-            <p className="text-xs text-muted-foreground mt-1">75% available</p>
+            <div className="text-2xl font-bold">{(stats as any)?.stores_count ?? "—"}</div>
+            <p className="text-xs text-muted-foreground mt-1">Registered stores</p>
           </CardContent>
         </Card>
         <Card className="bg-red-500/5 border-red-500/20">
@@ -163,7 +162,7 @@ export default function AdminConsole() {
                     {JSON.stringify(results, null, 2)}
                   </pre>
                 ) : (
-                  <div className="flex items-center justify-center h-[200px] text-slate-600 italic text-sm">
+                  <div className="flex items-center justify-center h-[200px] text-muted-foreground italic text-sm">
                     No results to display. Run a query to see output.
                   </div>
                 )}

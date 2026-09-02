@@ -238,6 +238,7 @@ function applyLegacyStoreFilters(stores: Array<StoreDirectoryItem & { sort_order
 
 function findLocalStoreFallback(identifier: { type: 'id' | 'slug' | 'shop_no'; value: string; complex_zone?: string }) {
   const value = identifier.value.toLowerCase();
+  const compactValue = value.replace(/[^a-z0-9]/g, "");
   return [...STORES, ...SEEDED_FALLBACK_STORES, ...BASIC_TAMRAKAR_STORES].find((store) => {
     const normalized = normalizeStore(store);
     if (identifier.complex_zone && normalized.complex_zone !== identifier.complex_zone) return false;
@@ -246,7 +247,8 @@ function findLocalStoreFallback(identifier: { type: 'id' | 'slug' | 'shop_no'; v
       normalized.id.toLowerCase() === value ||
       String(normalized.slug || "").toLowerCase() === value ||
       String(normalized.seo_slug || "").toLowerCase() === value ||
-      slugify(normalized.name) === value
+      slugify(normalized.name) === value ||
+      normalized.name.toLowerCase().replace(/[^a-z0-9]/g, "") === compactValue
     );
   });
 }
@@ -343,7 +345,7 @@ export const storeDirectoryService = {
       .or(`seo_slug.eq.${slug},slug.eq.${slug}`)
       .eq("status", "active")
       .eq("public_status", "published")
-      .maybeSingle();
+      .single();
 
     if (error && !String(error.message || "").includes("Could not find a relationship")) throw error;
     if (data) return { ...data, entitlements: getStoreEntitlements(resolveEffectiveStorePackage(data)) };
@@ -375,13 +377,7 @@ export const storeDirectoryService = {
     const { data, error } = await query
       .select(`
         *,
-        store_subscriptions(
-          id,
-          status,
-          start_date,
-          end_date,
-          packages(*)
-        )
+        package:store_packages(*)
       `)
       .single();
 
@@ -391,10 +387,13 @@ export const storeDirectoryService = {
       throw error;
     }
 
-    return {
-      ...data,
-      entitlements: getStoreEntitlements(resolveEffectiveStorePackage(data))
-    };
+    if (!data) {
+      const local = findLocalStoreFallback(identifier);
+      return local ? normalizeStore(local) : null;
+    }
+
+    const normalized = normalizeStore(data);
+    return { ...normalized, entitlements: getStoreEntitlements(normalized.package_slug) };
   },
 
   // Get store products (if allowed by package)
@@ -503,21 +502,21 @@ export const storeDirectoryService = {
 
   async createExchangeRequest(storeId: string, payload: Record<string, unknown>) {
     // Use consolidated exchange_requests table with store_id
-    const { data, error } = await supabase.from("exchange_requests").insert({ ...payload, store_id: storeId }).select().single();
+    const { error, status } = await supabase.from("exchange_requests").insert({ ...payload, store_id: storeId });
     if (error) throw error;
-    return data;
+    return { submitted: status >= 200 && status < 300 };
   },
 
   async createRepairRequest(storeId: string, payload: Record<string, unknown>) {
-    const { data, error } = await supabase.from("store_repair_requests").insert({ ...payload, store_id: storeId }).select().single();
+    const { error, status } = await supabase.from("store_repair_requests").insert({ ...payload, store_id: storeId });
     if (error) throw error;
-    return data;
+    return { submitted: status >= 200 && status < 300 };
   },
 
   async createStoreLead(storeId: string, payload: Record<string, unknown>) {
-    const { data, error } = await supabase.from("store_leads").insert({ ...payload, store_id: storeId }).select().single();
+    const { error, status } = await supabase.from("store_leads").insert({ ...payload, store_id: storeId });
     if (error) throw error;
-    return data;
+    return { submitted: status >= 200 && status < 300 };
   },
 
   async assignStorePackage(storeId: string, packageId: string) {

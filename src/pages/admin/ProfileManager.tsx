@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { USER_DEVICES_COLUMNS, ORDERS_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -312,7 +313,7 @@ export default function ProfileManager() {
   const { data: devices } = useQuery({
     queryKey: ["user-devices", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("user_devices").select("*").eq("user_id", user?.id).order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("user_devices").select(USER_DEVICES_COLUMNS.join(",")).eq("user_id", user?.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -332,7 +333,7 @@ export default function ProfileManager() {
   const { data: orders } = useQuery({
     queryKey: ["user-orders", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("orders").select("*").eq("user_id", user?.id).order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("orders").select(ORDERS_COLUMNS.join(",")).eq("user_id", user?.id).order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },

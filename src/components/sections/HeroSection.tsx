@@ -83,7 +83,7 @@ export function HeroSection({ settings = {} }: HeroSectionProps) {
             <div className="relative rounded-3xl overflow-hidden group border border-border/60 bg-card shadow-elevated">
               {featuredArticles && featuredArticles.length > 0 && (
                 <>
-                  <Link to={`/article/${featuredArticles[currentSlide].slug}`}>
+                  <Link to={`/stores/article/${featuredArticles[currentSlide].slug}`}>
                     <div className="relative aspect-[16/10]">
                       <img
                         src={featuredArticles[currentSlide].image || "/placeholder.svg"}
@@ -129,13 +129,13 @@ export function HeroSection({ settings = {} }: HeroSectionProps) {
                   {/* Navigation Arrows */}
                   <button
                     onClick={prevSlide}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/25 border border-white/15"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-card/15 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-card/25 border border-white/15"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button
                     onClick={nextSlide}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/25 border border-white/15"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-card/15 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-card/25 border border-white/15"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -147,7 +147,7 @@ export function HeroSection({ settings = {} }: HeroSectionProps) {
                         key={index}
                         onClick={() => setCurrentSlide(index)}
                         className={`w-2 h-2 rounded-full transition-all ${
-                          index === currentSlide ? "bg-accent w-7" : "bg-white/50 hover:bg-white/70"
+                          index === currentSlide ? "bg-accent w-7" : "bg-card/50 hover:bg-card/70"
                         }`}
                       />
                     ))}
@@ -177,7 +177,7 @@ export function HeroSection({ settings = {} }: HeroSectionProps) {
                       {trendingArticles?.slice(0, 5).map((article, index) => (
                         <Link
                           key={article.id}
-                          to={`/article/${article.slug}`}
+                          to={`/stores/article/${article.slug}`}
                           className="flex gap-3 group py-3 first:pt-1 last:pb-1"
                         >
                           <span className="font-display text-base font-bold text-muted-foreground/40 w-8 shrink-0 pt-0.5">

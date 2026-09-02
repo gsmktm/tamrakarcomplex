@@ -179,7 +179,7 @@ export default function ValuationEstimator() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/50">
+    <div className="min-h-screen flex flex-col bg-background">
       <SEO
         title="Device Valuation Estimator"
         description="Estimate the resale value of your phone using model, condition, storage, and age."
@@ -191,7 +191,7 @@ export default function ValuationEstimator() {
         <div className="bg-primary text-primary-foreground py-16">
           <div className="container max-w-4xl text-center space-y-6">
             <div className="flex justify-center mb-4">
-              <div className="bg-white p-3 rounded-2xl shadow-glow w-20 h-20 flex items-center justify-center">
+              <div className="bg-card p-3 rounded-2xl shadow-glow w-20 h-20 flex items-center justify-center">
                 <img src={logo} alt="Tamrakar Complex" className="w-full h-full object-contain" />
               </div>
             </div>
@@ -208,7 +208,7 @@ export default function ValuationEstimator() {
           <div className="max-w-5xl mx-auto">
             {/* Step Indicator */}
             <div className="flex justify-center mb-8">
-              <div className="flex items-center gap-4 bg-white p-4 rounded-full shadow-sm border border-slate-100">
+              <div className="flex items-center gap-4 bg-card p-4 rounded-full shadow-sm border border-border">
                 {[1, 2, 3, 4].map((s) => (
                   <div key={s} className="flex items-center">
                     <div className={cn(
@@ -228,7 +228,7 @@ export default function ValuationEstimator() {
               <div className="lg:col-span-2 space-y-8">
                 {step === 1 && (
                   <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden">
-                    <CardHeader className="bg-white pb-0">
+                    <CardHeader className="bg-card pb-0">
                       <CardTitle className="text-2xl">Step 1: Select Brand</CardTitle>
                       <CardDescription>What kind of device are you valuing today?</CardDescription>
                     </CardHeader>
@@ -243,8 +243,8 @@ export default function ValuationEstimator() {
                               setStep(2);
                             }}
                             className={cn(
-                              "group cursor-pointer p-8 bg-white border-2 rounded-[2rem] transition-all hover:border-primary hover:shadow-xl text-center space-y-4",
-                              brand === b ? "border-primary bg-primary/5 shadow-md" : "border-slate-100"
+                              "group cursor-pointer p-8 bg-card border-2 rounded-[2rem] transition-all hover:border-primary hover:shadow-xl text-center space-y-4",
+                              brand === b ? "border-primary bg-primary/5 shadow-md" : "border-border"
                             )}
                           >
                             <div className="h-16 flex items-center justify-center transition-all">
@@ -264,7 +264,7 @@ export default function ValuationEstimator() {
 
                 {step === 2 && (
                   <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden">
-                    <CardHeader className="bg-white">
+                    <CardHeader className="bg-card">
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle className="text-2xl">Step 2: Select Model</CardTitle>
@@ -286,7 +286,7 @@ export default function ValuationEstimator() {
                             }}
                             className={cn(
                               "cursor-pointer p-4 border-2 rounded-2xl transition-all hover:border-primary flex items-center justify-between",
-                              model === m ? "border-primary bg-primary/5" : "border-slate-50 bg-slate-50/50"
+                              model === m ? "border-primary bg-primary/5" : "border-border/30 bg-muted/20"
                             )}
                           >
                             <span className="font-semibold">{m}</span>
@@ -300,7 +300,7 @@ export default function ValuationEstimator() {
 
                 {step === 3 && (
                   <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden">
-                    <CardHeader className="bg-white">
+                    <CardHeader className="bg-card">
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle className="text-2xl">Step 3: Device Condition</CardTitle>
@@ -322,7 +322,7 @@ export default function ValuationEstimator() {
                                 onClick={() => setStorage(s)}
                                 className={cn(
                                   "cursor-pointer p-3 text-center border-2 rounded-xl font-bold transition-all",
-                                  storage === s ? "border-primary bg-primary/5 text-primary" : "border-slate-100"
+                                  storage === s ? "border-primary bg-primary/5 text-primary" : "border-border"
                                 )}
                               >
                                 {s}
@@ -359,10 +359,10 @@ export default function ValuationEstimator() {
                               onClick={() => setCondition(c.id)}
                               className={cn(
                                 "cursor-pointer p-4 border-2 rounded-2xl text-center space-y-1 transition-all",
-                                condition === c.id ? "border-primary bg-primary/5" : "border-slate-100"
+                                condition === c.id ? "border-primary bg-primary/5" : "border-border"
                               )}
                             >
-                              <div className={cn("font-bold", condition === c.id ? "text-primary" : "text-slate-900")}>{c.label}</div>
+                              <div className={cn("font-bold", condition === c.id ? "text-primary" : "text-foreground")}>{c.label}</div>
                               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{c.desc}</div>
                             </div>
                           ))}
@@ -391,25 +391,25 @@ export default function ValuationEstimator() {
                 )}
 
                 {step === 4 && estimateMutation.data && (
-                  <Card className="border-none shadow-2xl rounded-[2rem] overflow-hidden bg-white animate-in zoom-in-95 duration-500">
+                  <Card className="border-none shadow-2xl rounded-[2rem] overflow-hidden bg-card animate-in zoom-in-95 duration-500">
                     <div className="bg-green-500 p-8 text-white text-center">
                       <CheckCircle2 className="h-16 w-16 mx-auto mb-4" />
                       <h2 className="text-3xl font-bold">Valuation Complete!</h2>
                     </div>
                     <CardContent className="p-10 space-y-10">
                       <div className="text-center space-y-2">
-                        <p className="text-slate-500 font-medium uppercase tracking-widest text-sm">Estimated Market Value</p>
-                        <div className="text-6xl font-black text-slate-900">
+                        <p className="text-muted-foreground font-medium uppercase tracking-widest text-sm">Estimated Market Value</p>
+                        <div className="text-6xl font-black text-foreground">
                           Rs. {estimateMutation.data.quoted_value.toLocaleString()}
                         </div>
-                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-sm font-bold text-slate-600">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-sm font-bold text-muted-foreground">
                           <AlertCircle className="h-4 w-4" />
                           {estimateMutation.data.manual_quote_required
                             ? "Manual quote required"
                             : `${Math.round((estimateMutation.data.confidence || 0) * 100)}% Price Accuracy`}
                         </div>
                         {estimateMutation.data.source === "local" && (
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-muted-foreground">
                             Database valuation rule was not available, so this is a fallback estimate pending staff review.
                           </p>
                         )}
@@ -419,7 +419,7 @@ export default function ValuationEstimator() {
                         <div className="space-y-6">
                           <h3 className="font-bold text-lg border-b pb-2">Price Breakdown</h3>
                           <div className="space-y-4">
-                            <div className="flex justify-between items-center text-slate-600">
+                            <div className="flex justify-between items-center text-muted-foreground">
                               <span>Base Market Price</span>
                               <span className="font-bold">Rs. {estimateMutation.data.base_price.toLocaleString()}</span>
                             </div>
@@ -443,13 +443,13 @@ export default function ValuationEstimator() {
                                 <ArrowRight className="h-4 w-4" />
                               </Link>
                             </Button>
-                            <Button variant="outline" className="w-full h-12 rounded-xl font-bold gap-2 border-slate-200" asChild>
+                            <Button variant="outline" className="w-full h-12 rounded-xl font-bold gap-2 border-border" asChild>
                               <Link to="/exchange-your-phone">
                                 Exchange for Upgrade
                                 <Smartphone className="h-4 w-4" />
                               </Link>
                             </Button>
-                            <Button variant="ghost" onClick={() => setStep(1)} className="w-full text-slate-500">
+                            <Button variant="ghost" onClick={() => setStep(1)} className="w-full text-muted-foreground">
                               Value another device
                             </Button>
                           </div>
@@ -464,7 +464,7 @@ export default function ValuationEstimator() {
               <div className="space-y-6">
                 <Card className="border-none shadow-lg rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 text-white overflow-hidden">
                   <CardContent className="p-8 space-y-6">
-                    <div className="p-3 bg-white/10 w-fit rounded-2xl">
+                    <div className="p-3 bg-card/10 w-fit rounded-2xl">
                       <Calculator className="h-8 w-8 text-primary" />
                     </div>
                     <div className="space-y-2">
@@ -489,12 +489,12 @@ export default function ValuationEstimator() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-lg rounded-3xl p-8 bg-white space-y-4">
+                <Card className="border-none shadow-lg rounded-3xl p-8 bg-card space-y-4">
                   <h3 className="font-bold text-lg flex items-center gap-2">
                     <Smartphone className="h-5 w-5 text-primary" />
                     Quick Tips
                   </h3>
-                  <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
+                  <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
                     <p>• Clean your device before photos to get better offers.</p>
                     <p>• Including original box and charger adds 10-15% value.</p>
                     <p>• Newer OS updates usually increase demand.</p>

@@ -47,59 +47,49 @@ type SystemHealth = {
   uptime: number;
 };
 
+const countTable = async (table: string, filter?: (q: any) => any) => {
+  try {
+    let query = supabase.from(table as any).select("*", { count: "exact", head: true });
+    if (filter) query = filter(query);
+    const { count, error } = await query;
+    if (error) throw error;
+    return count ?? 0;
+  } catch (error) {
+    console.warn(`Unable to count ${table}`, error);
+    return 0;
+  }
+};
+
 const SuperAdminDashboard = () => {
   const { user } = useAuth();
 
   const { data, isLoading } = useQuery({
     queryKey: ["super-admin-dashboard", user?.id],
     queryFn: async () => {
-      try {
-        // Try RPC first (if deployed)
-        const { data: stats, error } = await supabase.rpc("get_super_admin_stats");
-        if (!error && stats) {
-          const systemHealth: SystemHealth = {
-            database: "healthy",
-            api: "healthy",
-            storage: "healthy",
-            uptime: stats?.uptime || 99.9,
-          };
+      const [
+        productsCount,
+        ordersCount,
+        listingsCount,
+        repairsCount,
+        unlocksCount,
+        storesCount,
+        profilesCount,
+        pendingRepairs,
+        pendingUnlocks,
+        pendingApplications,
+      ] = await Promise.all([
+        countTable("products"),
+        countTable("orders"),
+        countTable("community_listings"),
+        countTable("repair_requests"),
+        countTable("unlocking_requests"),
+        countTable("stores"),
+        countTable("profiles"),
+        countTable("repair_requests", (q) => q.eq("status", "pending")),
+        countTable("unlocking_requests", (q) => q.eq("status", "pending")),
+        countTable("store_applications", (q) => q.eq("status", "pending")),
+      ]);
 
-          const metrics = [
-            { title: "Total Revenue", value: stats?.total_revenue || 0, link: "/suadmin/analytics", icon: BarChart3, error: false },
-            { title: "Total Products", value: stats?.products_count || 0, link: "/suadmin/products", icon: Package, error: false },
-            { title: "Total Orders", value: stats?.orders_count || 0, link: "/suadmin/orders", icon: ShoppingBag, error: false },
-            { title: "Unread Messages", value: stats?.alerts?.unread_messages || 0, link: "/suadmin/messages", icon: MessageSquare, error: false },
-            { title: "Active Listings", value: stats?.listings_count || 0, link: "/suadmin/listings", icon: TrendingUp, error: false },
-            { title: "Repair Requests", value: stats?.repairs_count || 0, link: "/suadmin/repairs", icon: Wrench, error: false },
-            { title: "Unlocking Requests", value: stats?.unlocks_count || 0, link: "/suadmin/unlocking", icon: Unlock, error: false },
-            { title: "Pending Leads", value: stats?.alerts?.pending_leads || 0, link: "/suadmin/leads", icon: User, error: false },
-            { title: "Active Stores", value: stats?.stores_count || 0, link: "/suadmin/stores", icon: Store, error: false },
-            { title: "Registered Users", value: stats?.profiles_count || 0, link: "/suadmin/users", icon: Users, error: false },
-          ] satisfies DashboardMetric[];
-
-          return {
-            metrics,
-            recentActivity: {
-              orders24h: stats?.activity_24h?.orders || 0,
-              listings24h: stats?.activity_24h?.listings || 0,
-              repairs24h: stats?.activity_24h?.repairs || 0,
-            },
-            alerts: {
-              unreadMessages: stats?.alerts?.unread_messages || 0,
-              pendingRepairs: stats?.alerts?.pending_repairs || 0,
-              pendingOrders: stats?.alerts?.pending_orders || 0,
-              pendingUnlocks: stats?.alerts?.pending_unlocks || 0,
-              pendingLeads: stats?.alerts?.pending_leads || 0,
-            },
-            systemHealth,
-          };
-        }
-      } catch (rpcError) {
-        console.info("Dashboard: RPC fallback - building from individual queries", rpcError);
-      }
-
-      // Fallback: Build stats from individual queries (workaround for missing RPC)
-      console.warn("Dashboard: Using fallback stat collection (RPC not available)");
       const systemHealth: SystemHealth = {
         database: "healthy",
         api: "healthy",
@@ -108,16 +98,14 @@ const SuperAdminDashboard = () => {
       };
 
       const metrics = [
-        { title: "Total Revenue", value: 0, link: "/suadmin/analytics", icon: BarChart3, error: false },
-        { title: "Total Products", value: 0, link: "/suadmin/products", icon: Package, error: false },
-        { title: "Total Orders", value: 0, link: "/suadmin/orders", icon: ShoppingBag, error: false },
-        { title: "Unread Messages", value: 0, link: "/suadmin/messages", icon: MessageSquare, error: false },
-        { title: "Active Listings", value: 0, link: "/suadmin/listings", icon: TrendingUp, error: false },
-        { title: "Repair Requests", value: 0, link: "/suadmin/repairs", icon: Wrench, error: false },
-        { title: "Unlocking Requests", value: 0, link: "/suadmin/unlocking", icon: Unlock, error: false },
-        { title: "Pending Leads", value: 0, link: "/suadmin/leads", icon: User, error: false },
-        { title: "Active Stores", value: 0, link: "/suadmin/stores", icon: Store, error: false },
-        { title: "Registered Users", value: 0, link: "/suadmin/users", icon: Users, error: false },
+        { title: "Total Products", value: productsCount, link: "/suadmin/catalog?tab=products", icon: Package, error: false },
+        { title: "Total Orders", value: ordersCount, link: "/suadmin/commerce?tab=orders", icon: ShoppingBag, error: false },
+        { title: "Active Listings", value: listingsCount, link: "/suadmin/commerce?tab=listings", icon: TrendingUp, error: false },
+        { title: "Repair Requests", value: repairsCount, link: "/suadmin/service-desk?tab=repairs", icon: Wrench, error: false },
+        { title: "Unlocking Requests", value: unlocksCount, link: "/suadmin/service-desk?tab=unlocking", icon: Unlock, error: false },
+        { title: "Active Stores", value: storesCount, link: "/suadmin/store-network?tab=stores", icon: Store, error: false },
+        { title: "Registered Users", value: profilesCount, link: "/suadmin/customers?tab=users", icon: Users, error: false },
+        { title: "Pending Stores", value: pendingApplications, link: "/suadmin/store-network?tab=applications", icon: FileText, error: false },
       ] satisfies DashboardMetric[];
 
       return {
@@ -129,9 +117,9 @@ const SuperAdminDashboard = () => {
         },
         alerts: {
           unreadMessages: 0,
-          pendingRepairs: 0,
+          pendingRepairs: pendingRepairs,
           pendingOrders: 0,
-          pendingUnlocks: 0,
+          pendingUnlocks: pendingUnlocks,
           pendingLeads: 0,
         },
         systemHealth,
@@ -165,10 +153,12 @@ const SuperAdminDashboard = () => {
     (data?.alerts.pendingLeads ?? 0);
 
   const quickActions = [
-    { label: "Master Catalog", href: "/suadmin/master-data", icon: Database },
-    { label: "Refer & Earn", href: "/suadmin/user-rewards", icon: Gift },
-    { label: "System Settings", href: "/suadmin/settings", icon: SettingsIcon },
-    { label: "User Management", href: "/suadmin/users", icon: Users },
+    { label: "Store Applications", href: "/suadmin/store-network?tab=applications", icon: FileText },
+    { label: "Catalog Overview", href: "/suadmin/catalog", icon: Database },
+    { label: "Team Access", href: "/suadmin/team-access", icon: ShieldAlert },
+    { label: "System Overview", href: "/suadmin/system", icon: SettingsIcon },
+    { label: "Customers", href: "/suadmin/customers", icon: Users },
+    { label: "Service Desk", href: "/suadmin/service-desk", icon: Wrench },
   ];
 
   return (
@@ -230,7 +220,7 @@ const SuperAdminDashboard = () => {
       {alertTotal > 0 && (
         <div className="grid gap-3 md:grid-cols-3">
           {(data?.alerts.unreadMessages ?? 0) > 0 && (
-            <Link to="/suadmin/messages" className="block rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 hover:bg-purple-500/10 transition-colors">
+            <Link to="/suadmin/engagement?tab=messages" className="block rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 hover:bg-purple-500/10 transition-colors">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Unread Messages</span>
                 <Badge variant="secondary">{data?.alerts.unreadMessages}</Badge>
@@ -238,7 +228,7 @@ const SuperAdminDashboard = () => {
             </Link>
           )}
           {(data?.alerts.pendingRepairs ?? 0) > 0 && (
-            <Link to="/suadmin/repairs" className="block rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 hover:bg-blue-500/10 transition-colors">
+            <Link to="/suadmin/service-desk?tab=repairs" className="block rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 hover:bg-blue-500/10 transition-colors">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Pending Repairs</span>
                 <Badge variant="secondary">{data?.alerts.pendingRepairs}</Badge>
@@ -246,7 +236,7 @@ const SuperAdminDashboard = () => {
             </Link>
           )}
           {(data?.alerts.pendingOrders ?? 0) > 0 && (
-            <Link to="/suadmin/orders" className="block rounded-xl border border-orange-500/20 bg-orange-500/5 p-4 hover:bg-orange-500/10 transition-colors">
+            <Link to="/suadmin/commerce?tab=orders" className="block rounded-xl border border-orange-500/20 bg-orange-500/5 p-4 hover:bg-orange-500/10 transition-colors">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Pending Orders</span>
                 <Badge variant="secondary">{data?.alerts.pendingOrders}</Badge>
@@ -254,7 +244,7 @@ const SuperAdminDashboard = () => {
             </Link>
           )}
           {(data?.alerts.pendingUnlocks ?? 0) > 0 && (
-            <Link to="/suadmin/unlocking" className="block rounded-xl border border-green-500/20 bg-green-500/5 p-4 hover:bg-green-500/10 transition-colors">
+            <Link to="/suadmin/service-desk?tab=unlocking" className="block rounded-xl border border-green-500/20 bg-green-500/5 p-4 hover:bg-green-500/10 transition-colors">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Pending Unlocks</span>
                 <Badge variant="secondary">{data?.alerts.pendingUnlocks}</Badge>
@@ -262,7 +252,7 @@ const SuperAdminDashboard = () => {
             </Link>
           )}
           {(data?.alerts.pendingLeads ?? 0) > 0 && (
-            <Link to="/suadmin/leads" className="block rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 hover:bg-amber-500/10 transition-colors">
+            <Link to="/suadmin/commerce?tab=leads" className="block rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 hover:bg-amber-500/10 transition-colors">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">New Leads</span>
                 <Badge variant="secondary">{data?.alerts.pendingLeads}</Badge>
@@ -278,7 +268,7 @@ const SuperAdminDashboard = () => {
           <CardTitle className="text-lg">Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (

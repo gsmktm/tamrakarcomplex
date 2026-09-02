@@ -170,7 +170,7 @@ export function FeaturedGadgetsSection() {
                 <div className="bg-card/50 border border-border/60 rounded-2xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-semibold">Related Blog Posts</div>
-                    <Link to="/news" className="text-xs text-primary hover:underline">View all</Link>
+                    <Link to="/stores/article" className="text-xs text-primary hover:underline">View all</Link>
                   </div>
                   {isArticlesLoading ? (
                     <div className="space-y-3">

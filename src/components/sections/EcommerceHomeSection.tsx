@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -53,6 +53,7 @@ import { HomeOffers } from "@/components/home/HomeOffers";
 import { HomeTrustStats } from "@/components/home/HomeTrustStats";
 import { HomeCompareMini } from "@/components/home/HomeCompareMini";
 import { useFeaturedProducts, useProducts, type Product } from "@/hooks/useProducts";
+import { useLatestPrices } from "@/hooks/useLatestPrices";
 import { useArticlesList } from "@/hooks/useArticles";
 import { useGuidesList } from "@/hooks/useGuides";
 import { useAuth } from "@/hooks/useAuth";
@@ -244,6 +245,9 @@ const smartphoneBrands = [
   { name: "Honor", code: "HO", color: "from-cyan-500 to-blue-400" },
   { name: "Infinix", code: "IN", color: "from-purple-500 to-pink-400" },
   { name: "Tecno", code: "TE", color: "from-teal-500 to-green-400" },
+  { name: "POCO", code: "PO", color: "from-yellow-600 to-yellow-400" },
+  { name: "Ai+", code: "AI", color: "from-emerald-600 to-teal-400" },
+  { name: "ZTE", code: "ZT", color: "from-sky-600 to-cyan-400" },
 ];
 
 const laptopBrands = [
@@ -346,8 +350,8 @@ export function EcommerceHomeSection() {
   }, []);
 
   // Data
-  const { data: featuredProducts, isLoading: productsLoading } = useFeaturedProducts();
-  const { data: allProducts } = useProducts();
+  const { data: featuredProducts } = useFeaturedProducts();
+  const { data: allProducts, isLoading: latestProductsLoading } = useProducts(100);
   const { data: latestArticles, isLoading: articlesLoading } = useArticlesList({ limit: 6 });
   const { data: latestGuides } = useGuidesList({ limit: 4 });
   const { data: featuredStores, isLoading: isStoresLoading } = useQuery({
@@ -387,15 +391,18 @@ export function EcommerceHomeSection() {
   const products = useMemo(() => featuredProducts ?? [], [featuredProducts]);
   const allProductsList = useMemo(() => {
     const live = allProducts ?? [];
-    const covered = new Set(live.map((p) => p.category.toLowerCase()));
-    return live as Product[];
+    return [...live].sort((a, b) => {
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bTime - aTime;
+    }) as Product[];
   }, [allProducts]);
   const stores = rawStores ?? [];
   const articles = latestArticles ?? [];
   const guides = latestGuides ?? [];
 
   return (
-    <div className="pb-20">
+    <div className="home-world pb-20">
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       {(enabledSections.hero || enabledSections.search_box) && (
         <HeroSection products={products} />
@@ -424,7 +431,7 @@ export function EcommerceHomeSection() {
 
       {/* ── FEATURED PRODUCTS ────────────────────────────────────────────── */}
       {enabledSections.featured && (
-        <FeaturedSection products={allProductsList} isLoading={productsLoading} />
+        <FeaturedSection products={allProductsList} isLoading={latestProductsLoading} />
       )}
 
       {/* ── COMPARE MINI ─────────────────────────────────────────────────── */}
@@ -433,11 +440,8 @@ export function EcommerceHomeSection() {
       {/* ── REPAIR MINI FORM ─────────────────────────────────────────────── */}
       {enabledSections.repair_form && <HomeRepairMiniForm />}
 
-      {/* ── PRE-BOOKING ──────────────────────────────────────────────────── */}
-      <PreBookingSection />
-
-      {/* ── EMI INQUIRY ──────────────────────────────────────────────────── */}
-      <EmiInquirySection />
+      {/* ── PRE-BOOKING + EMI ────────────────────────────────────────────── */}
+      <DeviceAccessSection />
 
       {/* ── WHAT'S HOT — EDITORIAL ───────────────────────────────────────── */}
       <EditorialSection articles={articles} guides={guides} isLoading={articlesLoading} />
@@ -477,14 +481,14 @@ function NewsTicker() {
   return (
     <div
       className="overflow-hidden py-1.5 border-b border-white/[0.08]"
-      style={{ background: "linear-gradient(90deg, oklch(18% 0.038 258) 0%, oklch(22% 0.045 270) 50%, oklch(18% 0.038 258) 100%)" }}
+      style={{ background: "linear-gradient(90deg, oklch(16% 0.034 258) 0%, oklch(22% 0.040 258) 50%, oklch(16% 0.034 258) 100%)" }}
     >
       <div className="flex gap-12 ticker-track whitespace-nowrap">
         {items.map((item, i) => (
           <span key={i} className="inline-flex items-center gap-2 text-[11px] font-bold tracking-wide" style={{ color: "oklch(80% 0.014 80)" }}>
             <item.icon className="h-3.5 w-3.5" aria-hidden style={{ color: "oklch(78% 0.165 65)" }} />
             <span>{item.text}</span>
-            <span className="mx-2" style={{ color: "oklch(62% 0.25 285 / 0.55)" }}>◆</span>
+            <span className="mx-2" style={{ color: "oklch(64% 0.118 70 / 0.55)" }}>◆</span>
           </span>
         ))}
       </div>
@@ -495,10 +499,10 @@ function NewsTicker() {
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
 const heroStats = [
-  { stat: "500+",  label: "Products",      href: "/buy" },
-  { stat: "250+",  label: "Stores",        href: "/stores" },
-  { stat: "10K+",  label: "Customers",     href: "/marketplace" },
-  { stat: "4.9★",  label: "Rating",        href: "/stores" },
+  { stat: "01", label: "Compare live catalog prices", eyebrow: "Price radar", href: "/cat/mobiles", icon: TrendingUp },
+  { stat: "02", label: "Contact independent stores", eyebrow: "Local network", href: "/stores", icon: Store },
+  { stat: "03", label: "Sell, exchange, or repair", eyebrow: "Device loop", href: "/sell-your-phone", icon: RefreshCw },
+  { stat: "04", label: "Shop with clearer terms", eyebrow: "Buyer clarity", href: "/marketplace-disclosure", icon: ShieldAlert },
 ];
 
 const heroCTAs = [
@@ -538,160 +542,112 @@ function HeroSection({ products }: { products: Product[] }) {
   };
 
   return (
-    <>
-      <section className="home-hero border-b border-white/[0.06]">
-        {/* Orb blobs */}
-        <div aria-hidden className="pointer-events-none">
-          <div className="home-orb-violet" />
-          <div className="home-orb-amber" />
-          <div className="home-slash-violet" />
-          <div className="home-slash-amber" />
-        </div>
-
-        <div className="home-hero-content container pt-10 pb-0 md:pt-16 md:pb-0">
-          {/* ── Badge ── */}
-          <div className="flex justify-center mb-7 animate-fade-up delay-0">
-            <span className="home-hero-badge" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              <Zap className="h-3 w-3" aria-hidden />
-              Nepal&apos;s Mobile Mega Market — New Road, Kathmandu
-            </span>
-          </div>
-
-          {/* ── Headline ── */}
-          <div className="text-center mb-7 animate-fade-up delay-100">
-            <h1
-              className="font-display font-bold text-white leading-[1.0] tracking-[-0.02em]"
-              style={{ fontSize: "clamp(2.8rem, 8vw, 6rem)", fontWeight: 700 }}
-            >
-              Find Mobiles,{" "}
-              <span className="home-headline-accent" style={{ fontStyle: "italic" }}>Gadgets</span>
-              <br />
-              &amp; Trusted Stores
-            </h1>
-            <p className="mt-5 text-white/50 text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-              Search phones, compare prices, call real shops, book repair, or exchange your old device — all from Tamrakar Complex.
-            </p>
-          </div>
-
-          {/* ── Search bar ── */}
-          <form onSubmit={handleSearch} className="animate-fade-up delay-150 max-w-2xl mx-auto mb-6">
-            <div
-              className="flex items-center h-14 overflow-hidden transition-all duration-300"
-              style={{
-                background: "oklch(98.5% 0.010 78)",
-                clipPath: "polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%)",
-                boxShadow: "0 8px 40px oklch(7% 0.020 252 / 0.55), 0 0 0 1px oklch(62% 0.25 285 / 0.18)",
-              }}
-            >
-              <Search className="ml-4 h-5 w-5 shrink-0" style={{ color: "oklch(52% 0.070 55)" }} aria-hidden />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search iPhone 16, Samsung S25, screen repair…"
-                className="flex-1 h-full px-3 text-sm md:text-base bg-transparent outline-none"
-                style={{ color: "oklch(20% 0.025 50)", fontFamily: "'Outfit', sans-serif" }}
-                aria-label="Search products and stores"
-              />
-              <button
-                type="submit"
-                className="h-full px-7 font-bold text-sm shrink-0 transition-all pressable hover:brightness-110"
-                style={{
-                  background: "linear-gradient(135deg, oklch(62% 0.25 285), oklch(50% 0.22 275))",
-                  color: "oklch(95% 0.010 285)",
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                Search
-              </button>
+    <section className="home-hero">
+      <div className="home-hero-grid" aria-hidden />
+      <div className="home-hero-sun" aria-hidden />
+      <div className="container home-hero-content">
+        <div className="grid min-h-[720px] items-center gap-12 py-14 lg:grid-cols-[1.08fr_.92fr] lg:py-20">
+          <div className="relative z-10 animate-fade-up">
+            <div className="mb-7 flex items-center gap-3">
+              <span className="home-hero-index">TC / 01</span>
+              <span className="home-hero-badge">
+                <Zap className="h-3 w-3" aria-hidden />
+                New Road · Kathmandu
+              </span>
             </div>
-          </form>
+            <h1 className="home-hero-title">
+              Nepal&apos;s tech
+              <span>market, decoded.</span>
+            </h1>
+            <p className="home-hero-description mt-6 max-w-xl text-base leading-7 md:text-lg">
+              Compare devices, discover independent stores, repair what you own,
+              and trade into what comes next—all through one connected gadget exchange.
+            </p>
 
-          {/* ── Quick category chips ── */}
-          <div className="animate-fade-up delay-200 flex flex-wrap justify-center gap-2 mb-7">
-            {quickCategories.map((cat) => (
-              <Link key={cat.label} to={cat.href} className="home-chip pressable">
-                <cat.icon className="h-3.5 w-3.5" aria-hidden />
-                {cat.label}
-              </Link>
-            ))}
-          </div>
+            <form onSubmit={handleSearch} className="mt-8 max-w-2xl">
+              <div className="home-search-shell">
+                <Search className="ml-5 h-5 w-5 shrink-0" aria-hidden />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search a device, store, price or repair…"
+                  className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none md:text-base"
+                  aria-label="Search products and stores"
+                />
+                <button type="submit" className="home-search-submit">
+                  Explore <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
 
-          {/* ── Operation tiles ── */}
-          <div className="animate-fade-up delay-250 mx-auto mb-8 grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
-            {operationTiles.map((tile) => (
-              <Link key={tile.label} to={tile.href} className="home-op-tile pressable block">
-                <div className="home-op-icon">
-                  <tile.icon className="h-4 w-4" aria-hidden />
-                </div>
-                <p className="font-data text-sm font-semibold text-white">{tile.label}</p>
-                <p className="mt-0.5 text-xs text-white/45">{tile.value}</p>
-              </Link>
-            ))}
-          </div>
-
-          {/* ── CTA row ── */}
-          <div className="animate-fade-up delay-300 flex flex-wrap justify-center gap-2.5 mb-10">
-            {heroCTAs.map((cta) => {
-              const Icon = cta.icon;
-              if (cta.variant === "gold") return (
-                <Link key={cta.label} to={cta.href}>
-                  <button
-                    className="inline-flex items-center gap-2 h-11 px-6 font-bold text-sm pressable transition-all"
-                    style={{
-                      background: "linear-gradient(135deg, oklch(78% 0.165 65), oklch(64% 0.118 70))",
-                      color: "oklch(10% 0.022 48)",
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
-                      boxShadow: "0 4px 24px oklch(64% 0.118 70 / 0.45)",
-                    }}
-                  >
-                    <Icon className="h-4 w-4" aria-hidden />{cta.label}
-                  </button>
-                </Link>
-              );
-              if (cta.variant === "outline") return (
-                <Link key={cta.label} to={cta.href}>
-                  <button
-                    className="inline-flex items-center gap-2 h-11 px-5 font-medium text-sm text-white/80 pressable transition-all hover:text-white"
-                    style={{
-                      border: "1px solid oklch(62% 0.25 285 / 0.35)",
-                      background: "oklch(62% 0.25 285 / 0.08)",
-                      clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
-                    }}
-                  >
-                    <Icon className="h-4 w-4" aria-hidden />{cta.label}
-                  </button>
-                </Link>
-              );
-              return (
-                <Link key={cta.label} to={cta.href}>
-                  <button className="inline-flex items-center gap-2 h-10 px-4 font-medium text-sm text-white/45 hover:text-white/75 pressable transition-colors">
-                    <Icon className="h-4 w-4" aria-hidden />{cta.label}
-                  </button>
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* ── Stats bar — clips into ivory section ── */}
-          <div className="home-stats-bar animate-fade-up delay-300 -mx-4 md:-mx-8 lg:mx-0 px-4 pt-6 pb-0">
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border max-w-2xl mx-auto">
-              {heroStats.map(({ stat, label, href }) => (
-                <Link key={label} to={href} className="flex flex-col items-center py-4 px-3 hover:bg-secondary/60 rounded-xl transition-colors group">
-                  <span
-                    className="font-display text-2xl md:text-3xl font-semibold group-hover:text-primary transition-colors"
-                    style={{ fontFamily: "'Cormorant Garamond', serif", letterSpacing: "-0.01em", color: "oklch(18% 0.034 255)" }}
-                  >{stat}</span>
-                  <span className="text-xs text-muted-foreground mt-0.5">{label}</span>
+            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-3">
+              {quickCategories.slice(0, 6).map((cat) => (
+                <Link key={cat.label} to={cat.href} className="home-chip">
+                  <span>{cat.label}</span><ArrowRight className="h-3 w-3" />
                 </Link>
               ))}
             </div>
+
+            <div className="mt-9 flex flex-wrap gap-3">
+              {heroCTAs.slice(0, 3).map((cta, index) => {
+                const Icon = cta.icon;
+                return (
+                  <Link key={cta.label} to={cta.href} className={index === 0 ? "home-cta-primary" : "home-cta-secondary"}>
+                    <Icon className="h-4 w-4" /> {cta.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="home-device-stage animate-fade-up delay-150" aria-label="Connected gadget services">
+            <div className="home-device-shadow" aria-hidden />
+            <div className="home-device-card home-device-card-back" aria-hidden>
+              <span>REPAIR / 24</span>
+            </div>
+            <div className="home-device-card home-device-card-front">
+              <div className="home-device-camera" />
+              <div className="home-device-screen">
+                <span className="home-device-kicker">LIVE EXCHANGE</span>
+                <strong>Find your<br />next device.</strong>
+                <div className="home-device-price">NPR / MARKET</div>
+                <div className="home-device-wave" aria-hidden />
+              </div>
+            </div>
+            {operationTiles.map((tile, index) => (
+              <Link key={tile.label} to={tile.href} className={`home-orbit-card home-orbit-${index + 1}`}>
+                <tile.icon className="h-4 w-4" />
+                <span><strong>{tile.label}</strong>{tile.value}</span>
+              </Link>
+            ))}
+            <div className="home-stage-stamp" aria-hidden>
+              <span>TAMRAKAR</span><span>COMPLEX</span>
+            </div>
           </div>
         </div>
-      </section>
-    </>
+
+        <div className="home-route-constellation" aria-label="Explore Tamrakar Complex services">
+          <span className="home-route-line" aria-hidden />
+          {heroStats.map(({ stat, label, eyebrow, href, icon: Icon }, index) => (
+            <Link
+              key={label}
+              to={href}
+              className="home-route-node"
+              style={{ "--route-order": index } as CSSProperties}
+            >
+              <span className="home-route-orbit" aria-hidden />
+              <span className="home-route-number">{stat}</span>
+              <span className="home-route-copy">
+                <span className="home-route-eyebrow"><Icon className="h-3.5 w-3.5" />{eyebrow}</span>
+                <strong>{label}</strong>
+              </span>
+              <span className="home-route-arrow" aria-hidden><ArrowRight className="h-4 w-4" /></span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -701,7 +657,7 @@ function HeroSection({ products }: { products: Product[] }) {
 
 const serviceCardColors = [
   { hex: "oklch(55% 0.22 255)", bg: "oklch(55% 0.22 255 / 0.12)", glow: "oklch(55% 0.22 255 / 0.25)" },
-  { hex: "oklch(62% 0.25 285)", bg: "oklch(62% 0.25 285 / 0.12)", glow: "oklch(62% 0.25 285 / 0.25)" },
+  { hex: "oklch(54% 0.130 268)", bg: "oklch(54% 0.130 268 / 0.12)", glow: "oklch(54% 0.130 268 / 0.22)" },
   { hex: "oklch(60% 0.18 220)", bg: "oklch(60% 0.18 220 / 0.12)", glow: "oklch(60% 0.18 220 / 0.25)" },
   { hex: "oklch(72% 0.18 65)",  bg: "oklch(72% 0.18 65  / 0.12)", glow: "oklch(72% 0.18 65  / 0.25)" },
   { hex: "oklch(65% 0.20 35)",  bg: "oklch(65% 0.20 35  / 0.12)", glow: "oklch(65% 0.20 35  / 0.25)" },
@@ -778,31 +734,59 @@ function PriceDesk({ allProducts }: { allProducts: Product[] }) {
   const [selectedBudget, setSelectedBudget] = useState(budgetRanges[0]);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  const { data: products, isLoading } = useQuery({
-    queryKey: ["price-desk", mode, selectedBrand, selectedBudget],
+  // Bridge hook: static latest-mobile-buying-prices via React Query (no network, staleTime: Infinity)
+  const { data: latestPrices } = useLatestPrices();
+
+  // Map LatestMobileBuyingPrice -> Product shape so ProductCard can render it
+  const latestAsProducts = useMemo(() => {
+    if (!latestPrices) return [] as Product[];
+    return latestPrices.map((item, idx) => {
+      const slug = `${item.brand.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${item.model.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${idx}`;
+      const priceLabel = `Rs. ${item.price.toLocaleString()}`;
+      return {
+        id: `latest-${idx}`,
+        name: `${item.brand} ${item.model}`,
+        slug,
+        brand: item.brand,
+        price: priceLabel,
+        price_value: item.price,
+        image: null,
+        rating: null,
+        category: "Smartphones",
+        specs: item.previousPrice ? ({ previousPrice: item.previousPrice } as unknown as Record<string, unknown>) : null,
+        in_stock: true,
+        created_at: new Date().toISOString(),
+      } as Product;
+    });
+  }, [latestPrices]);
+
+  const filteredLatest = useMemo(() => {
+    if (mode === "phone") {
+      return latestAsProducts.filter((p) => p.brand?.toLowerCase() === selectedBrand.toLowerCase()).slice(0, 6);
+    }
+    if (mode === "budget") {
+      return latestAsProducts
+        .filter((p) => (p.price_value ?? 0) >= selectedBudget.min && (p.price_value ?? 0) <= selectedBudget.max)
+        .slice(0, 6);
+    }
+    return [] as Product[];
+  }, [mode, latestAsProducts, selectedBrand, selectedBudget]);
+
+  // Laptop mode still queries live products (latestPrices is phone-only)
+  const { data: laptopProducts, isLoading: laptopLoading } = useQuery({
+    queryKey: ["price-desk", "laptop", selectedBrand],
     queryFn: async () => {
-      let q = supabase.from("products").select("*").limit(6);
-      if (mode === "budget") {
-        q = q.gte("price_value", selectedBudget.min).lte("price_value", selectedBudget.max);
-      } else {
-        q = q.eq("brand", selectedBrand);
-        if (mode === "phone") q = q.ilike("category", "%Smartphone%");
-        if (mode === "laptop") q = q.ilike("category", "%Laptop%");
-      }
-      const { data } = await q;
+      const { data } = await supabase.from("products").select("*").eq("brand", selectedBrand).ilike("category", "%Laptop%").limit(6);
       if (!data?.length) {
-        const cat = mode === "phone" ? "smartphones" : mode === "laptop" ? "laptops" : null;
-        return allProducts
-          .filter((p) => {
-            if (mode === "budget") return (p.price_value ?? 0) >= selectedBudget.min && (p.price_value ?? 0) <= selectedBudget.max;
-            if (cat) return p.category.toLowerCase().includes(cat) && p.brand?.toLowerCase() === selectedBrand.toLowerCase();
-            return true;
-          })
-          .slice(0, 6) as Product[];
+        return allProducts.filter((p) => p.category.toLowerCase().includes("laptops") && p.brand?.toLowerCase() === selectedBrand.toLowerCase()).slice(0, 6) as Product[];
       }
       return data as Product[];
     },
+    enabled: mode === "laptop",
   });
+
+  const products = mode === "laptop" ? laptopProducts : filteredLatest;
+  const isLoading = mode === "laptop" ? laptopLoading : !latestPrices;
 
   const switchMode = (next: typeof mode) => {
     setIsAnimating(true);
@@ -933,12 +917,29 @@ function PriceDesk({ allProducts }: { allProducts: Product[] }) {
 
 function FeaturedSection({ products, isLoading }: { products: Product[]; isLoading: boolean }) {
   const [activeTab, setActiveTab] = useState("All");
+  const [activeBrand, setActiveBrand] = useState("All");
   const [visibleCount, setVisibleCount] = useState(12);
   const [isExpanding, setIsExpanding] = useState(false);
 
+  const topBrands = useMemo(() => {
+    const counts = new Map<string, number>();
+    products.forEach((product) => {
+      const brand = product.brand?.trim();
+      if (brand) counts.set(brand, (counts.get(brand) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 7)
+      .map(([brand]) => brand);
+  }, [products]);
+
   const filtered = useMemo(
-    () => activeTab === "All" ? products : products.filter((p) => p.category === activeTab),
-    [products, activeTab],
+    () => products.filter((product) => {
+      const matchesCategory = activeTab === "All" || product.category === activeTab;
+      const matchesBrand = activeBrand === "All" || product.brand === activeBrand;
+      return matchesCategory && matchesBrand;
+    }),
+    [products, activeTab, activeBrand],
   );
 
   const visible = filtered.slice(0, visibleCount);
@@ -957,10 +958,34 @@ function FeaturedSection({ products, isLoading }: { products: Product[]; isLoadi
     setVisibleCount(12);
   };
 
+  const handleBrandChange = (brand: string) => {
+    setActiveBrand(brand);
+    setVisibleCount(12);
+  };
+
   return (
     <section className="py-14 bg-background">
       <div className="container">
         <SectionHeader eyebrow="Popular picks" title="Featured Gadgets" href="/buy" />
+
+        <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar" aria-label="Top brands">
+          <span className="mr-1 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Top brands</span>
+          {["All", ...topBrands].map((brand) => (
+            <button
+              key={brand}
+              type="button"
+              onClick={() => handleBrandChange(brand)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                activeBrand === brand
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border/60 bg-card hover:border-primary/50 hover:text-primary",
+              )}
+            >
+              {brand}
+            </button>
+          ))}
+        </div>
 
         {/* Category tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-1 no-scrollbar">
@@ -1036,7 +1061,7 @@ function EditorialSection({
         <div className="grid lg:grid-cols-3 gap-10">
           {/* News column */}
           <div className="lg:col-span-2">
-            <SectionHeader eyebrow="What's Hot" title="Latest News" href="/news" />
+            <SectionHeader eyebrow="What's Hot" title="Latest News" href="/stores/article" />
             {isLoading ? (
               <div className="space-y-4">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -1053,7 +1078,7 @@ function EditorialSection({
             ) : (
               <div className="space-y-4">
                 {featured && (
-                  <Link to={`/article/${featured.slug}`} className="group block">
+                  <Link to={`/stores/article/${featured.slug}`} className="group block">
                     <div className="relative rounded-2xl overflow-hidden border border-border/60 aspect-[16/7]">
                       <img
                         src={featured.image || "/placeholder.svg"}
@@ -1076,7 +1101,7 @@ function EditorialSection({
                 )}
                 <div className="grid sm:grid-cols-2 gap-3">
                   {rest.map((article) => (
-                    <Link key={article.id} to={`/article/${article.slug}`} className="group flex gap-3 rounded-2xl border border-border/60 bg-card p-3 hover:bg-secondary/40 hover:border-primary/30 transition-all">
+                    <Link key={article.id} to={`/stores/article/${article.slug}`} className="group flex gap-3 rounded-2xl border border-border/60 bg-card p-3 hover:bg-secondary/40 hover:border-primary/30 transition-all">
                       <img
                         src={article.image || "/placeholder.svg"}
                         alt={article.title}
@@ -1318,6 +1343,34 @@ function StoresSection({
 
 // ─── Pre-Booking Section ──────────────────────────────────────────────────────
 
+function DeviceAccessSection() {
+  return (
+    <section className="home-device-access py-16 md:py-20">
+      <div className="container">
+        <Reveal>
+          <div className="mx-auto mb-10 max-w-3xl text-center md:mb-12">
+            <span className="home-device-access-kicker inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em]">
+              <Sparkles className="h-3.5 w-3.5" aria-hidden />
+              Your next flagship, your way
+            </span>
+            <h2 className="home-device-access-heading mt-4 font-display text-3xl font-black tracking-tight md:text-5xl">
+              Reserve now. Pay your way.
+            </h2>
+            <p className="home-device-access-copy mx-auto mt-4 max-w-2xl text-sm leading-6 md:text-base">
+              Secure an upcoming device for free or ask our verified store partners for an easy EMI plan—all from one place.
+            </p>
+          </div>
+        </Reveal>
+
+        <div className="grid items-start gap-6 xl:grid-cols-2 xl:gap-8">
+          <PreBookingSection />
+          <EmiInquirySection />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PreBookingSection() {
   const [form, setForm] = useState({ name: "", phone: "", model: "", storage: "", color: "", city: "", delivery: "pickup", notes: "" });
   const [submitted, setSubmitted] = useState(false);
@@ -1355,15 +1408,14 @@ function PreBookingSection() {
         value={form[key]}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
         placeholder={placeholder}
-        className="w-full h-10 px-3 rounded-lg border border-border text-sm outline-none focus:border-gold focus:ring-1 focus:ring-gold/30 transition-all bg-white"
+        className="w-full h-10 px-3 rounded-lg border border-border text-sm outline-none focus:border-gold focus:ring-1 focus:ring-gold/30 transition-all bg-background text-foreground"
       />
     </div>
   );
 
   return (
-    <section className="py-16">
-      <div className="container">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+    <article className="home-device-access-card home-device-access-card--booking overflow-hidden rounded-[2rem]">
+      <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] xl:grid-cols-1">
 
           {/* ── Left content ── */}
           <Reveal>
@@ -1397,7 +1449,7 @@ function PreBookingSection() {
 
           {/* ── Form ── */}
           <Reveal>
-            <div className="bg-white rounded-2xl border border-border p-6 shadow-tk-md">
+            <div className="home-device-access-form rounded-2xl border border-border p-5 shadow-tk-md sm:p-6">
               {submitted ? (
                 <div className="text-center py-8">
                   <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gold/15 text-gold">
@@ -1425,7 +1477,7 @@ function PreBookingSection() {
                     <select
                       value={form.delivery}
                       onChange={(e) => setForm((f) => ({ ...f, delivery: e.target.value }))}
-                      className="w-full h-10 px-3 rounded-lg border border-border text-sm outline-none focus:border-gold bg-white"
+                      className="w-full h-10 px-3 rounded-lg border border-border text-sm outline-none focus:border-gold bg-background text-foreground"
                     >
                       <option value="pickup">Store Pickup — Tamrakar Complex</option>
                       <option value="delivery">Home Delivery (Kathmandu Valley)</option>
@@ -1445,9 +1497,8 @@ function PreBookingSection() {
               )}
             </div>
           </Reveal>
-        </div>
       </div>
-    </section>
+    </article>
   );
 }
 
@@ -1477,26 +1528,25 @@ function EmiInquirySection() {
   };
 
   return (
-    <section className="py-12" style={{ background: "oklch(14% 0.042 255)" }}>
-      <div className="container">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+    <article className="home-device-access-card home-device-access-card--emi overflow-hidden rounded-[2rem]">
+      <div className="home-emi-section grid gap-8 p-6 sm:p-8 lg:grid-cols-[0.9fr_1.1fr] xl:grid-cols-1">
 
           <Reveal>
             <div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-gold/15 border border-gold/30 px-3.5 py-1 text-[11px] font-bold tracking-widest uppercase text-gold mb-4">
+              <span className="home-emi-badge inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-[11px] font-bold tracking-widest uppercase mb-4">
                 <CreditCard className="h-3.5 w-3.5" aria-hidden />
                 EMI Available
               </span>
-              <h2 className="font-display text-2xl md:text-3xl font-black text-white leading-tight mb-3">
+              <h2 className="home-emi-heading font-display text-2xl md:text-3xl font-black leading-tight mb-3">
                 Buy Now,<br />
-                <span className="text-gold">Pay Easy EMI</span>
+                <span className="home-emi-accent">Pay Easy EMI</span>
               </h2>
-              <p className="text-white/55 text-sm leading-relaxed mb-5">
+              <p className="home-emi-copy text-sm leading-relaxed mb-5">
                 Get iPhone 15 or Samsung S24 Ultra on easy monthly installments. Submit your inquiry — our store partners will reach out with the best offer.
               </p>
               <div className="flex flex-wrap gap-2">
                 {["3 Month", "6 Month", "12 Month", "24 Month"].map((plan) => (
-                  <span key={plan} className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-xs font-semibold text-gold">
+                  <span key={plan} className="home-emi-plan inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold">
                     <CheckCircle2 className="h-3 w-3" aria-hidden />
                     {plan}
                   </span>
@@ -1506,18 +1556,18 @@ function EmiInquirySection() {
           </Reveal>
 
           <Reveal>
-            <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+            <div className="home-emi-form rounded-2xl p-5 sm:p-6">
               {submitted ? (
                 <div className="text-center py-6">
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 text-gold">
+                  <div className="home-emi-success-icon mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full">
                     <CheckCircle2 className="h-6 w-6" aria-hidden />
                   </div>
-                  <p className="text-white font-bold">EMI Inquiry Sent!</p>
-                  <p className="text-white/50 text-sm mt-1">A store partner will call you within 24 hours.</p>
+                  <p className="home-emi-heading font-bold">EMI Inquiry Sent!</p>
+                  <p className="home-emi-copy text-sm mt-1">A store partner will call you within 24 hours.</p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <h3 className="font-display text-base font-bold text-white mb-1">EMI Inquiry</h3>
+                  <h3 className="home-emi-heading font-display text-base font-bold mb-1">EMI Inquiry</h3>
                   {[
                     { label: "Your Name *", key: "name" as const, ph: "Full name" },
                     { label: "Phone *", key: "phone" as const, ph: "+977 98XXXXXXXX" },
@@ -1525,13 +1575,12 @@ function EmiInquirySection() {
                     { label: "Down Payment Amount", key: "down" as const, ph: "e.g. Rs. 20,000" },
                   ].map(({ label, key, ph }) => (
                     <div key={key}>
-                      <label className="block text-xs font-semibold text-white/70 mb-1">{label}</label>
+                      <label className="home-emi-label block text-xs font-semibold mb-1">{label}</label>
                       <input
                         value={form[key]}
                         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                         placeholder={ph}
-                        className="w-full h-9 px-3 rounded-lg text-sm outline-none transition-all text-white"
-                        style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }}
+                        className="home-emi-input w-full h-9 px-3 rounded-lg text-sm outline-none transition-all"
                       />
                     </div>
                   ))}
@@ -1547,9 +1596,8 @@ function EmiInquirySection() {
               )}
             </div>
           </Reveal>
-        </div>
       </div>
-    </section>
+    </article>
   );
 }
 
@@ -1565,7 +1613,7 @@ function SellCtaBanner() {
           </div>
           {/* Top accent line */}
           <div aria-hidden className="absolute inset-x-0 top-0 h-[2px]"
-            style={{ background: "linear-gradient(90deg, oklch(62% 0.25 285), oklch(78% 0.165 65), oklch(62% 0.25 285))" }}
+            style={{ background: "linear-gradient(90deg, transparent, oklch(64% 0.118 70), oklch(78% 0.130 72), oklch(64% 0.118 70), transparent)" }}
           />
 
           <div className="relative grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
@@ -1575,10 +1623,10 @@ function SellCtaBanner() {
                   className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.20em]"
                   style={{
                     clipPath: "polygon(6% 0, 100% 0, 94% 100%, 0 100%)",
-                    background: "oklch(62% 0.25 285 / 0.20)",
-                    border: "1px solid oklch(62% 0.25 285 / 0.40)",
+                    background: "oklch(64% 0.118 70 / 0.16)",
+                    border: "1px solid oklch(64% 0.118 70 / 0.38)",
                     padding: "5px 14px",
-                    color: "oklch(75% 0.22 285)",
+                    color: "oklch(82% 0.095 74)",
                   }}
                 >
                   <TrendingUp className="h-3 w-3" aria-hidden /> Best Resale Prices in Nepal
@@ -1593,7 +1641,7 @@ function SellCtaBanner() {
                 <span className="home-headline-accent">worth more than you think.</span>
               </h2>
               <p className="mt-4 max-w-lg text-white/60 text-base md:text-lg">
-                Get an AI-powered instant valuation in 30 seconds. No appointments, no guesswork.
+                Tell us the model and condition — we&apos;ll quote a fair resale price in under a minute. Walk into New Road, get paid the same day.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
                 <Link to="/sell-your-phone">
@@ -1614,8 +1662,8 @@ function SellCtaBanner() {
                   <button
                     className="inline-flex items-center gap-2 h-12 px-7 font-medium text-sm text-white/85 pressable transition-all hover:text-white"
                     style={{
-                      border: "1px solid oklch(62% 0.25 285 / 0.40)",
-                      background: "oklch(62% 0.25 285 / 0.10)",
+                      border: "1px solid oklch(64% 0.118 70 / 0.38)",
+                      background: "oklch(64% 0.118 70 / 0.10)",
                       clipPath: "polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%)",
                     }}
                   >
@@ -1631,7 +1679,7 @@ function SellCtaBanner() {
                 { icon: Zap,          label: "Instant quote",      color: "oklch(78% 0.165 65)" },
                 { icon: BadgeCheck,   label: "Verified buyers",    color: "oklch(62% 0.18 152)" },
                 { icon: Star,         label: "4.9★ rated service", color: "oklch(78% 0.165 65)" },
-                { icon: MessageCircle,label: "Live support",       color: "oklch(62% 0.25 285)" },
+                { icon: MessageCircle,label: "Live support",       color: "oklch(60% 0.130 240)" },
               ].map(({ icon: Icon, label, color }) => (
                 <div
                   key={label}

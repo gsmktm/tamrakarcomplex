@@ -82,7 +82,7 @@ export function LatestNewsSection({ settings = {} }: LatestNewsSectionProps) {
             </h2>
           </div>
           
-          <Link to="/news">
+          <Link to="/stores/article">
             <Button variant="ghost" className="text-primary gap-1 group">
               View all news
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -123,12 +123,12 @@ export function LatestNewsSection({ settings = {} }: LatestNewsSectionProps) {
             <div className="lg:col-span-1">
                 <div className="h-full min-h-[300px] bg-gradient-to-br from-primary to-primary/80 rounded-2xl p-8 text-primary-foreground relative overflow-hidden flex flex-col justify-between group shadow-lg hover:shadow-xl transition-shadow">
                     {/* Background decoration */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-card/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
                     <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 rounded-full blur-2xl translate-y-1/3 -translate-x-1/3" />
                     
                     <div className="relative z-10">
                         <div className="flex items-center gap-2 mb-4">
-                            <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
+                            <span className="bg-card/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
                                 <Timer className="w-3 h-3" /> Limited Time
                             </span>
                         </div>
@@ -144,25 +144,25 @@ export function LatestNewsSection({ settings = {} }: LatestNewsSectionProps) {
                     <div className="relative z-10 mt-auto">
                         {timeLeft ? (
                             <div className="grid grid-cols-4 gap-2 mb-8 text-center">
-                                <div className="bg-white/20 backdrop-blur rounded-lg p-2">
+                                <div className="bg-card/20 backdrop-blur rounded-lg p-2">
                                     <div className="text-xl font-bold font-mono">{String(timeLeft.days).padStart(2, '0')}</div>
                                     <div className="text-[10px] uppercase opacity-80">Days</div>
                                 </div>
-                                <div className="bg-white/20 backdrop-blur rounded-lg p-2">
+                                <div className="bg-card/20 backdrop-blur rounded-lg p-2">
                                     <div className="text-xl font-bold font-mono">{String(timeLeft.hours).padStart(2, '0')}</div>
                                     <div className="text-[10px] uppercase opacity-80">Hrs</div>
                                 </div>
-                                <div className="bg-white/20 backdrop-blur rounded-lg p-2">
+                                <div className="bg-card/20 backdrop-blur rounded-lg p-2">
                                     <div className="text-xl font-bold font-mono">{String(timeLeft.minutes).padStart(2, '0')}</div>
                                     <div className="text-[10px] uppercase opacity-80">Min</div>
                                 </div>
-                                <div className="bg-white/20 backdrop-blur rounded-lg p-2">
+                                <div className="bg-card/20 backdrop-blur rounded-lg p-2">
                                     <div className="text-xl font-bold font-mono text-yellow-300">{String(timeLeft.seconds).padStart(2, '0')}</div>
                                     <div className="text-[10px] uppercase opacity-80">Sec</div>
                                 </div>
                             </div>
                         ) : (
-                            <div className="mb-8 p-4 bg-white/10 rounded-lg text-center backdrop-blur-sm">
+                            <div className="mb-8 p-4 bg-card/10 rounded-lg text-center backdrop-blur-sm">
                                 <p className="font-medium flex items-center justify-center gap-2">
                                     <Clock className="w-4 h-4" /> Offer ending soon!
                                 </p>

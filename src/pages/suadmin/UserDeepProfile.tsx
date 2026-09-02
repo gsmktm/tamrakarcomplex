@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { USER_ACTIVITY_HISTORY_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,7 @@ export default function UserDeepProfile() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("user_activity_history")
-        .select("*")
+        .select(USER_ACTIVITY_HISTORY_COLUMNS.join(","))
         .eq("user_id", id)
         .order("created_at", { ascending: false });
       if (error) throw error;

@@ -13,7 +13,24 @@ import { useProductSearch } from "@/hooks/useProductSearch";
 import { Product } from "@/types/product";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const BRANDS = ["All Brands", "Apple", "Samsung", "Xiaomi", "Vivo", "OPPO", "Realme"];
+const BRANDS = [
+  "All Brands",
+  "Ai+",
+  "Apple",
+  "Honor",
+  "Infinix",
+  "Motorola",
+  "Nothing",
+  "OPPO",
+  "OnePlus",
+  "POCO",
+  "Realme",
+  "Samsung",
+  "Tecno",
+  "Vivo",
+  "Xiaomi",
+  "ZTE",
+];
 const BUDGETS = [
   { label: "Any Budget", min: 0, max: 1000000 },
   { label: "Under 20k", min: 0, max: 20000 },

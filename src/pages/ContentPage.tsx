@@ -15,9 +15,68 @@ type ContentPageModel = {
   title: string;
   content: string | null;
   description?: string | null;
+  meta_title?: string | null;
+  meta_description?: string | null;
+  og_image?: string | null;
 };
 
 const fallbackPages: Record<string, { title: string; content: string; description: string }> = {
+  "shipping-delivery": {
+    title: "Shipping & Delivery Policy",
+    description: "How delivery, pickup, charges, timing, and order confirmation work for Tamrakar Complex marketplace purchases.",
+    content: `
+      <section>
+        <p className="text-sm text-muted-foreground mb-6">Last updated: July 27, 2026</p>
+        <p className="mb-4"><strong>TamrakarComplex.com is a marketplace and product-discovery platform.</strong> Independent stores may sell and fulfil products. Tamrakar Complex is not a manufacturer or an authorized representative of every brand displayed on the website.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Order confirmation</h2>
+        <p className="mb-4">A product is available for online purchase only when its page shows an active purchase option and current stock status. Reference prices and assisted purchase enquiries are not confirmed orders. The seller must confirm the exact variant, final price, stock, warranty, invoice availability, delivery area, and payment method before payment.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Delivery and pickup</h2>
+        <p className="mb-4">Delivery coverage, courier, delivery time, and charges depend on the individual seller and destination. These details must be shown or confirmed before the customer completes payment. Store pickup may be offered when the seller confirms the collection location and time.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Delays and non-delivery</h2>
+        <p className="mb-4">If an accepted order is delayed or not delivered, contact the fulfilling seller first and keep the order confirmation and payment record. You can also contact Tamrakar Complex through our Contact page so we can record and help route the complaint.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Questions before ordering</h2>
+        <p>Do not pay until the seller has disclosed the full amount, including delivery charges. For help, visit <a href="/contact-us">Contact Us</a>.</p>
+      </section>
+    `,
+  },
+  "returns-refunds": {
+    title: "Returns, Refunds & Cancellations",
+    description: "Clear return, refund, cancellation, and dispute information for purchases made through Tamrakar Complex sellers.",
+    content: `
+      <section>
+        <p className="text-sm text-muted-foreground mb-6">Last updated: July 27, 2026</p>
+        <p className="mb-4"><strong>Returns and warranty terms are seller-specific.</strong> The seller must disclose the applicable return window, eligible condition, exclusions, warranty provider, and refund method before payment. Tamrakar Complex does not advertise a platform-wide return period where one has not been agreed by the fulfilling seller.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Before you pay</h2>
+        <ul className="list-disc pl-6 mb-6 space-y-2">
+          <li>Confirm the exact model, colour, RAM/storage variant, condition, and included accessories.</li>
+          <li>Ask who provides the warranty and obtain the warranty and invoice terms in writing.</li>
+          <li>Confirm the seller's return deadline, restocking or delivery deductions, and refund processing method.</li>
+        </ul>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Wrong, damaged, or undelivered orders</h2>
+        <p className="mb-4">Notify the fulfilling seller promptly using the contact details on the order or store page. Keep packaging, photos, invoice, payment receipt, and communication records. Do not send a product back until the seller provides return instructions.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Cancellations and refunds</h2>
+        <p className="mb-4">Cancellation is subject to the seller's disclosed terms and whether fulfilment has started. An approved refund is returned through the method agreed with the seller. Processing time depends on the seller and payment provider and must be communicated when the refund is approved.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Escalating a problem</h2>
+        <p>If the seller does not respond or follow the terms disclosed before purchase, submit the order details through <a href="/contact-us">Contact Us</a>. Tamrakar Complex can document and route the dispute but cannot replace rights or obligations that belong to the independent seller.</p>
+      </section>
+    `,
+  },
+  "marketplace-disclosure": {
+    title: "Marketplace & Pricing Disclosure",
+    description: "Understand Tamrakar Complex product listings, reference prices, independent sellers, and purchase availability.",
+    content: `
+      <section>
+        <p className="text-sm text-muted-foreground mb-6">Last updated: July 27, 2026</p>
+        <p className="mb-4">TamrakarComplex.com combines a product information catalog, Nepal market price references, independent store listings, and selected online-purchase products.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Who sells the product?</h2>
+        <p className="mb-4">Independent stores are responsible for their listings, stock, fulfilment, invoice, warranty, returns, and refunds unless a product page explicitly identifies Tamrakar Complex as the seller. Displaying a brand name or product does not imply a brand partnership or authorization.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Reference price versus purchasable offer</h2>
+        <p className="mb-4">A “price in Nepal” may be a catalog reference and can change. It is not a confirmed offer unless the exact product page shows a working purchase option, in-stock status, final price, and seller. Assisted purchase buttons request confirmation; they do not guarantee stock or create an order.</p>
+        <h2 className="text-2xl font-bold mt-8 mb-4">Accuracy and corrections</h2>
+        <p>We work to keep listing information current. Customers should report an incorrect price, seller identity, image, or availability through <a href="/contact-us">Contact Us</a>. Sellers must correct or remove inaccurate listings promptly.</p>
+      </section>
+    `,
+  },
   "privacy-policy": {
     title: "Privacy Policy | Tamrakar Complex Official",
     description: "Official Privacy Policy for Tamrakar Complex. Learn how we protect your data, manage marketplace transactions, and ensure secure gadget repairs in Nepal.",
@@ -215,7 +274,10 @@ export default function ContentPage({ slug: propSlug }: ContentPageProps) {
         return {
           title: data.title ?? "",
           content: data.content ?? null,
-          description: data.description ?? null,
+          description: (data as any).description ?? null,
+          meta_title: (data as any).meta_title ?? null,
+          meta_description: (data as any).meta_description ?? null,
+          og_image: (data as any).og_image ?? null,
         };
       }
 
@@ -253,7 +315,12 @@ export default function ContentPage({ slug: propSlug }: ContentPageProps) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <SEO title={page.title} description={page.description || page.title} url={slug ? `/${slug}` : undefined} />
+      <SEO
+        title={page.meta_title || page.title}
+        description={page.meta_description || page.description || page.title}
+        image={page.og_image || undefined}
+        url={slug ? `/${slug}` : undefined}
+      />
       <Header />
       <main className="container max-w-4xl flex-1 py-10">
         <h1 className="mb-6 text-4xl font-bold">{page.title}</h1>

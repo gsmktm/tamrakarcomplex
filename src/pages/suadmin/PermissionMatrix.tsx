@@ -59,8 +59,9 @@ export default function PermissionMatrix() {
     mutationFn: async () => {
       if (!selectedStaffId || !localPermissions) return;
 
+      const currentUser = (await supabase.auth.getUser()).data.user;
       const updates = Object.entries(localPermissions).map(([moduleKey, perms]) => ({
-        user_id: selectedStaffId,
+        staff_user_id: selectedStaffId,
         module_key: moduleKey,
         can_view: perms.view,
         can_create: perms.create,
@@ -69,12 +70,13 @@ export default function PermissionMatrix() {
         can_approve: perms.approve,
         can_assign: perms.assign,
         can_export: perms.export,
+        granted_by: currentUser?.id ?? null,
         updated_at: new Date().toISOString()
       }));
 
       const { error } = await supabase
-        .from("staffadmin_permissions")
-        .upsert(updates, { onConflict: "user_id,module_key" });
+        .from("staff_permissions" as any)
+        .upsert(updates, { onConflict: "staff_user_id,module_key" });
 
       if (error) throw error;
     },

@@ -14,6 +14,9 @@ export default function Wishlist() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const { items, clearWishlist, removeItem } = useWishlist();
+  const itemPath = (product: (typeof items)[number]) => product.source_type === "store_product"
+    ? `/marketplace/listing/${product.store_product_id || product.id}`
+    : `/product/${product.slug}`;
 
   const handleMoveToCart = (productId: string) => {
     const product = items.find((entry) => entry.id === productId);
@@ -81,7 +84,7 @@ export default function Wishlist() {
                   {items.map((product) => (
                     <Card key={product.id} className="overflow-hidden border-border/60 bg-card/70">
                       <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center">
-                        <Link to={`/product/${product.slug}`} className="shrink-0">
+                        <Link to={itemPath(product)} className="shrink-0">
                           <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-secondary/40 p-4">
                             <SafeImage src={product.image} alt={product.name} className="h-full w-full object-contain" aspect="square" />
                           </div>
@@ -89,7 +92,7 @@ export default function Wishlist() {
 
                         <div className="min-w-0 flex-1 space-y-2">
                           {product.brand ? <div className="text-sm text-muted-foreground">{product.brand}</div> : null}
-                          <Link to={`/product/${product.slug}`} className="block font-display text-xl font-semibold transition-colors hover:text-primary">
+                          <Link to={itemPath(product)} className="block font-display text-xl font-semibold transition-colors hover:text-primary">
                             {product.name}
                           </Link>
                           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">

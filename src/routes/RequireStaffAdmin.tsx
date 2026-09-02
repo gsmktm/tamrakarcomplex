@@ -1,10 +1,11 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { StaffPermissionAction } from "@/lib/permissions";
 import { usePermissions } from "@/hooks/usePermissions";
+import { getAuthPathForLocation } from "@/lib/authRedirects";
 
 interface RequireStaffAdminProps {
   children: ReactNode;
@@ -16,8 +17,20 @@ export function RequireStaffAdmin({ children, module, action = "view" }: Require
   const { role, loading, user } = useAuth();
   const location = useLocation();
   const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const [authTimedOut, setAuthTimedOut] = useState(false);
+  const isResolvingAuth = loading || (!!user && !role);
 
-  if (loading || permissionsLoading) {
+  useEffect(() => {
+    if (!isResolvingAuth) {
+      setAuthTimedOut(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setAuthTimedOut(true), 2500);
+    return () => window.clearTimeout(timer);
+  }, [isResolvingAuth]);
+
+  if ((isResolvingAuth && !authTimedOut) || (user && permissionsLoading)) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -26,7 +39,7 @@ export function RequireStaffAdmin({ children, module, action = "view" }: Require
   }
 
   if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    return <Navigate to={getAuthPathForLocation(location)} replace />;
   }
 
   const isStaffOrSu = role === "staffadmin" || role === "suadmin";
@@ -45,7 +58,7 @@ export function RequireStaffAdmin({ children, module, action = "view" }: Require
             </h2>
             <p className="text-muted-foreground">
               {!isStaffOrSu 
-                ? `This area is reserved for platform staff. Your current role (${role}) does not have permission to view this page.`
+                ? `This area is reserved for platform staff. Your current role (${role ?? "not assigned"}) does not have permission to view this page.`
                 : `You don't have the required permissions (${action} on ${module}) to access this feature.`}
             </p>
           </div>

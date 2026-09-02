@@ -11,8 +11,10 @@ export type RepairRequestRecord = {
   phone: string | null;
   location: string | null;
   status: string | null;
+  tracking_id: string | null;
   tracking_code: string | null;
   assigned_to: string | null;
+  assigned_store_id: string | null;
   estimated_cost: number | null;
   final_cost: number | null;
   created_at: string;

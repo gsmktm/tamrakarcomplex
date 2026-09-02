@@ -43,17 +43,19 @@ import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
+import { useMyStores } from "@/hooks/useMyStores";
 import { STORES } from "@/data/storeData";
 import { BASIC_TAMRAKAR_STORES } from "@/data/basicStoreData";
 import { SEEDED_FALLBACK_STORES, storeDirectoryService, type StoreDirectoryItem } from "@/services/storeDirectoryService";
 import { SEO } from "@/components/common/SEO";
 import { isAdminRole } from "@/lib/roles";
-import { fetchStoreTierOverrides, resolveTierForStore } from "@/lib/storeTier";
-import { cn } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import type { SellListingRow, StorePageRow, StoreRow } from "@/types/app";
 import { sanitizeThemeForPackage } from "@/lib/storeThemeBuilder";
 import { absoluteUrl, breadcrumbSchema } from "@/lib/seo";
 import { getPublicStoreSlug } from "@/lib/storeRoutes";
+import { LATEST_MOBILE_BUYING_PRICES } from "@/data/latestMobileBuyingPrices";
+import { isValidEmail, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeOptionalText, sanitizeText } from "@/lib/security";
 
 type StoreDetailRow = StoreRow & {
   subscription_tier?: string;
@@ -64,20 +66,69 @@ type StoreDetailRow = StoreRow & {
   cover_image_url?: string | null;
   seo_slug?: string | null;
   public_status?: string | null;
+  // columns added via migrations — extend the base StoreRow type
+  slug?: string | null;
+  status?: string | null;
+  theme_slug?: string | null;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  meta_keywords?: string | null;
 };
 
-function isMissingRelationshipError(error: unknown) {
-  const message = (error as { message?: string })?.message;
-  const code = (error as { code?: string })?.code;
-  if (!message && !code) return false;
-  return (
-    code === "PGRST200" ||
-    code === "PGRST202" ||
-    code === "PGRST205" ||
-    message?.includes("Could not find a relationship") ||
-    message?.includes("Could not find the table") ||
-    message?.includes("schema cache")
-  );
+function normalizeStoreIdentifier(value: unknown) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function defaultInventoryForStore(storeId: string, storeName: string) {
+  const preferredBrand = /apple|iphone|i-fix/i.test(storeName) ? "Apple" : null;
+  const preferred = preferredBrand ? LATEST_MOBILE_BUYING_PRICES.filter((item) => item.brand === preferredBrand) : [];
+  const diverse = ["Samsung", "Apple", "Xiaomi", "Vivo", "OnePlus"]
+    .map((brand) => LATEST_MOBILE_BUYING_PRICES.find((item) => item.brand === brand))
+    .filter(Boolean);
+  return [...preferred, ...diverse]
+    .filter((item, index, all) => all.findIndex((candidate) => candidate?.brand === item?.brand && candidate?.model === item?.model) === index)
+    .slice(0, 5)
+    .map((item, index) => ({
+      id: `default-${storeId}-phone-${index}`,
+      store_id: storeId,
+      title: `${item!.brand} ${item!.model}`,
+      brand: item!.brand,
+      model: item!.model,
+      product_type: "new_phone",
+      condition: "new",
+      storage: item!.model.match(/\(([^)]*(?:GB|TB)[^)]*)\)/i)?.[1] || null,
+      price: item!.price,
+      discount_price: item!.previousPrice ? item!.price : null,
+      price_mrp: item!.previousPrice || item!.price,
+      stock_quantity: 1,
+      stock: 1,
+      images: [],
+      status: "active",
+      description: "Current Nepal buying-price reference. Confirm final price, color, warranty and stock with the store.",
+      is_default_inventory: true,
+    }));
+}
+
+function defaultAccessoriesForStore(storeId: string) {
+  return [
+    ["20W USB-C Fast Charger", "Chargers", 1999],
+    ["USB-C Fast Charging Cable", "Cables", 799],
+    ["Tempered Glass Installation", "Protection", 499],
+    ["Protective Phone Case", "Cases", 999],
+  ].map(([title, category, price], index) => ({ id: `default-${storeId}-accessory-${index}`, store_id: storeId, title, category, brand: "Universal", price, stock_quantity: 5, images: [], status: "active" }));
+}
+
+function defaultServicesForStore(storeId: string) {
+  return [
+    ["Device diagnostic assessment", "Smartphone Repair", 500, "30–60 minutes"],
+    ["Screen replacement assessment", "Smartphone Repair", null, "Same day estimate"],
+    ["Battery replacement assessment", "Smartphone Repair", null, "Same day estimate"],
+    ["Legal carrier unlock assessment", "Network Unlocking", null, "1–3 business days"],
+    ["Account and activation-lock guidance", "Unlocking Guidance", null, "By assessment"],
+  ].map(([service_name, device_type, estimated_price, estimated_time], index) => ({
+    id: `default-${storeId}-service-${index}`, store_id: storeId, service_name, device_type, estimated_price, estimated_time,
+    description: String(device_type).includes("Unlock") ? "Eligibility-based, lawful service only. Ownership and carrier requirements apply." : "Professional assessment with a confirmed quote before work begins.", status: "active",
+  }));
 }
 
 const serviceAccents = [
@@ -124,228 +175,42 @@ function StoreQuickActions({
   showOwnerActions?: boolean;
   reviewCount?: number;
 }) {
+  const actions = [
+    { title: "Shop products", description: "Live phones, prices and verified offers", label: "Browse products", href: `/marketplace?store=${storeId}`, icon: ShoppingBag, tone: "from-blue-500/20 to-cyan-500/5 text-blue-400" },
+    { title: "Check inventory", description: "See current stock and buying prices", label: "View stock", href: "#inventory", icon: Smartphone, tone: "from-emerald-500/20 to-teal-500/5 text-emerald-400", anchor: true },
+    { title: "Exchange a phone", description: "Value your device and upgrade", label: "Start exchange", href: `/exchange-your-phone?store=${storeId}`, icon: ArrowRightLeft, tone: "from-amber-500/20 to-orange-500/5 text-amber-400" },
+    { title: "Book a repair", description: "Diagnostics, parts and repair booking", label: "Book repair", href: `/repair/custom?store=${storeId}`, icon: Wrench, tone: "from-fuchsia-500/20 to-rose-500/5 text-fuchsia-400" },
+    { title: "Unlock eligibility", description: "Lawful carrier-unlock assessment", label: "Check eligibility", href: `/unlocking?store=${storeId}`, icon: Lock, tone: "from-indigo-500/20 to-violet-500/5 text-indigo-400" },
+    { title: "Customer reviews", description: reviewCount ? `${reviewCount} verified customer reviews` : "Ratings and customer experiences", label: "Read reviews", href: "#reviews", icon: Star, tone: "from-yellow-500/20 to-amber-500/5 text-yellow-400", anchor: true },
+  ];
+
   return (
-    <div
-      className={cn(
-        "mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2",
-        showOwnerActions ? "lg:grid-cols-6" : "lg:grid-cols-5",
-        isPremiumTheme ? "text-white" : "",
-      )}
-    >
-      <Card
-        className={cn(
-          "rounded-2xl border transition-colors",
-          isPremiumTheme ? "border-white/10 bg-white/5 hover:bg-white/8" : "border-border/60 bg-background/70 hover:bg-muted/30",
-        )}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div
-              className={cn(
-                "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-                isPremiumTheme ? "bg-blue-500/15 text-blue-300" : "bg-primary/10 text-primary",
-              )}
-            >
-              <ShoppingBag className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Buy</div>
-              <div className={cn("text-xs leading-5", isPremiumTheme ? "text-white/55" : "text-muted-foreground")}>
-                Browse this store’s live listings.
+    <div className={cn("mt-8 space-y-4", isPremiumTheme ? "text-white" : "")}>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {actions.map((action) => {
+          const Icon = action.icon;
+          const content = (
+            <>
+              <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br", action.tone)}><Icon className="h-5 w-5" /></div>
+              <div className="min-w-0 flex-1">
+                <div className={cn("font-bold", isPremiumTheme ? "text-white" : "text-foreground")}>{action.title}</div>
+                <div className={cn("mt-1 text-xs leading-5", isPremiumTheme ? "text-white/50" : "text-muted-foreground")}>{action.description}</div>
+                <div className={cn("mt-3 inline-flex items-center text-xs font-bold", isPremiumTheme ? "text-white/80" : "text-primary")}>{action.label}<ArrowUpRight className="ml-1.5 h-3.5 w-3.5" /></div>
               </div>
-            </div>
-          </div>
-          <Button asChild size="sm" className={cn("mt-3 w-full rounded-xl", isPremiumTheme ? "bg-blue-600/80 hover:bg-blue-600" : "")}>
-            <Link to={`/marketplace?store=${storeId}`}>View Products</Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card
-        className={cn(
-          "rounded-2xl border transition-colors",
-          isPremiumTheme ? "border-white/10 bg-white/5 hover:bg-white/8" : "border-border/60 bg-background/70 hover:bg-muted/30",
-        )}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div
-              className={cn(
-                "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-                isPremiumTheme ? "bg-amber-500/15 text-amber-300" : "bg-amber-500/10 text-amber-600",
-              )}
-            >
-              <ArrowRightLeft className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Exchange</div>
-              <div className={cn("text-xs leading-5", isPremiumTheme ? "text-white/55" : "text-muted-foreground")}>
-                Swap your phone with a newer one.
-              </div>
-            </div>
-          </div>
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className={cn(
-              "mt-3 w-full rounded-xl",
-              isPremiumTheme ? "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white" : "",
-            )}
-          >
-            <Link to={`/exchange-your-phone?store=${storeId}`}>Start Exchange</Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card
-        className={cn(
-          "rounded-2xl border transition-colors",
-          isPremiumTheme ? "border-white/10 bg-white/5 hover:bg-white/8" : "border-border/60 bg-background/70 hover:bg-muted/30",
-        )}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div
-              className={cn(
-                "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-                isPremiumTheme ? "bg-emerald-500/15 text-emerald-300" : "bg-emerald-500/10 text-emerald-600",
-              )}
-            >
-              <Star className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Reviews</div>
-              <div className={cn("text-xs leading-5", isPremiumTheme ? "text-white/55" : "text-muted-foreground")}>
-                {reviewCount ? `${reviewCount} customer reviews` : "See what others say"}
-              </div>
-            </div>
-          </div>
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className={cn(
-              "mt-3 w-full rounded-xl",
-              isPremiumTheme ? "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white" : "",
-            )}
-          >
-            <a href="#reviews">View Reviews</a>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card
-        className={cn(
-          "rounded-2xl border transition-colors",
-          isPremiumTheme ? "border-white/10 bg-white/5 hover:bg-white/8" : "border-border/60 bg-background/70 hover:bg-muted/30",
-        )}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div
-              className={cn(
-                "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-                isPremiumTheme ? "bg-rose-500/15 text-rose-300" : "bg-rose-500/10 text-rose-600",
-              )}
-            >
-              <Smartphone className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Inventory</div>
-              <div className={cn("text-xs leading-5", isPremiumTheme ? "text-white/55" : "text-muted-foreground")}>
-                Browse live stock & prices.
-              </div>
-            </div>
-          </div>
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className={cn(
-              "mt-3 w-full rounded-xl",
-              isPremiumTheme ? "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white" : "",
-            )}
-          >
-            <a href="#inventory">Check Stock</a>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card
-        className={cn(
-          "rounded-2xl border transition-colors",
-          isPremiumTheme ? "border-white/10 bg-white/5 hover:bg-white/8" : "border-border/60 bg-background/70 hover:bg-muted/30",
-        )}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div
-              className={cn(
-                "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-                isPremiumTheme ? "bg-fuchsia-500/15 text-fuchsia-300" : "bg-fuchsia-500/10 text-fuchsia-600",
-              )}
-            >
-              <Wrench className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Repair</div>
-              <div className={cn("text-xs leading-5", isPremiumTheme ? "text-white/55" : "text-muted-foreground")}>
-                Book a repair request.
-              </div>
-            </div>
-          </div>
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className={cn(
-              "mt-3 w-full rounded-xl",
-              isPremiumTheme ? "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white" : "",
-            )}
-          >
-            <Link to={`/repair/custom?store=${storeId}`}>Book Repair</Link>
-          </Button>
-        </CardContent>
-      </Card>
+            </>
+          );
+          const classes = cn("group flex min-h-36 items-start gap-4 rounded-3xl border p-5 text-left transition-all hover:-translate-y-1 hover:shadow-xl", isPremiumTheme ? "border-white/10 bg-card/5 hover:border-white/20 hover:bg-card/8" : "border-border/60 bg-background/75 hover:border-primary/25");
+          return action.anchor
+            ? <a key={action.title} href={action.href} className={classes}>{content}</a>
+            : <Link key={action.title} to={action.href} className={classes}>{content}</Link>;
+        })}
+      </div>
 
       {showOwnerActions ? (
-        <Card
-          className={cn(
-            "rounded-2xl border transition-colors",
-            isPremiumTheme ? "border-white/10 bg-white/5 hover:bg-white/8" : "border-border/60 bg-background/70 hover:bg-muted/30",
-          )}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div
-                className={cn(
-                  "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-                  isPremiumTheme ? "bg-white/10 text-white" : "bg-muted text-foreground",
-                )}
-              >
-                <Plus className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <div className={cn("text-sm font-semibold", isPremiumTheme ? "text-white" : "")}>Add Product</div>
-                <div className={cn("text-xs leading-5", isPremiumTheme ? "text-white/55" : "text-muted-foreground")}>
-                  Create a marketplace listing.
-                </div>
-              </div>
-            </div>
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className={cn(
-                "mt-3 w-full rounded-xl",
-                isPremiumTheme ? "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white" : "",
-              )}
-            >
-              <Link to={`/marketplace/sell?store=${storeId}`}>Add Listing</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <div className={cn("flex flex-col gap-4 rounded-3xl border border-dashed p-5 sm:flex-row sm:items-center sm:justify-between", isPremiumTheme ? "border-white/15 bg-card/3" : "border-primary/25 bg-primary/5")}>
+          <div className="flex items-center gap-4"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Plus className="h-5 w-5" /></div><div><div className="font-bold">Store management</div><div className={cn("text-sm", isPremiumTheme ? "text-white/50" : "text-muted-foreground")}>Add products and manage your live store inventory.</div></div></div>
+          <div className="flex gap-2"><Button variant="outline" asChild><Link to="/storeadmin/products">Manage inventory</Link></Button><Button asChild><Link to={`/marketplace/sell?store=${storeId}`}>Add product</Link></Button></div>
+        </div>
       ) : null}
     </div>
   );
@@ -357,7 +222,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -377,6 +241,7 @@ export default function StoreDetail() {
   const id = params.id ?? params.slug ?? params.shop_no;
   const location = useLocation();
   const { user, role } = useAuth();
+  const { data: manageableStores = [] } = useMyStores();
   const isAdmin = isAdminRole(role);
   const queryClient = useQueryClient();
   
@@ -387,15 +252,130 @@ export default function StoreDetail() {
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<any>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [purchaseNote, setPurchaseRequestNote] = useState("");
+  const [submittingAction, setSubmittingAction] = useState<"purchase" | "inquiry" | "exchange" | "review" | null>(null);
 
   const handlePurchaseRequest = async () => {
-    if (!selectedInventoryItem) return;
-    
-    // In a real app, this would insert into a 'purchase_requests' table
-    toast.success(`Request sent to ${store?.name} for ${selectedInventoryItem.title}!`);
-    setPurchaseDialogOpen(false);
-    setSelectedInventoryItem(null);
-    setPurchaseRequestNote("");
+    if (!selectedInventoryItem || !store?.id || submittingAction) return;
+    setSubmittingAction("purchase");
+    try {
+      const result = await storeDirectoryService.createStoreLead(store.id, {
+        customer_name: sanitizeText(user?.user_metadata?.full_name || user?.email || "Signed-in customer", 120),
+        customer_email: user?.email ? normalizeEmail(user.email) : null,
+        customer_phone: null,
+        message: sanitizeText(
+          `Purchase request for ${selectedInventoryItem.title}.${purchaseNote ? ` Note: ${purchaseNote}` : ""}`,
+          1500,
+        ),
+        lead_type: "purchase",
+        status: "new",
+        source_page: window.location.pathname,
+      });
+      if (!result.submitted) throw new Error("The request was not confirmed by the database");
+      toast.success(`Request sent to ${store.name} for ${selectedInventoryItem.title}!`);
+      setPurchaseDialogOpen(false);
+      setSelectedInventoryItem(null);
+      setPurchaseRequestNote("");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleInquirySubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!store?.id || submittingAction) return;
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    const phone = normalizePhone(String(values.get("phone") || ""));
+    const email = normalizeEmail(String(values.get("email") || ""));
+    if (!isValidNepalPhone(phone)) return toast.error("Enter a valid Nepal phone number");
+    if (email && !isValidEmail(email)) return toast.error("Enter a valid email address");
+    setSubmittingAction("inquiry");
+    try {
+      const result = await storeDirectoryService.createStoreLead(store.id, {
+        customer_name: sanitizeText(String(values.get("name") || ""), 120),
+        customer_phone: phone,
+        customer_email: email || null,
+        message: sanitizeText(String(values.get("message") || ""), 1500),
+        lead_type: "inquiry",
+        status: "new",
+        source_page: window.location.pathname,
+      });
+      if (!result.submitted) throw new Error("The inquiry was not confirmed by the database");
+      toast.success("Inquiry sent! The store will contact you soon.");
+      form.reset();
+      setInquiryDialogOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleExchangeSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!store?.id || submittingAction) return;
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    const phone = normalizePhone(String(values.get("phone") || ""));
+    const expectedValue = Number(values.get("expected_value"));
+    if (!isValidNepalPhone(phone)) return toast.error("Enter a valid Nepal phone number");
+    if (!Number.isFinite(expectedValue) || expectedValue <= 0) return toast.error("Enter a valid expected value");
+    setSubmittingAction("exchange");
+    try {
+      const result = await storeDirectoryService.createExchangeRequest(store.id, {
+        customer_name: sanitizeText(String(values.get("name") || ""), 120),
+        customer_phone: phone,
+        old_device: {
+          brand: sanitizeText(String(values.get("brand") || ""), 80),
+          model: sanitizeText(String(values.get("model") || ""), 120),
+          condition: sanitizeText(String(values.get("condition") || "good"), 40),
+          storage: "",
+          defects: [],
+        },
+        new_device: {},
+        trade_in_value: expectedValue,
+        status: "pending",
+        notes: sanitizeOptionalText(String(values.get("notes") || ""), 1500),
+      });
+      if (!result.submitted) throw new Error("The exchange request was not confirmed by the database");
+      toast.success("Exchange request sent!");
+      form.reset();
+      setExchangeDialogOpen(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleReviewSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!store?.id || submittingAction) return;
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    if (reviewRating < 1 || reviewRating > 5) return toast.error("Select a rating from 1 to 5");
+    setSubmittingAction("review");
+    try {
+      const { error, status } = await supabase.from("store_reviews").insert({
+        store_id: store.id,
+        customer_name: sanitizeText(String(values.get("name") || ""), 120),
+        rating: reviewRating,
+        review_text: sanitizeText(String(values.get("review") || ""), 2000),
+        status: "pending",
+      });
+      if (error) throw error;
+      if (status < 200 || status >= 300) throw new Error("The review was not confirmed by the database");
+      toast.success("Thank you! Your review was submitted for moderation.");
+      form.reset();
+      setReviewDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["store_reviews", store.id] });
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setSubmittingAction(null);
+    }
   };
 
   // Determine lookup type based on route
@@ -409,7 +389,8 @@ export default function StoreDetail() {
     item.id === id ||
     item.slug === id ||
     (lookupType === "shop_no" && item.shop_no === id) ||
-    item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === id
+    item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === id ||
+    (lookupType !== "shop_no" && normalizeStoreIdentifier(item.name) === normalizeStoreIdentifier(id))
   );
 
   const toLocalStoreFallback = (
@@ -444,105 +425,20 @@ export default function StoreDetail() {
     queryKey: ["store", lookupType, id],
     queryFn: async () => {
       if (!id) throw new Error("missing_store_id");
+      try {
+        const identifierType = lookupType === "shop_no" ? "shop_no" : isUuid ? "id" : "slug";
+        const serviceStore = await storeDirectoryService.getStoreByIdentifier({
+          type: identifierType,
+          value: id,
+          complex_zone: lookupType === "shop_no" ? "inside" : undefined,
+        });
+        if (serviceStore) return toStoreDetailFallback(serviceStore);
+      } catch {
+        // The local fallback below keeps seeded profiles available offline.
+      }
+
       if (localStoreFallback) return toLocalStoreFallback(localStoreFallback);
-
-      const buildStoreQuery = () => {
-        const query = supabase.from("stores");
-        if (lookupType === "shop_no") return query.eq("shop_no", id).eq("complex_zone", "inside");
-        if (lookupType === "slug") return query.or(`seo_slug.eq.${id},slug.eq.${id}`);
-        
-        // id_or_slug logic
-        if (isUuid) return query.eq("id", id);
-        return query.or(`seo_slug.eq.${id},slug.eq.${id}`);
-      };
-
-      const fromDirectoryFallback = async () => {
-        try {
-          const identifierType = lookupType === "shop_no" ? "shop_no" : "slug";
-          const serviceMatch = await storeDirectoryService.getStoreByIdentifier({
-            type: identifierType,
-            value: id,
-            complex_zone: lookupType === "shop_no" ? "inside" : undefined,
-          });
-
-          if (serviceMatch) {
-            return toStoreDetailFallback(serviceMatch);
-          }
-        } catch {
-          // Fall through to the full directory scan below.
-        }
-
-        try {
-          const directory = await storeDirectoryService.getStoresForDirectory();
-          const match = directory.data.find((item) =>
-            item.id === id ||
-            item.slug === id ||
-            item.seo_slug === id ||
-            item.shop_no === id ||
-            item.shop_number === id ||
-            item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === id
-          );
-
-          if (match) {
-            return toStoreDetailFallback(match);
-          }
-        } catch {
-          // Keep store profile URLs working even when optional detail joins fail.
-        }
-        return null;
-      };
-
-      const tryWithJoin = async () =>
-        buildStoreQuery()
-          .select("*, store_subscriptions(packages(slug))")
-          .maybeSingle();
-
-      const tryBase = async () =>
-        buildStoreQuery()
-          .select("*")
-          .maybeSingle();
-
-      let data: StoreRow & { subscription_tier?: string } | null = null;
-
-      const joined = await tryWithJoin();
-      if (!joined.error && joined.data) {
-        data = joined.data;
-      } else if (isMissingRelationshipError(joined.error)) {
-        const base = await tryBase();
-        if (base.error) {
-          const directoryStore = await fromDirectoryFallback();
-          if (directoryStore) return directoryStore;
-          if (localStoreFallback) return toLocalStoreFallback(localStoreFallback);
-          throw base.error;
-        }
-        data = base.data || await fromDirectoryFallback();
-      } else {
-        // Unknown error: still try base query before failing
-        const base = await tryBase();
-        if (base.error) {
-          const directoryStore = await fromDirectoryFallback();
-          if (directoryStore) return directoryStore;
-          if (localStoreFallback) return toLocalStoreFallback(localStoreFallback);
-          throw joined.error;
-        }
-        data = base.data || await fromDirectoryFallback();
-      }
-
-      if (!data) {
-        const directoryStore = await fromDirectoryFallback();
-        if (directoryStore) return directoryStore;
-        if (localStoreFallback) return toLocalStoreFallback(localStoreFallback);
-        throw new Error("Store not found");
-      }
-
-      const overrides = await fetchStoreTierOverrides(supabase);
-
-      // Flatten the subscription tier from join (if present) and merge with override/default rules
-      const sub = (data as { store_subscriptions?: unknown }).store_subscriptions?.[0] || (data as { store_subscriptions?: unknown }).store_subscriptions;
-      const joinedTier = sub?.packages?.slug as string | undefined;
-      const tier = resolveTierForStore({ ...data, subscription_tier: joinedTier }, overrides);
-
-      return { ...data, subscription_tier: tier };
+      throw new Error("Store not found");
     },
     enabled: !!id,
     staleTime: 10 * 60 * 1000, // 10 min — store profile changes infrequently
@@ -567,10 +463,12 @@ export default function StoreDetail() {
     staleTime: 3 * 60 * 1000, // 3 min — listings can change more often
   });
 
-  const { data: inventory, isLoading: isInventoryLoading } = useQuery({
+  const { data: inventory } = useQuery({
     queryKey: ["store_inventory", store?.id],
     queryFn: async () => {
       if (!store?.id) return [];
+      const fallback = defaultInventoryForStore(store.id, store.name);
+      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(store.id)) return fallback;
       const { data, error } = await supabase
         .from("store_products")
         .select("*")
@@ -578,8 +476,8 @@ export default function StoreDetail() {
         .eq("status", "active")
         .gt("stock_quantity", 0)
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      if (error) return fallback;
+      return data?.length ? data : fallback;
     },
     enabled: !!store?.id,
     staleTime: 3 * 60 * 1000, // 3 min
@@ -603,21 +501,23 @@ export default function StoreDetail() {
   });
 
   const averageRating = storeReviews?.length 
-    ? (storeReviews.reduce((acc, r) => acc + r.rating, 0) / storeReviews.length).toFixed(1)
+    ? (storeReviews.reduce((acc: number, r: { rating: number }) => acc + r.rating, 0) / storeReviews.length).toFixed(1)
     : null;
 
   const { data: storeAccessories } = useQuery({
     queryKey: ["store_accessories", store?.id],
     queryFn: async () => {
       if (!store?.id) return [];
+      const fallback = defaultAccessoriesForStore(store.id);
+      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(store.id)) return fallback;
       const { data, error } = await supabase
         .from("store_accessories")
         .select("*")
         .eq("store_id", store.id)
         .eq("status", "active")
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      if (error) return fallback;
+      return data?.length ? data : fallback;
     },
     enabled: !!store?.id,
     staleTime: 10 * 60 * 1000, // 10 min — accessories catalogue is stable
@@ -627,14 +527,16 @@ export default function StoreDetail() {
     queryKey: ["store_repair_services", store?.id],
     queryFn: async () => {
       if (!store?.id) return [];
+      const fallback = defaultServicesForStore(store.id);
+      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(store.id)) return fallback;
       const { data, error } = await supabase
         .from("store_repair_services")
         .select("*")
         .eq("store_id", store.id)
         .eq("status", "active")
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      if (error) return fallback;
+      return data?.length ? data : fallback;
     },
     enabled: !!store?.id,
     staleTime: 10 * 60 * 1000, // 10 min — repair catalogue is stable
@@ -734,7 +636,12 @@ export default function StoreDetail() {
   const isGold = tier === "gold";
   const isSilver = tier === "silver";
   const isBasic = tier === "free";
-  const showOwnerActions = !!user && (user.id === store.owner_id || isAdmin);
+  const showOwnerActions = !!user && (
+    user.id === store.owner_id ||
+    user.id === store.owner_user_id ||
+    isAdmin ||
+    manageableStores.some((manageableStore) => manageableStore.id === store.id)
+  );
 
   const services = Array.isArray((store as StoreRow & { services_json?: string[] }).services_json) && (store as StoreRow & { services_json?: string[] }).services_json.length > 0
     ? (store as StoreRow & { services_json?: string[] }).services_json
@@ -743,9 +650,18 @@ export default function StoreDetail() {
   const featuredIds = Array.isArray((store as StoreRow & { featured_product_ids?: string[] }).featured_product_ids)
     ? (store as StoreRow & { featured_product_ids?: string[] }).featured_product_ids
     : [];
-  const activeProducts = featuredIds.length > 0
+  const curatedListings = featuredIds.length > 0
     ? (products ?? []).filter((product) => featuredIds.includes(product.id))
     : products ?? [];
+  const activeProducts: any[] = curatedListings.length > 0
+    ? curatedListings
+    : (inventory ?? []).map((item: any) => ({
+        ...item,
+        category: item.product_type || "new phone",
+        price: Number(item.discount_price ?? item.price_sale ?? item.price ?? 0),
+        description: item.description || "Current store inventory. Confirm final price, warranty, color and stock before purchase.",
+        inventory_source: true,
+      }));
 
   // Theme configuration
   const storeTheme = sanitizeThemeForPackage(tier, store?.theme_slug);
@@ -790,9 +706,9 @@ export default function StoreDetail() {
       accentBg: "bg-slate-100",
       border: "border-slate-400/20",
       gradient: "from-slate-300/15 via-white/5 to-transparent",
-      button: "bg-slate-100 hover:bg-white text-slate-950",
+      button: "bg-slate-100 hover:bg-card text-slate-950",
       orb1: "bg-slate-400/10",
-      orb2: "bg-white/5",
+      orb2: "bg-card/5",
       orb3: "bg-slate-600/10"
     },
     modern: {
@@ -814,7 +730,7 @@ export default function StoreDetail() {
       gradient: "from-yellow-200/15 via-white/5 to-transparent",
       button: "bg-yellow-200 hover:bg-yellow-100 text-slate-950",
       orb1: "bg-yellow-200/10",
-      orb2: "bg-white/5",
+      orb2: "bg-card/5",
       orb3: "bg-stone-500/10"
     },
     premium: {
@@ -834,9 +750,9 @@ export default function StoreDetail() {
       accentBg: "bg-stone-100",
       border: "border-stone-200/15",
       gradient: "from-stone-100/15 via-white/5 to-transparent",
-      button: "bg-stone-100 hover:bg-white text-stone-950",
+      button: "bg-stone-100 hover:bg-card text-stone-950",
       orb1: "bg-stone-300/10",
-      orb2: "bg-white/5",
+      orb2: "bg-card/5",
       orb3: "bg-zinc-500/10"
     },
     atelier: {
@@ -857,9 +773,9 @@ export default function StoreDetail() {
       border: "border-white/15",
       gradient: "from-white/10 via-white/5 to-transparent",
       button: "bg-[var(--store-theme-color)] text-white",
-      orb1: "bg-white/10",
-      orb2: "bg-white/5",
-      orb3: "bg-white/8"
+      orb1: "bg-card/10",
+      orb2: "bg-card/5",
+      orb3: "bg-card/8"
     },
     amber: {
       bg: "bg-slate-950",
@@ -867,131 +783,151 @@ export default function StoreDetail() {
       accentBg: "bg-amber-400",
       border: "border-amber-500/20",
       gradient: "from-amber-500/20 via-orange-400/5 to-transparent",
-      button: "bg-amber-500 hover:bg-amber-600 text-black",
+      button: "bg-amber-500 hover:bg-amber-600 text-foreground",
       orb1: "bg-amber-700/20",
       orb2: "bg-orange-600/15",
       orb3: "bg-yellow-800/18"
     }
   };
 
-  const currentTheme = themes[storeTheme as keyof typeof themes] || themes.default;
-  const storeFingerprint = `${store.name} ${store.description || ""} ${services.join(" ")}`.toLowerCase();
-  const isAppleRepairBrand = /(apple|mac|macbook|iphone|ipad|repair|diagnostic)/.test(storeFingerprint);
-  const isPremiumTheme = storeTheme !== "default" || isDiamond || isGold || isAppleRepairBrand;
-  const isPremium = isDiamond;
+  // Tier-based theme selection — no heuristics, no fingerprint guessing
+  // Diamond gets their chosen theme (or premium blue default)
+  // Gold always gets amber/warm dark theme
+  // Silver gets light mode (no dark glass)
+  const baseTheme = themes[storeTheme as keyof typeof themes] || themes.premium;
+  const currentTheme = isGold && !isDiamond ? themes.amber : isDiamond ? baseTheme : themes.default;
+  const isPremiumTheme = isDiamond || isGold; // dark glass only for paid dark tiers
+  const isDiamondFull = isDiamond; // diamond-exclusive sections (marquee, devices, issues, Apple CTA)
+  void isDiamondFull; // used below in JSX via isDiamond directly
 
   // Public store profiles:
   // - Basic: minimal public profile (no contact details)
   // - Silver: minimal profile to guests, full profile to logged-in users
   // - Gold/Diamond: full profile public
+  // ── FREE TIER ────────────────────────────────────────────────────────────
   if (isBasic && !isAdmin) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex min-h-screen flex-col bg-zinc-50 dark:bg-zinc-950">
         <SEO title={store.seo_title || `${store.name} — Store`} description={store.seo_description || store.description || undefined} />
         <Header />
-        <main className="container flex-1 py-10">
-          <Button variant="ghost" asChild className="pl-0 text-muted-foreground hover:bg-transparent">
-            <Link to="/stores" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Stores
-            </Link>
-          </Button>
-
-          <div className="mx-auto mt-6 max-w-3xl">
-            <Card className="rounded-3xl border-border/60 bg-card/80 backdrop-blur">
-              <CardContent className="p-6">
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                  <div className="h-20 w-20 rounded-2xl border bg-muted overflow-hidden flex items-center justify-center shrink-0">
+        <main className="flex-1">
+          {/* Grayscale hero band */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-zinc-200 via-zinc-100 to-white dark:from-zinc-900 dark:via-zinc-800 dark:to-zinc-950 border-b border-zinc-200 dark:border-zinc-800">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_rgba(161,161,170,0.18)_0%,_transparent_70%)]" />
+            <div className="container relative py-10">
+              <Button variant="ghost" asChild className="pl-0 mb-6 text-zinc-500 hover:bg-transparent hover:text-zinc-800 dark:hover:text-zinc-200">
+                <Link to="/stores" className="flex items-center gap-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Stores
+                </Link>
+              </Button>
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div className="relative shrink-0">
+                  <div className="h-20 w-20 rounded-2xl border-2 border-zinc-300 dark:border-zinc-700 bg-card dark:bg-zinc-800 overflow-hidden flex items-center justify-center shadow-sm">
                     {store.logo_url ? (
-                      <img src={store.logo_url} alt={store.name} className="h-full w-full object-cover" />
+                      <img src={store.logo_url} alt={store.name} className="h-full w-full object-cover grayscale" />
                     ) : (
-                      <StoreIcon className="h-8 w-8 text-muted-foreground" />
+                      <StoreIcon className="h-8 w-8 text-zinc-400" />
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-bold tracking-tight">{store.name}</h1>
-                      <Badge variant="outline" className="rounded-full">
-                        Basic
-                      </Badge>
-                      {store.is_verified ? (
-                        <Badge variant="outline" className="rounded-full border-emerald-400/30 bg-emerald-500/10 text-emerald-700">
-                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                          Verified
-                        </Badge>
-                      ) : null}
-                    </div>
-	                    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-	                      <span className="inline-flex items-center gap-1.5">
-	                        <MapPin className="h-4 w-4 text-primary" />
-	                        {store.location}
-	                      </span>
-	                    </div>
-
-	                    {store.description ? (
-	                      <p className="mt-3 text-sm leading-6 text-muted-foreground">{store.description}</p>
-	                    ) : null}
-
-	                    {store.website || store.map_url ? (
-	                      <div className="mt-4 flex flex-wrap gap-2">
-	                        {store.website ? (
-	                          <Button asChild size="sm" variant="outline" className="rounded-full">
-	                            <a href={store.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2">
-	                              <Globe2 className="h-4 w-4" />
-	                              Website
-	                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-	                            </a>
-	                          </Button>
-	                        ) : null}
-	                        {store.map_url ? (
-	                          <Button asChild size="sm" variant="outline" className="rounded-full">
-	                            <a href={store.map_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2">
-	                              <MapPin className="h-4 w-4" />
-	                              Map
-	                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-	                            </a>
-	                          </Button>
-	                        ) : null}
-	                      </div>
-	                    ) : null}
-
-	                    {Array.isArray(store.services) && store.services.length > 0 ? (
-	                      <div className="mt-4 flex flex-wrap gap-2">
-	                        {store.services.slice(0, 6).map((s) => (
-	                          <Badge key={s} variant="secondary" className="rounded-full">
-                            {s}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    <div className="mt-6 rounded-2xl border bg-muted/30 p-4">
-                      <div className="flex items-start gap-3">
-                        <Lock className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                        <div className="text-sm">
-                          <div className="font-semibold">Basic listing</div>
-                          <div className="mt-1 text-muted-foreground">
-                            Contact details and premium sections are hidden for free listings.
-                          </div>
-                        </div>
-                      </div>
-	                      {showOwnerActions ? (
-	                        <div className="mt-4 flex flex-wrap gap-2">
-	                          <Button asChild variant="outline" className="rounded-full">
-	                            <Link to={`/stores/${store.id}/manage`}>
-	                              <Settings className="mr-2 h-4 w-4" />
-	                              Manage Store
-	                            </Link>
-	                          </Button>
-	                        </div>
-	                      ) : null}
-	                    </div>
-
-                    <StoreQuickActions storeId={store.id} isPremiumTheme={false} showOwnerActions={showOwnerActions} reviewCount={storeReviews?.length} />
+                  <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-zinc-300 dark:bg-zinc-600 border-2 border-white dark:border-zinc-950 flex items-center justify-center">
+                    <Lock className="h-2.5 w-2.5 text-zinc-600 dark:text-zinc-300" />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">{store.name}</h1>
+                    <Badge className="rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 border-0 text-xs font-medium">
+                      Free Listing
+                    </Badge>
+                    {store.is_verified && (
+                      <Badge className="rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-xs">
+                        <CheckCircle2 className="mr-1 h-3 w-3" /> Verified
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5" />{store.location}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />Free tier
+                    </span>
+                  </div>
+                  {store.description && (
+                    <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400 max-w-xl">{store.description}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="container py-8">
+            <div className="mx-auto max-w-3xl space-y-4">
+              {Array.isArray(store.services) && store.services.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {store.services.slice(0, 6).map((s) => (
+                    <span key={s} className="inline-flex items-center rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-3 py-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Locked contact card */}
+              <div className="rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-card dark:bg-zinc-900 p-6">
+                <div className="flex items-start gap-4">
+                  <div className="mt-0.5 h-10 w-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                    <Lock className="h-5 w-5 text-zinc-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-zinc-800 dark:text-zinc-200">Contact details hidden</div>
+                    <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-400 leading-5">
+                      Phone, email, map, and premium sections require Silver tier or above.
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {[Phone, Mail, MapPin].map((Icon, i) => (
+                        <div key={i} className="flex items-center gap-2 opacity-30 select-none pointer-events-none">
+                          <Icon className="h-4 w-4 text-zinc-400 shrink-0" />
+                          <div className="h-3 rounded bg-zinc-300 dark:bg-zinc-700" style={{ width: `${[140, 180, 120][i]}px` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Upgrade CTA */}
+              <div className="rounded-2xl bg-gradient-to-r from-zinc-900 to-zinc-800 dark:from-zinc-800 dark:to-zinc-700 p-6 text-white">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex-1">
+                    <div className="font-semibold text-base">Upgrade to unlock your full store profile</div>
+                    <div className="mt-1 text-sm text-zinc-400">Silver — Gold — Diamond plans available. Show contact, inventory, pages, and more.</div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    {showOwnerActions ? (
+                      <Button asChild className="rounded-full bg-card text-zinc-900 hover:bg-zinc-100 font-semibold text-sm">
+                        <Link to={`/stores/${store.id}/manage`}>
+                          <Settings className="mr-2 h-4 w-4" />Manage Store
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button asChild className="rounded-full bg-card text-zinc-900 hover:bg-zinc-100 font-semibold text-sm">
+                        <Link to="/stores/pricing">View Plans</Link>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-2xl border bg-card p-4 text-center"><Wrench className="h-6 w-6 mx-auto text-fuchsia-500 mb-2"/><p className="text-sm font-bold">Repair</p><p className="text-xs text-muted-foreground">Diagnostics &amp; parts</p></div>
+                <div className="rounded-2xl border bg-card p-4 text-center"><ShoppingBag className="h-6 w-6 mx-auto text-blue-500 mb-2"/><p className="text-sm font-bold">Sales</p><p className="text-xs text-muted-foreground">Phones &amp; accessories</p></div>
+                <div className="rounded-2xl border bg-card p-4 text-center"><ArrowRightLeft className="h-6 w-6 mx-auto text-amber-500 mb-2"/><p className="text-sm font-bold">Exchange</p><p className="text-xs text-muted-foreground">Value &amp; upgrade</p></div>
+                <div className="rounded-2xl border bg-card p-4 text-center"><Lock className="h-6 w-6 mx-auto text-indigo-500 mb-2"/><p className="text-sm font-bold">Unlocking</p><p className="text-xs text-muted-foreground">Carrier unlock</p></div>
+              </div>
+              <StoreQuickActions storeId={store.id} isPremiumTheme={false} showOwnerActions={showOwnerActions} reviewCount={storeReviews?.length} />
+            </div>
           </div>
         </main>
         <Footer />
@@ -999,112 +935,108 @@ export default function StoreDetail() {
     );
   }
 
+  // ── SILVER TIER — GUEST (not logged in) ──────────────────────────────────
   if (isSilver && !user && !isAdmin) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex min-h-screen flex-col bg-muted dark:bg-[#0d1117]">
         <SEO title={store.seo_title || `${store.name} — Store`} description={store.seo_description || store.description || undefined} />
         <Header />
-        <main className="container flex-1 py-10">
-          <Button variant="ghost" asChild className="pl-0 text-muted-foreground hover:bg-transparent">
-            <Link to="/stores" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Stores
-            </Link>
-          </Button>
-
-          <div className="mx-auto mt-6 max-w-3xl">
-            <Card className="rounded-3xl border-border/60 bg-card/80 backdrop-blur">
-              <CardContent className="p-6">
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                  <div className="h-20 w-20 rounded-2xl border bg-muted overflow-hidden flex items-center justify-center shrink-0">
-                    {store.logo_url ? (
-                      <img src={store.logo_url} alt={store.name} className="h-full w-full object-cover" />
-                    ) : (
-                      <StoreIcon className="h-8 w-8 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-bold tracking-tight">{store.name}</h1>
-                      <Badge variant="outline" className="rounded-full">
-                        Silver
-                      </Badge>
-                      {store.is_verified ? (
-                        <Badge variant="outline" className="rounded-full border-emerald-400/30 bg-emerald-500/10 text-emerald-700">
-                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                          Verified
-                        </Badge>
-                      ) : null}
+        <main className="flex-1">
+          <div className="relative overflow-hidden border-b border-border dark:border-slate-800">
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-300/60 via-slate-100/40 to-white dark:from-slate-800/80 dark:via-slate-900/60 dark:to-[#0d1117]" />
+            <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-slate-400/10 dark:bg-muted0/10 blur-3xl" />
+            <div className="absolute bottom-0 left-0 h-40 w-80 rounded-full bg-slate-300/20 dark:bg-slate-700/20 blur-3xl" />
+            <div className="container relative py-10">
+              <Button variant="ghost" asChild className="pl-0 mb-6 text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:text-slate-200">
+                <Link to="/stores" className="flex items-center gap-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Stores
+                </Link>
+              </Button>
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div className="relative shrink-0">
+                  <div className="p-0.5 rounded-2xl bg-gradient-to-br from-slate-300 via-white to-slate-400 dark:from-slate-500 dark:via-slate-700 dark:to-slate-600 shadow-lg" style={{width:"fit-content"}}>
+                    <div className="rounded-[14px] border border-border dark:border-slate-700 bg-card dark:bg-slate-900 overflow-hidden flex items-center justify-center" style={{height:"80px",width:"80px"}}>
+                      {store.logo_url ? (
+                        <img src={store.logo_url} alt={store.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <StoreIcon className="h-8 w-8 text-slate-400" />
+                      )}
                     </div>
-	                    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-	                      <span className="inline-flex items-center gap-1.5">
-	                        <MapPin className="h-4 w-4 text-primary" />
-	                        {store.location}
-	                      </span>
-	                    </div>
-
-	                    {store.description ? (
-	                      <p className="mt-3 text-sm leading-6 text-muted-foreground">{store.description}</p>
-	                    ) : null}
-
-	                    {store.website || store.map_url ? (
-	                      <div className="mt-4 flex flex-wrap gap-2">
-	                        {store.website ? (
-	                          <Button asChild size="sm" variant="outline" className="rounded-full">
-	                            <a href={store.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2">
-	                              <Globe2 className="h-4 w-4" />
-	                              Website
-	                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-	                            </a>
-	                          </Button>
-	                        ) : null}
-	                        {store.map_url ? (
-	                          <Button asChild size="sm" variant="outline" className="rounded-full">
-	                            <a href={store.map_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2">
-	                              <MapPin className="h-4 w-4" />
-	                              Map
-	                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-	                            </a>
-	                          </Button>
-	                        ) : null}
-	                      </div>
-	                    ) : null}
-
-	                    {Array.isArray(store.services) && store.services.length > 0 ? (
-	                      <div className="mt-4 flex flex-wrap gap-2">
-	                        {store.services.slice(0, 6).map((s) => (
-	                          <Badge key={s} variant="secondary" className="rounded-full">
-                            {s}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    <div className="mt-6 rounded-2xl border bg-muted/30 p-4">
-                      <div className="flex items-start gap-3">
-                        <ShieldCheck className="mt-0.5 h-5 w-5 text-primary" />
-                        <div className="text-sm">
-                          <div className="font-semibold">Login required for contact details</div>
-                          <div className="mt-1 text-muted-foreground">
-                            Silver tier stores show phone number, email, and premium sections to registered members.
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <Button asChild className="rounded-full">
-                          <Link to={`/auth?redirect=/stores/${publicStoreSlug}`}>Login / Register</Link>
-                        </Button>
-                        <Button asChild variant="outline" className="rounded-full">
-                          <Link to="/stores">Back to Directory</Link>
-                        </Button>
-                      </div>
-                    </div>
-
-                    <StoreQuickActions storeId={store.id} isPremiumTheme={false} reviewCount={storeReviews?.length} />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground dark:text-slate-100">{store.name}</h1>
+                    <Badge className="rounded-full bg-gradient-to-r from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-500 text-foreground dark:text-slate-100 border-0 text-xs font-semibold shadow-sm">
+                      ✦ Silver
+                    </Badge>
+                    {store.is_verified && (
+                      <Badge className="rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-xs">
+                        <CheckCircle2 className="mr-1 h-3 w-3" /> Verified
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground dark:text-slate-400">
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-slate-400" />{store.location}
+                    </span>
+                  </div>
+                  {store.description && (
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground dark:text-slate-400 max-w-xl">{store.description}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="container py-8">
+            <div className="mx-auto max-w-3xl space-y-4">
+              {Array.isArray(store.services) && store.services.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {store.services.slice(0, 6).map((s) => (
+                    <span key={s} className="inline-flex items-center rounded-full border border-border dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3 py-0.5 text-xs text-muted-foreground dark:text-slate-400 font-medium">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative overflow-hidden rounded-2xl border border-border dark:border-slate-700 bg-card dark:bg-slate-900 p-6 shadow-sm">
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-slate-400/60 dark:via-slate-500/60 to-transparent" />
+                <div className="flex items-start gap-4">
+                  <div className="mt-0.5 h-10 w-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center shrink-0 shadow-sm">
+                    <ShieldCheck className="h-5 w-5 text-muted-foreground dark:text-slate-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-foreground dark:text-slate-200">Members see the full profile</div>
+                    <div className="mt-1 text-sm text-muted-foreground dark:text-slate-400 leading-5">
+                      Silver tier stores unlock phone, email, and full contact for logged-in members.
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {[Phone, Mail, MapPin].map((Icon, i) => (
+                        <div key={i} className="flex items-center gap-2 opacity-25 select-none pointer-events-none">
+                          <Icon className="h-4 w-4 text-slate-400 shrink-0" />
+                          <div className="h-3 rounded-full bg-slate-300 dark:bg-slate-600" style={{ width: `${[150, 190, 130][i]}px` }} />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <Button asChild className="rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-card dark:text-foreground text-white font-semibold text-sm shadow-sm">
+                        <Link to={`/auth?redirect=/stores/${publicStoreSlug}`}>
+                          <Sparkles className="mr-2 h-3.5 w-3.5" />Login / Register
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" className="rounded-full border-slate-300 dark:border-slate-700 text-sm">
+                        <Link to="/stores">Back to Directory</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <StoreQuickActions storeId={store.id} isPremiumTheme={false} reviewCount={storeReviews?.length} />
+            </div>
           </div>
         </main>
         <Footer />
@@ -1119,9 +1051,11 @@ export default function StoreDetail() {
     .join("");
   const locationLabel = store.location.split(",")[0]?.trim() || store.location;
   
-  const diamondBadges = isPremiumTheme
-    ? ["Diamond Service Experience", "Premium Brand Presence", locationLabel]
-    : [locationLabel];
+  const diamondBadges = isDiamond
+    ? ["Diamond Tier Store", "Premium Experience", locationLabel]
+    : isGold
+      ? ["Gold Partner Store", locationLabel]
+      : [locationLabel];
 
   const trustPoints = [
     store.is_verified ? "Verified store — trust-first profile" : "Independent store profile",
@@ -1130,38 +1064,39 @@ export default function StoreDetail() {
     activeProducts.length > 0 ? `${activeProducts.length} active listings on-page` : "Ready for inventory listing",
   ];
 
-  const signatureServices = isPremiumTheme
-    ? ["MacBook Diagnostics", "iPhone Screen Repair", "iPad Service Desk", "Battery & Charging", "Board-Level Repair", "Data Safety Check"]
-    : services.length > 0
-      ? services
+  // Always use the store's actual services; fall back to tier-appropriate defaults
+  const signatureServices = services.length > 0
+    ? services
+    : isPremiumTheme
+      ? ["Device Repair", "Screen Replacement", "Battery Service", "Data Recovery", "Trade-In", "Accessories"]
       : ["Sales", "Support", "Warranty", "Trade-In", "Accessories", "Setup"];
 
   const workflowSteps = isPremiumTheme
     ? [
-        { title: "Book a Diagnosis", description: "Start with issue capture, visible symptoms, and a faster route into technical inspection.", icon: Smartphone },
-        { title: "Get a Clean Quote", description: "Transparent pricing before you commit — no hidden fees, no surprises.", icon: Award },
-        { title: "Authorize Repair", description: "Move into screen, battery, board, or device-level repair with clearer expectations.", icon: Wrench },
-        { title: "Collect & Verify", description: "Device checks, pickup, and direct follow-up through phone, map, or website.", icon: CheckCircle2 },
+        { title: "Book an Appointment", description: "Describe your issue and get a fast route into the service queue.", icon: Smartphone },
+        { title: "Get a Clear Quote", description: "Transparent pricing before you commit — no hidden fees.", icon: Award },
+        { title: "Confirm Repair", description: "Authorize the work with clear timelines and technician oversight.", icon: Wrench },
+        { title: "Collect & Verify", description: "Device tested, collected, and followed up directly by the store.", icon: CheckCircle2 },
       ]
     : [
-        { title: "Discover the Store", description: "Lead with trust signals, service categories, and stronger contact entry points.", icon: StoreIcon },
-        { title: "Choose a Service", description: "Guide visitors toward buying, support, repairs, trade-ins, or custom offerings.", icon: Star },
-        { title: "Confirm Details", description: "Use clearer calls to action for phone, location, website, and inventory.", icon: CheckCircle2 },
-        { title: "Follow Through", description: "Keep the whole experience closer to a real frontpage than a listing profile.", icon: Zap },
+        { title: "Discover the Store", description: "Find the store via directory, services, and contact details.", icon: StoreIcon },
+        { title: "Choose a Service", description: "Browse buying, repair, trade-in, or accessory options.", icon: Star },
+        { title: "Get in Touch", description: "Call, map, or visit — direct contact routes from this page.", icon: CheckCircle2 },
+        { title: "Complete the Deal", description: "Finalize purchase, repair, or exchange with the store team.", icon: Zap },
       ];
 
   const premiumPillars = isPremiumTheme
     ? [
-        "Apple repair center feel with sharper premium hierarchy",
-        "Device-first service framing for MacBook, iPhone, and iPad",
-        "Minimal, high-contrast visuals instead of generic card stacks",
-        "Repair journey sections that feel like a real branded homepage",
+        isDiamond ? "Diamond-tier store with premium presentation" : "Gold-tier partner with full contact access",
+        "Service categories clearly listed with conversion-ready layout",
+        "Live inventory, accessories, and repair catalog visible on page",
+        "Direct phone, map, and website contact routes available",
       ]
     : [
-        "Distinctive frontpage structure instead of a generic store profile",
-        "Service-first story flow with stronger section rhythm",
+        "Silver-tier store — full contact visible to logged-in members",
+        "Service-first profile with strong section rhythm",
         "Clear direct actions for contact, map, and website",
-        "Better merchandising and content on one page",
+        "Ready for inventory and custom page content",
       ];
 
   type SupportedDeviceCard = {
@@ -1175,7 +1110,7 @@ export default function StoreDetail() {
     bg?: string;
   };
 
-  const supportedDevices: SupportedDeviceCard[] = isPremiumTheme
+  const supportedDevices: SupportedDeviceCard[] = isDiamond
     ? [
         {
           title: "MacBook",
@@ -1207,7 +1142,7 @@ export default function StoreDetail() {
       ]
     : [];
 
-  const issueHighlights = isPremiumTheme
+  const issueHighlights = isDiamond
     ? [
         { title: "Battery & Power", stat: "01", description: "Fast-draining batteries, charging failure, overheating, and no-power diagnostics.", icon: BatteryCharging, color: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/20" },
         { title: "Screen & Body", stat: "02", description: "Broken display, touch issues, glass damage, frame problems, and hardware inspection.", icon: Smartphone, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
@@ -1331,7 +1266,7 @@ export default function StoreDetail() {
                 <Button
                   asChild
                   variant="outline"
-                  className={isPremiumTheme ? "gap-2 rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10" : "gap-2 rounded-full"}
+                  className={isPremiumTheme ? "gap-2 rounded-full border-white/10 bg-card/5 text-white hover:bg-card/10" : "gap-2 rounded-full"}
                 >
                   <Link to={`/stores/${store.id}/manage`}>
                     <Settings className="h-4 w-4" />
@@ -1350,11 +1285,17 @@ export default function StoreDetail() {
                   <Badge
                     className={
                       isPremiumTheme
-                        ? `rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-[11px] uppercase tracking-[0.26em] ${currentTheme.accent} hover:bg-white/10`
+                        ? `rounded-full border border-white/10 bg-card/5 px-4 py-1.5 text-[11px] uppercase tracking-[0.26em] ${currentTheme.accent} hover:bg-card/10`
                         : "rounded-full bg-foreground px-4 py-1.5 text-[11px] uppercase tracking-[0.26em] text-primary-foreground hover:bg-foreground"
                     }
                   >
-                    {isDiamond ? "Diamond Store Experience" : isPremiumTheme ? "Apple Repair Specialist" : "Gold Tier Partner"}
+                    {isDiamond
+                      ? "Diamond Store Experience"
+                      : isGold
+                        ? "Gold Partner Store"
+                        : isSilver
+                          ? "Silver Member Store"
+                          : "Basic Store"}
                   </Badge>
                   {store.is_verified && (
                     <Badge
@@ -1381,7 +1322,7 @@ export default function StoreDetail() {
                       <img
                         src={store.logo_url}
                         alt={store.name}
-                        className={`relative h-24 w-24 rounded-[28px] border object-cover shadow-2xl md:h-32 md:w-32 ${isPremiumTheme ? "border-white/10 bg-white logo-glow" : "border-border"}`}
+                        className={`relative h-24 w-24 rounded-[28px] border object-cover shadow-2xl md:h-32 md:w-32 ${isPremiumTheme ? "border-white/10 bg-card logo-glow" : "border-border"}`}
                       />
                     ) : (
                       <div
@@ -1427,7 +1368,7 @@ export default function StoreDetail() {
                           key={badge}
                           className={`rounded-full border px-3.5 py-1.5 text-[11px] uppercase tracking-[0.2em] ${
                             isPremiumTheme
-                              ? "border-white/10 bg-white/5 text-white/60"
+                              ? "border-white/10 bg-card/5 text-white/60"
                               : "border-border/60 bg-background/80 text-muted-foreground"
                           }`}
                         >
@@ -1441,25 +1382,25 @@ export default function StoreDetail() {
                 {/* Contact pills */}
                 <div className="mt-8 flex flex-wrap gap-2.5">
                   {store.location && (
-                    <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
+                    <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-card/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
                       <MapPin className={`h-3.5 w-3.5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
                       {store.location}
                     </div>
                   )}
                   {shopNumber && (
-                    <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
+                    <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-card/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
                       <StoreIcon className={`h-3.5 w-3.5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
                       Shop #{shopNumber} {floor ? `• Floor ${floor}` : ""} {block ? `• Block ${block}` : ""}
                     </div>
                   )}
                   {openingHoursText && (
-                    <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
+                    <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-card/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
                       <Clock3 className={`h-3.5 w-3.5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
                       {openingHoursText}
                     </div>
                   )}
                   {store.email && (
-                    <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
+                    <div className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm backdrop-blur ${isPremiumTheme ? "border-white/10 bg-card/5 text-white/65" : "border-border/60 bg-background/80 text-muted-foreground"}`}>
                       <Mail className={`h-3.5 w-3.5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
                       {store.email}
                     </div>
@@ -1514,7 +1455,7 @@ export default function StoreDetail() {
                       asChild
                       className={
                         isPremiumTheme
-                          ? "rounded-full border-white/12 bg-white/5 px-8 text-white hover:bg-white/10 hover:text-white"
+                          ? "rounded-full border-white/12 bg-card/5 px-8 text-white hover:bg-card/10 hover:text-white"
                           : "rounded-full px-8"
                       }
                     >
@@ -1531,7 +1472,7 @@ export default function StoreDetail() {
                       asChild
                       className={
                         isPremiumTheme
-                          ? "rounded-full px-8 text-white/75 hover:bg-white/5 hover:text-white"
+                          ? "rounded-full px-8 text-white/75 hover:bg-card/5 hover:text-white"
                           : "rounded-full px-8"
                       }
                     >
@@ -1546,7 +1487,7 @@ export default function StoreDetail() {
                 <StoreQuickActions storeId={store.id} isPremiumTheme={isPremiumTheme} showOwnerActions={showOwnerActions} reviewCount={storeReviews?.length} />
 
                 {banner.title ? (
-                  <div className={cn("mt-8 rounded-[28px] border p-6", isPremiumTheme ? "border-white/10 bg-white/5 text-white" : "bg-muted/30")}>
+                  <div className={cn("mt-8 rounded-[28px] border p-6", isPremiumTheme ? "border-white/10 bg-card/5 text-white" : "bg-muted/30")}>
                     <div className="text-xl font-bold">{banner.title}</div>
                     {banner.subtitle ? (
                       <p className={cn("mt-2 text-sm leading-6", isPremiumTheme ? "text-white/60" : "text-muted-foreground")}>{banner.subtitle}</p>
@@ -1571,7 +1512,7 @@ export default function StoreDetail() {
                 <Card
                   className={
                     isPremiumTheme
-                      ? "overflow-hidden rounded-[32px] border-white/8 bg-white/5 text-white shadow-2xl backdrop-blur-xl"
+                      ? "overflow-hidden rounded-[32px] border-white/8 bg-card/5 text-white shadow-2xl backdrop-blur-xl"
                       : "overflow-hidden rounded-[32px] border-border/60 bg-foreground text-primary-foreground shadow-2xl"
                   }
                 >
@@ -1582,15 +1523,17 @@ export default function StoreDetail() {
                           Store Pulse
                         </div>
                         <div className="mt-3 text-2xl font-bold">
-                          {isPremiumTheme ? "Apple Device Repair Center" : services.length > 0 ? services[0] : "Sales & Support"}
+                          {services.length > 0 ? services[0] : isDiamond ? "Diamond Service Center" : isGold ? "Gold Partner Store" : "Store Services"}
                         </div>
                         <p className={`mt-3 text-sm leading-6 ${isPremiumTheme ? "text-white/55" : "text-primary-foreground/70"}`}>
-                          {isPremiumTheme
-                            ? "A premium repair-center presentation with stronger issue framing, direct contact flow, and higher-end visual trust."
-                            : "Premium store layout with service-led positioning and faster contact routes."}
+                          {store.description
+                            ? store.description.slice(0, 140)
+                            : isPremiumTheme
+                              ? `${store.name} — ${tier} tier store with full contact, live inventory, and premium profile.`
+                              : "Store profile with service categories, contact routes, and direct links."}
                         </p>
                       </div>
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${isPremiumTheme ? "border border-blue-400/20 bg-blue-500/10" : "border border-white/10 bg-white/8"}`}>
+                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${isPremiumTheme ? "border border-blue-400/20 bg-blue-500/10" : "border border-white/10 bg-card/8"}`}>
                         <Sparkles className={`h-5 w-5 ${isPremiumTheme ? currentTheme.accent : "text-cyan-300"}`} />
                       </div>
                     </div>
@@ -1598,7 +1541,7 @@ export default function StoreDetail() {
                       {trustPoints.map((item) => (
                         <div
                           key={item}
-                          className={`rounded-2xl border p-3.5 text-sm ${isPremiumTheme ? "border-white/8 bg-black/25 text-white/60" : "border-white/10 bg-white/5 text-primary-foreground/75"}`}
+                          className={`rounded-2xl border p-3.5 text-sm ${isPremiumTheme ? "border-white/8 bg-black/25 text-white/60" : "border-white/10 bg-card/5 text-primary-foreground/75"}`}
                         >
                           {item}
                         </div>
@@ -1613,7 +1556,7 @@ export default function StoreDetail() {
                       key={card.label}
                       className={
                         isPremiumTheme
-                          ? "rounded-[26px] border-white/8 bg-white/4 backdrop-blur"
+                          ? "rounded-[26px] border-white/8 bg-card/4 backdrop-blur"
                           : "rounded-[26px] border-border/60 bg-card/90 shadow-sm backdrop-blur"
                       }
                     >
@@ -1640,8 +1583,8 @@ export default function StoreDetail() {
           )}
         </section>
 
-        {/* ─── MARQUEE TICKER ─── */}
-        {isPremiumTheme && (
+        {/* ─── MARQUEE TICKER — diamond only ─── */}
+        {isDiamond && (
           <div className="relative overflow-hidden border-y border-white/6 bg-[#080d1a] py-4">
             <div className="flex">
               <div className="animate-marquee flex shrink-0 items-center gap-0 whitespace-nowrap">
@@ -1672,10 +1615,10 @@ export default function StoreDetail() {
                 <div className={`text-xs font-semibold uppercase tracking-[0.28em] ${isPremiumTheme ? currentTheme.accent : "text-muted-foreground"}`}>
                   {isPremiumTheme ? "Device Service Lines" : "Signature Services"}
                 </div>
-                <h2 className={`mt-3 text-3xl font-bold tracking-tight md:text-5xl ${isPremiumTheme ? "gradient-text-apple" : ""}`}>
+                <h2 className={`mt-3 text-3xl font-bold tracking-tight md:text-5xl`}>
                   {isPremiumTheme
-                    ? "MacBook, iPhone & iPad\nRepair Pathways"
-                    : "Built like a service brand,\nnot just a listing"}
+                    ? `${store.name} — Premium Services`
+                    : "Services & what this store offers"}
                 </h2>
               </div>
               <Badge
@@ -1697,7 +1640,7 @@ export default function StoreDetail() {
                       isFeatured ? "xl:col-span-2" : ""
                     } ${
                       isPremiumTheme
-                        ? "rounded-[28px] border-white/8 bg-white/4 shadow-none backdrop-blur hover:border-blue-500/20 hover:bg-white/6"
+                        ? "rounded-[28px] border-white/8 bg-card/4 shadow-none backdrop-blur hover:border-blue-500/20 hover:bg-card/6"
                         : "rounded-[28px] border-border/60 bg-card shadow-card"
                     }`}
                   >
@@ -1709,7 +1652,7 @@ export default function StoreDetail() {
                         </div>
                         <Badge
                           variant="secondary"
-                          className={`rounded-full text-[10px] uppercase tracking-[0.18em] ${isPremiumTheme ? "border border-white/10 bg-white/5 text-white/55" : ""}`}
+                          className={`rounded-full text-[10px] uppercase tracking-[0.18em] ${isPremiumTheme ? "border border-white/10 bg-card/5 text-white/55" : ""}`}
                         >
                           0{index + 1}
                         </Badge>
@@ -1718,14 +1661,16 @@ export default function StoreDetail() {
                         {service}
                       </h3>
                       <p className={`mt-3 text-sm leading-7 ${isPremiumTheme ? "text-white/50" : "text-muted-foreground"}`}>
-                        {isPremiumTheme
-                          ? `Premium-grade ${service.toLowerCase()} service with clear diagnostics, polished intake flow, and expert technician oversight.`
-                          : `A more intentional landing-page treatment for ${service.toLowerCase()} with cleaner conversion routes and stronger trust framing.`}
+                        {store.description
+                          ? store.description.slice(0, 120)
+                          : isPremiumTheme
+                            ? `${service} — offered by this ${tier} tier store with priority service flow.`
+                            : `${service} available at ${store.name}.`}
                       </p>
-                      {isFeatured && isPremiumTheme && (
+                      {isFeatured && isDiamond && (
                         <div className="mt-6 flex flex-wrap gap-2">
-                          {["Diamond Support", "Precision Workflow", "Expert Technicians"].map((tag) => (
-                            <span key={tag} className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs text-blue-300">
+                          {["Diamond Store", "Priority Service", "Verified Partner"].map((tag) => (
+                            <span key={tag} className={`rounded-full border px-3 py-1 text-xs ${currentTheme.accent} border-current/20 bg-current/10`}>
                               {tag}
                             </span>
                           ))}
@@ -1739,8 +1684,8 @@ export default function StoreDetail() {
           </div>
         </section>
 
-        {/* ─── SUPPORTED DEVICES (Apple only) ─── */}
-        {isPremiumTheme && (
+        {/* ─── SUPPORTED DEVICES — diamond only ─── */}
+        {isDiamond && supportedDevices.length > 0 && (
           <section className="py-16 bg-[#050912]">
             <div className="container">
               <div className="mb-10">
@@ -1766,7 +1711,7 @@ export default function StoreDetail() {
                     >
                       {/* Glow orb */}
                       <div className={`absolute right-[-20%] top-[-20%] h-48 w-48 rounded-full ${device.bg || "bg-blue-600/10"} blur-3xl`} />
-                      <div className={`relative flex h-16 w-16 items-center justify-center rounded-2xl border ${device.border} bg-white/5`}>
+                      <div className={`relative flex h-16 w-16 items-center justify-center rounded-2xl border ${device.border} bg-card/5`}>
                         <Icon className={`h-8 w-8 ${device.accent}`} />
                       </div>
                       <div className={`mt-4 text-xs uppercase tracking-[0.22em] ${device.accent}`}>
@@ -1782,8 +1727,8 @@ export default function StoreDetail() {
           </section>
         )}
 
-        {/* ─── ISSUE HIGHLIGHTS (Apple only) ─── */}
-        {isPremiumTheme && (
+        {/* ─── ISSUE HIGHLIGHTS — diamond only ─── */}
+        {isDiamond && issueHighlights.length > 0 && (
           <section className="py-16 bg-[#060b18]">
             <div className="container">
               <div className="mb-10">
@@ -1801,7 +1746,7 @@ export default function StoreDetail() {
                   return (
                     <div
                       key={issue.title}
-                      className={`group relative overflow-hidden rounded-[28px] border ${issue.border} bg-white/3 p-6 transition-all duration-300 hover:-translate-y-1 hover:bg-white/5`}
+                      className={`group relative overflow-hidden rounded-[28px] border ${issue.border} bg-card/3 p-6 transition-all duration-300 hover:-translate-y-1 hover:bg-card/5`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${issue.bg}`}>
@@ -1846,7 +1791,7 @@ export default function StoreDetail() {
                     <Card
                       className={`relative overflow-hidden ${
                         isPremiumTheme
-                          ? "rounded-[28px] border-white/8 bg-white/4 backdrop-blur hover:border-blue-500/15 hover:bg-white/6"
+                          ? "rounded-[28px] border-white/8 bg-card/4 backdrop-blur hover:border-blue-500/15 hover:bg-card/6"
                           : "rounded-[28px] border-border/60 bg-card"
                       } transition-all duration-200`}
                     >
@@ -1891,26 +1836,7 @@ export default function StoreDetail() {
                 Ask about availability, pricing, or services.
               </DialogDescription>
             </DialogHeader>
-            <form className="space-y-4 py-4" onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              const { error } = await supabase.from("store_leads").insert({
-                store_id: store.id,
-                customer_name: formData.get("name"),
-                customer_phone: formData.get("phone"),
-                customer_email: formData.get("email"),
-                message: formData.get("message"),
-                lead_type: "inquiry",
-                status: "new",
-                source_page: window.location.pathname
-              });
-              if (error) {
-                toast.error(error.message);
-              } else {
-                toast.success("Inquiry sent! The store will contact you soon.");
-                setInquiryDialogOpen(false);
-              }
-            }}>
+            <form className="space-y-4 py-4" onSubmit={handleInquirySubmit}>
               <div className="space-y-2">
                 <Label>Your Name</Label>
                 <Input name="name" placeholder="John Doe" required />
@@ -1930,7 +1856,10 @@ export default function StoreDetail() {
                 <Textarea name="message" placeholder="I am interested in..." required />
               </div>
               <DialogFooter>
-                <Button type="submit">Submit Inquiry</Button>
+                <Button type="submit" disabled={submittingAction !== null}>
+                  {submittingAction === "inquiry" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Submit Inquiry
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -1944,32 +1873,7 @@ export default function StoreDetail() {
                 Get a valuation from {store?.name} for your old device.
               </DialogDescription>
             </DialogHeader>
-            <form className="space-y-4 py-4" onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              const { error } = await supabase.from("exchange_requests").insert({
-                store_id: store.id,
-                customer_name: formData.get("name"),
-                customer_phone: formData.get("phone"),
-                old_device: {
-                  brand: formData.get("brand"),
-                  model: formData.get("model"),
-                  condition: formData.get("condition"),
-                  storage: "",
-                  defects: []
-                },
-                new_device: {},
-                trade_in_value: parseFloat(formData.get("expected_value") as string),
-                status: "pending",
-                notes: formData.get("notes")
-              });
-              if (error) {
-                toast.error(error.message);
-              } else {
-                toast.success("Exchange request sent!");
-                setExchangeDialogOpen(false);
-              }
-            }}>
+            <form className="space-y-4 py-4" onSubmit={handleExchangeSubmit}>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Your Name</Label>
@@ -2013,14 +1917,17 @@ export default function StoreDetail() {
                 <Textarea name="notes" placeholder="Anything else we should know?" />
               </div>
               <DialogFooter>
-                <Button type="submit">Submit Request</Button>
+                <Button type="submit" disabled={submittingAction !== null}>
+                  {submittingAction === "exchange" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Submit Request
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
 
         {/* ─── LIVE INVENTORY ─── */}
-        {(inventory?.length ?? 0) > 0 && (
+        {(inventory?.length ?? 0) > 0 && activeProducts.length === 0 && (
           <section id="inventory" className={`py-20 ${isPremiumTheme ? "bg-[#080d1a]" : "bg-muted/30"}`}>
             <div className="container">
               <div className="mb-12 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -2050,11 +1957,11 @@ export default function StoreDetail() {
                     key={item.id}
                     className={`group relative flex flex-col overflow-hidden transition-all duration-500 hover:-translate-y-2 ${
                       isPremiumTheme
-                        ? "rounded-[32px] border-white/8 bg-white/4 shadow-none hover:border-emerald-500/30 hover:shadow-[0_30px_70px_rgba(16,185,129,0.15)]"
+                        ? "rounded-[32px] border-white/8 bg-card/4 shadow-none hover:border-emerald-500/30 hover:shadow-[0_30px_70px_rgba(16,185,129,0.15)]"
                         : "rounded-[32px] border-border/60 bg-card shadow-card hover:shadow-2xl"
                     }`}
                   >
-                    <div className={`relative aspect-[4/3] overflow-hidden ${isPremiumTheme ? "bg-white/3" : "bg-muted/30"}`}>
+                    <div className={`relative aspect-[4/3] overflow-hidden ${isPremiumTheme ? "bg-card/3" : "bg-muted/30"}`}>
                       {(Array.isArray(item.images) && item.images.length > 0) ? (
                         <img
                           src={item.images[0]}
@@ -2107,13 +2014,13 @@ export default function StoreDetail() {
 
                       <div className="mt-4 flex flex-wrap gap-2">
                         {item.storage && (
-                          <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-medium ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/60" : "bg-muted"}`}>
+                          <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-medium ${isPremiumTheme ? "border-white/10 bg-card/5 text-white/60" : "bg-muted"}`}>
                             <HardDrive className="h-3 w-3" />
                             {item.storage}
                           </div>
                         )}
                         {item.color && (
-                          <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-medium ${isPremiumTheme ? "border-white/10 bg-white/5 text-white/60" : "bg-muted"}`}>
+                          <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-medium ${isPremiumTheme ? "border-white/10 bg-card/5 text-white/60" : "bg-muted"}`}>
                             <Zap className="h-3 w-3" />
                             {item.color}
                           </div>
@@ -2159,7 +2066,7 @@ export default function StoreDetail() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-2xl border">
-                <div className="h-16 w-16 bg-white rounded-xl border flex items-center justify-center overflow-hidden shrink-0">
+                <div className="h-16 w-16 bg-card rounded-xl border flex items-center justify-center overflow-hidden shrink-0">
                   {Array.isArray(selectedInventoryItem?.images) && selectedInventoryItem.images.length > 0 ? (
                     <img src={selectedInventoryItem.images[0]} className="h-full w-full object-contain" />
                   ) : (
@@ -2193,7 +2100,10 @@ export default function StoreDetail() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setPurchaseDialogOpen(false)}>Cancel</Button>
-              <Button className="bg-primary text-white" onClick={handlePurchaseRequest}>Send Request</Button>
+              <Button className="bg-primary text-white" onClick={handlePurchaseRequest} disabled={submittingAction !== null}>
+                {submittingAction === "purchase" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Send Request
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2207,13 +2117,13 @@ export default function StoreDetail() {
                   Store Services
                 </div>
                 <h2 className={`mt-3 text-3xl font-bold tracking-tight md:text-4xl ${isPremiumTheme ? "text-white" : ""}`}>
-                  Professional Repair Catalog
+                  Repair & Unlock Services
                 </h2>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {repairServices?.map((service: any) => (
-                  <Card key={service.id} className={`${isPremiumTheme ? "bg-white/5 border-white/10 text-white" : ""}`}>
+                  <Card key={service.id} className={`${isPremiumTheme ? "bg-card/5 border-white/10 text-white" : ""}`}>
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start">
                         <div>
@@ -2234,6 +2144,13 @@ export default function StoreDetail() {
                           {service.estimated_price ? `Rs. ${service.estimated_price.toLocaleString()}` : "Contact for Quote"}
                         </div>
                       </div>
+                      <Button className="mt-5 w-full" asChild>
+                        <Link to={String(service.device_type || "").toLowerCase().includes("unlock")
+                          ? `/unlocking?store=${store.id}`
+                          : `/repair/custom?store=${store.id}&service=${encodeURIComponent(service.service_name)}`}>
+                          {String(service.device_type || "").toLowerCase().includes("unlock") ? "Check unlock eligibility" : "Book assessment"}
+                        </Link>
+                      </Button>
                     </CardContent>
                   </Card>
                 ))}
@@ -2264,7 +2181,7 @@ export default function StoreDetail() {
                     key={acc.id} 
                     className={`group relative flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
                       isPremiumTheme 
-                        ? "bg-white/5 border-white/10 text-white hover:bg-white/8 hover:border-white/20" 
+                        ? "bg-card/5 border-white/10 text-white hover:bg-card/8 hover:border-white/20"
                         : "border-border/60 hover:shadow-lg"
                     }`}
                   >
@@ -2325,7 +2242,8 @@ export default function StoreDetail() {
         )}
 
         {/* ─── PRODUCTS ─── */}
-        <section className={`py-16 ${isPremiumTheme ? "bg-[#060b18]" : "bg-secondary/20"}`}>
+        {(isProductsLoading || activeProducts.length > 0) && (
+        <section id="inventory" className={`scroll-mt-24 py-16 ${isPremiumTheme ? "bg-[#060b18]" : "bg-secondary/20"}`}>
           <div className="container">
             <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
@@ -2348,7 +2266,7 @@ export default function StoreDetail() {
             {isProductsLoading ? (
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className={`h-[320px] animate-pulse rounded-[28px] ${isPremiumTheme ? "bg-white/4" : "bg-muted"}`} />
+                  <div key={i} className={`h-[320px] animate-pulse rounded-[28px] ${isPremiumTheme ? "bg-card/4" : "bg-muted"}`} />
                 ))}
               </div>
             ) : activeProducts.length > 0 ? (
@@ -2358,11 +2276,11 @@ export default function StoreDetail() {
                     key={product.id}
                     className={`group overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
                       isPremiumTheme
-                        ? "rounded-[28px] border-white/8 bg-white/4 shadow-none hover:border-blue-500/20 hover:shadow-[0_20px_60px_rgba(59,130,246,0.12)]"
+                        ? "rounded-[28px] border-white/8 bg-card/4 shadow-none hover:border-blue-500/20 hover:shadow-[0_20px_60px_rgba(59,130,246,0.12)]"
                         : "rounded-[28px] border-border/60 bg-card shadow-card hover:shadow-xl"
                     }`}
                   >
-                    <div className={`relative aspect-square overflow-hidden ${isPremiumTheme ? "bg-white/3" : "bg-muted/30"}`}>
+                    <div className={`relative aspect-square overflow-hidden ${isPremiumTheme ? "bg-card/3" : "bg-muted/30"}`}>
                       {product.images && product.images.length > 0 ? (
                         <img
                           src={product.images[0]}
@@ -2372,7 +2290,7 @@ export default function StoreDetail() {
                       ) : (
                         <div className={`flex h-full items-center justify-center ${isPremiumTheme ? "bg-gradient-to-br from-blue-950 to-slate-950" : "bg-gradient-to-br from-slate-100 to-slate-200"}`}>
                           <div className="text-center">
-                            <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${isPremiumTheme ? "bg-white/8" : "bg-white/60"}`}>
+                            <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${isPremiumTheme ? "bg-card/8" : "bg-card/60"}`}>
                               <StoreIcon className={`h-7 w-7 ${isPremiumTheme ? "text-white/40" : "text-muted-foreground"}`} />
                             </div>
                             <div className={`mt-3 text-xs uppercase tracking-[0.22em] ${isPremiumTheme ? "text-white/30" : "text-muted-foreground"}`}>
@@ -2387,7 +2305,7 @@ export default function StoreDetail() {
                       >
                         {(product.condition || "active").replace("_", " ")}
                       </Badge>
-                      <div className={`absolute bottom-4 right-4 rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur ${isPremiumTheme ? "bg-white/10 text-white/60" : "bg-background/90 shadow-sm"}`}>
+                      <div className={`absolute bottom-4 right-4 rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur ${isPremiumTheme ? "bg-card/10 text-white/60" : "bg-background/90 shadow-sm"}`}>
                         #{index + 1}
                       </div>
                     </div>
@@ -2397,7 +2315,9 @@ export default function StoreDetail() {
                         {product.category}
                       </div>
                       <h3 className={`mt-2.5 line-clamp-2 text-lg font-bold tracking-tight transition-colors ${isPremiumTheme ? "text-white group-hover:text-blue-300" : "group-hover:text-primary"}`}>
-                        <Link to={`/marketplace/listing/${product.id}`}>{product.title}</Link>
+                        {product.inventory_source && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(product.id)
+                          ? product.title
+                          : <Link to={`/marketplace/listing/${product.id}`}>{product.title}</Link>}
                       </h3>
                       <div className={`mt-3 text-2xl font-bold ${isPremiumTheme ? currentTheme.accent : "text-primary"}`}>
                         Rs. {product.price.toLocaleString()}
@@ -2405,25 +2325,25 @@ export default function StoreDetail() {
                       <p className={`mt-2.5 line-clamp-2 text-sm leading-6 ${isPremiumTheme ? "text-white/45" : "text-muted-foreground"}`}>
                         {product.description || "Explore this listing for detailed specs, pricing, and direct store contact."}
                       </p>
-                      <Button
-                        className={`mt-5 w-full rounded-full ${isPremiumTheme ? "bg-blue-600/80 text-white hover:bg-blue-600" : ""}`}
-                        asChild
-                      >
-                        <Link to={`/marketplace/listing/${product.id}`}>
-                          View Listing
-                          <ArrowUpRight className="ml-2 h-4 w-4" />
-                        </Link>
-                      </Button>
+                      {product.inventory_source && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(product.id) ? (
+                        <Button className={`mt-5 w-full rounded-full ${isPremiumTheme ? "bg-blue-600/80 text-white hover:bg-blue-600" : ""}`} onClick={() => { setSelectedInventoryItem(product); setPurchaseDialogOpen(true); }}>
+                          Check stock <ShoppingBag className="ml-2 h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button className={`mt-5 w-full rounded-full ${isPremiumTheme ? "bg-blue-600/80 text-white hover:bg-blue-600" : ""}`} asChild>
+                          <Link to={`/marketplace/listing/${product.id}`}>View & buy <ArrowUpRight className="ml-2 h-4 w-4" /></Link>
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
               </div>
             ) : (
               <Card
-                className={`rounded-[32px] border-dashed ${isPremiumTheme ? "border-white/10 bg-white/3" : "border-border/60 bg-card/70"}`}
+                className={`rounded-[32px] border-dashed ${isPremiumTheme ? "border-white/10 bg-card/3" : "border-border/60 bg-card/70"}`}
               >
                 <CardContent className="p-12 text-center">
-                  <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${isPremiumTheme ? "border border-white/10 bg-white/5" : "bg-secondary"}`}>
+                  <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${isPremiumTheme ? "border border-white/10 bg-card/5" : "bg-secondary"}`}>
                     <StoreIcon className={`h-8 w-8 ${isPremiumTheme ? "text-white/30" : "text-primary"}`} />
                   </div>
                   <h3 className={`mt-6 text-xl font-bold ${isPremiumTheme ? "text-white" : ""}`}>No live listings yet</h3>
@@ -2435,6 +2355,7 @@ export default function StoreDetail() {
             )}
           </div>
         </section>
+        )}
 
         {/* ─── BRAND STORY + CONTACT ─── */}
         <section className={`py-16 ${isPremiumTheme ? "bg-[#050912]" : ""}`}>
@@ -2457,9 +2378,11 @@ export default function StoreDetail() {
                     Brand Story
                   </div>
                   <h2 className={`mt-3 text-3xl font-bold tracking-tight ${isPremiumTheme ? "text-white" : "text-primary-foreground"}`}>
-                    {isPremiumTheme
-                      ? "A diamond-grade Apple service presence"
-                      : "A store profile that feels like a destination"}
+                    {isDiamond
+                      ? "Diamond-tier store — premium experience"
+                      : isPremiumTheme
+                        ? "Gold-tier partner — full access profile"
+                        : "A store profile that feels like a destination"}
                   </h2>
                   <p className={`mt-4 max-w-xl text-sm leading-7 ${isPremiumTheme ? "text-white/55" : "text-primary-foreground/76"}`}>
                     {store.description ||
@@ -2471,8 +2394,8 @@ export default function StoreDetail() {
                         key={item}
                         className={`flex items-start gap-3 rounded-2xl border p-4 ${
                           isPremiumTheme
-                            ? "border-white/8 bg-white/4"
-                            : "border-white/10 bg-white/5"
+                            ? "border-white/8 bg-card/4"
+                            : "border-white/10 bg-card/5"
                         }`}
                       >
                         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
@@ -2487,7 +2410,7 @@ export default function StoreDetail() {
 
               {/* Contact + Policy */}
               <div className="space-y-5">
-                <Card className={isPremiumTheme ? "rounded-[30px] border-white/8 bg-white/4 backdrop-blur" : "rounded-[30px] border-border/60"}>
+                <Card className={isPremiumTheme ? "rounded-[30px] border-white/8 bg-card/4 backdrop-blur" : "rounded-[30px] border-border/60"}>
                   <CardContent className="p-7">
                     <div className={`text-xs font-semibold uppercase tracking-[0.26em] ${isPremiumTheme ? currentTheme.accent : "text-muted-foreground"}`}>
                       Visit The Store
@@ -2504,7 +2427,7 @@ export default function StoreDetail() {
                       {store.phone && (
                         <a
                           href={`tel:${store.phone}`}
-                          className={`group rounded-2xl border p-4 transition-all ${isPremiumTheme ? "border-white/8 bg-white/3 hover:border-blue-500/20 hover:bg-blue-500/5" : "border-border/60 hover:bg-secondary/50"}`}
+                          className={`group rounded-2xl border p-4 transition-all ${isPremiumTheme ? "border-white/8 bg-card/3 hover:border-blue-500/20 hover:bg-blue-500/5" : "border-border/60 hover:bg-secondary/50"}`}
                         >
                           <Phone className={`h-5 w-5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
                           <div className={`mt-3 text-sm font-semibold ${isPremiumTheme ? "text-white" : ""}`}>
@@ -2516,7 +2439,7 @@ export default function StoreDetail() {
                       {store.email && (
                         <a
                           href={`mailto:${store.email}`}
-                          className={`group rounded-2xl border p-4 transition-all ${isPremiumTheme ? "border-white/8 bg-white/3 hover:border-blue-500/20 hover:bg-blue-500/5" : "border-border/60 hover:bg-secondary/50"}`}
+                          className={`group rounded-2xl border p-4 transition-all ${isPremiumTheme ? "border-white/8 bg-card/3 hover:border-blue-500/20 hover:bg-blue-500/5" : "border-border/60 hover:bg-secondary/50"}`}
                         >
                           <Mail className={`h-5 w-5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
                           <div className={`mt-3 text-sm font-semibold ${isPremiumTheme ? "text-white" : ""}`}>Email</div>
@@ -2528,7 +2451,7 @@ export default function StoreDetail() {
                           href={store.map_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`group rounded-2xl border p-4 transition-all ${isPremiumTheme ? "border-white/8 bg-white/3 hover:border-blue-500/20 hover:bg-blue-500/5" : "border-border/60 hover:bg-secondary/50"}`}
+                          className={`group rounded-2xl border p-4 transition-all ${isPremiumTheme ? "border-white/8 bg-card/3 hover:border-blue-500/20 hover:bg-blue-500/5" : "border-border/60 hover:bg-secondary/50"}`}
                         >
                           <MapPin className={`h-5 w-5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
                           <div className={`mt-3 text-sm font-semibold ${isPremiumTheme ? "text-white" : ""}`}>Map</div>
@@ -2540,7 +2463,7 @@ export default function StoreDetail() {
                           href={store.website}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`group rounded-2xl border p-4 transition-all ${isPremiumTheme ? "border-white/8 bg-white/3 hover:border-blue-500/20 hover:bg-blue-500/5" : "border-border/60 hover:bg-secondary/50"}`}
+                          className={`group rounded-2xl border p-4 transition-all ${isPremiumTheme ? "border-white/8 bg-card/3 hover:border-blue-500/20 hover:bg-blue-500/5" : "border-border/60 hover:bg-secondary/50"}`}
                         >
                           <Globe2 className={`h-5 w-5 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
                           <div className={`mt-3 text-sm font-semibold ${isPremiumTheme ? "text-white" : ""}`}>Website</div>
@@ -2551,7 +2474,7 @@ export default function StoreDetail() {
                   </CardContent>
                 </Card>
 
-                <Card className={isPremiumTheme ? "rounded-[30px] border-white/8 bg-white/4 backdrop-blur" : "rounded-[30px] border-border/60"}>
+                <Card className={isPremiumTheme ? "rounded-[30px] border-white/8 bg-card/4 backdrop-blur" : "rounded-[30px] border-border/60"}>
                   <CardContent className="p-7">
                     <div className={`text-xs font-semibold uppercase tracking-[0.26em] ${isPremiumTheme ? currentTheme.accent : "text-muted-foreground"}`}>
                       Service Policy
@@ -2576,7 +2499,7 @@ export default function StoreDetail() {
                       ].map((policy) => (
                         <div
                           key={policy.title}
-                          className={`rounded-2xl border p-4 ${isPremiumTheme ? "border-white/8 bg-white/3" : "border-border/60"}`}
+                          className={`rounded-2xl border p-4 ${isPremiumTheme ? "border-white/8 bg-card/3" : "border-border/60"}`}
                         >
                           <div className={`font-semibold ${isPremiumTheme ? "text-white" : ""}`}>{policy.title}</div>
                           <p className={`mt-2 text-sm leading-6 ${isPremiumTheme ? "text-white/50" : "text-muted-foreground"}`}>
@@ -2589,7 +2512,7 @@ export default function StoreDetail() {
                 </Card>
 
                 {Object.keys(openingHours).length > 0 ? (
-                  <Card className={isPremiumTheme ? "rounded-[28px] border-white/8 bg-white/5 text-white backdrop-blur-xl" : "rounded-[28px]"}>
+                  <Card className={isPremiumTheme ? "rounded-[28px] border-white/8 bg-card/5 text-white backdrop-blur-xl" : "rounded-[28px]"}>
                     <CardContent className="p-6">
                       <div className="mb-4 flex items-center gap-2 font-semibold">
                         <Clock3 className={`h-4 w-4 ${isPremiumTheme ? currentTheme.accent : "text-primary"}`} />
@@ -2610,7 +2533,7 @@ export default function StoreDetail() {
                 ) : null}
 
                 {socialLinkEntries.length > 0 ? (
-                  <Card className={isPremiumTheme ? "rounded-[28px] border-white/8 bg-white/5 text-white backdrop-blur-xl" : "rounded-[28px]"}>
+                  <Card className={isPremiumTheme ? "rounded-[28px] border-white/8 bg-card/5 text-white backdrop-blur-xl" : "rounded-[28px]"}>
                     <CardContent className="p-6">
                       <div className="mb-4 font-semibold">More Contacts</div>
                       <div className="flex flex-wrap gap-2">
@@ -2620,7 +2543,7 @@ export default function StoreDetail() {
                           const href = isUrl ? value : isPhone ? `tel:${value.replace(/[^+\d]/g, "")}` : value;
 
                           return (
-                            <Button key={label} asChild size="sm" variant="outline" className={isPremiumTheme ? "rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white" : "rounded-full"}>
+                            <Button key={label} asChild size="sm" variant="outline" className={isPremiumTheme ? "rounded-full border-white/10 bg-card/5 text-white hover:bg-card/10 hover:text-white" : "rounded-full"}>
                               <a href={href} target={isUrl ? "_blank" : undefined} rel={isUrl ? "noopener noreferrer" : undefined}>
                                 {label.replace(/_/g, " ")}
                                 {isUrl ? <ExternalLink className="ml-2 h-3.5 w-3.5" /> : null}
@@ -2653,7 +2576,7 @@ export default function StoreDetail() {
                 {publishedPages.map((page, index) => (
                   <Card
                     key={page.id}
-                    className={`overflow-hidden ${isPremiumTheme ? "rounded-[28px] border-white/8 bg-white/4 backdrop-blur" : "rounded-[28px] border-border/60 shadow-card"}`}
+                    className={`overflow-hidden ${isPremiumTheme ? "rounded-[28px] border-white/8 bg-card/4 backdrop-blur" : "rounded-[28px] border-border/60 shadow-card"}`}
                   >
                     <div className={`h-1.5 bg-gradient-to-r ${serviceAccents[index % serviceAccents.length]}`} />
                     <CardContent className="p-7">
@@ -2684,7 +2607,7 @@ export default function StoreDetail() {
         )}
 
         {/* ─── REVIEWS ─── */}
-        <section id="reviews" className={`py-20 ${isPremiumTheme ? "bg-[#040812]" : "bg-muted/5"}`}>
+        <section id="reviews" className={`scroll-mt-24 py-20 ${isPremiumTheme ? "bg-[#040812]" : "bg-muted/5"}`}>
           <div className="container">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
               <div>
@@ -2719,7 +2642,7 @@ export default function StoreDetail() {
               <Button 
                 onClick={() => setReviewDialogOpen(true)}
                 size="lg"
-                className={`rounded-full px-8 font-bold ${isPremiumTheme ? "bg-white/10 hover:bg-white/20 text-white border border-white/10" : ""}`}
+                className={`rounded-full px-8 font-bold ${isPremiumTheme ? "bg-card/10 hover:bg-card/20 text-white border border-white/10" : ""}`}
               >
                 <Star className="mr-2 h-4 w-4" /> Write a Review
               </Button>
@@ -2727,7 +2650,7 @@ export default function StoreDetail() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {storeReviews?.length === 0 ? (
-                <div className={`col-span-full py-20 text-center border-2 border-dashed rounded-[32px] ${isPremiumTheme ? "border-white/10 bg-white/2" : "bg-muted/30"}`}>
+                <div className={`col-span-full py-20 text-center border-2 border-dashed rounded-[32px] ${isPremiumTheme ? "border-white/10 bg-card/2" : "bg-muted/30"}`}>
                   <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
                     <Star className="h-8 w-8 text-muted-foreground/40" />
                   </div>
@@ -2742,12 +2665,12 @@ export default function StoreDetail() {
                   </Button>
                 </div>
               ) : (
-                storeReviews?.map((review) => (
-                  <Card key={review.id} className={`group relative overflow-hidden transition-all duration-300 ${isPremiumTheme ? "bg-white/5 border-white/10 text-white hover:bg-white/8" : "hover:shadow-md"}`}>
+                storeReviews?.map((review: any) => (
+                  <Card key={review.id} className={`group relative overflow-hidden transition-all duration-300 ${isPremiumTheme ? "bg-card/5 border-white/10 text-white hover:bg-card/8" : "hover:shadow-md"}`}>
                     <CardContent className="p-8">
                       <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${isPremiumTheme ? "bg-white/10 text-white" : "bg-primary/10 text-primary"}`}>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${isPremiumTheme ? "bg-card/10 text-white" : "bg-primary/10 text-primary"}`}>
                             {review.customer_name?.[0]?.toUpperCase() || "C"}
                           </div>
                           <div>
@@ -2782,24 +2705,7 @@ export default function StoreDetail() {
                 Share your experience with this store to help other customers.
               </DialogDescription>
             </DialogHeader>
-            <form className="space-y-4 py-4" onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              const { error } = await supabase.from("store_reviews").insert({
-                store_id: store.id,
-                customer_name: formData.get("name"),
-                rating: reviewRating,
-                review_text: formData.get("review"),
-                status: "active" // auto-publish for now
-              });
-              if (error) {
-                toast.error(error.message);
-              } else {
-                toast.success("Thank you for your review!");
-                setReviewDialogOpen(false);
-                queryClient.invalidateQueries({ queryKey: ["store_reviews", store.id] });
-              }
-            }}>
+            <form className="space-y-4 py-4" onSubmit={handleReviewSubmit}>
               <div className="space-y-2">
                 <Label>Your Name</Label>
                 <Input name="name" placeholder="John Doe" required />
@@ -2826,41 +2732,45 @@ export default function StoreDetail() {
                 <Textarea name="review" placeholder="Tell us about the service, products, or price..." required className="min-h-[120px]" />
               </div>
               <DialogFooter>
-                <Button type="submit" className="w-full">Post Review</Button>
+                <Button type="submit" className="w-full" disabled={submittingAction !== null}>
+                  {submittingAction === "review" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Post Review
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
 
-        {/* ─── FINAL CTA ─── */}
+        {/* ─── FINAL CTA — gold + diamond ─── */}
         {isPremiumTheme && store.phone && (
-          <section className="relative overflow-hidden bg-[#050816] py-20">
-            {/* Glow */}
+          <section className={`relative overflow-hidden py-20 ${isDiamond ? "bg-[#050816]" : "bg-slate-950"}`}>
+            {/* Tier-colored glow */}
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="h-[400px] w-[600px] rounded-full bg-blue-700/20 blur-[100px]" />
+              <div className={`h-[400px] w-[600px] rounded-full blur-[100px] ${isDiamond ? "bg-blue-700/20" : "bg-amber-700/15"}`} />
             </div>
-            <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
+            <div className={`absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent ${isDiamond ? "via-blue-500/40" : "via-amber-500/30"}`} />
+            <div className={`absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent to-transparent ${isDiamond ? "via-blue-500/20" : "via-amber-500/15"}`} />
 
             <div className="container relative text-center">
-              <Badge className="rounded-full border border-blue-400/25 bg-blue-500/10 px-4 py-1.5 text-xs uppercase tracking-[0.24em] text-blue-300">
-                Ready to fix your device?
+              <Badge className={`rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.24em] ${isDiamond ? "border-blue-400/25 bg-blue-500/10 text-blue-300" : "border-amber-400/25 bg-amber-500/10 text-amber-300"}`}>
+                {isDiamond ? "Ready to fix your device?" : `Visit ${store.name} today`}
               </Badge>
               <h2 className="mx-auto mt-5 max-w-2xl font-display text-4xl font-bold text-white md:text-6xl">
-                Professional Apple repair,{" "}
-                <span className="gradient-text-apple">done right</span>
+                {isDiamond ? "Premium service," : "Gold-tier store,"}{" "}
+                <span className={isDiamond ? "gradient-text-apple" : currentTheme.accent}>{isDiamond ? "done right" : "full experience"}</span>
               </h2>
               <p className="mx-auto mt-5 max-w-lg text-lg text-white/50">
-                {store.name} now presents a more premium service-center experience with clearer action paths, stronger trust, and a more polished repair-first layout.
+                {store.description || `${store.name} — a premium store profile with direct contact, live inventory, and full service access.`}
               </p>
               <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
                 <Button
                   size="lg"
                   asChild
-                  className="rounded-full bg-blue-600 px-10 text-white shadow-[0_0_32px_rgba(59,130,246,0.45)] hover:bg-blue-500 hover:shadow-[0_0_48px_rgba(59,130,246,0.55)]"
+                  className={`rounded-full px-10 text-white ${isDiamond ? "bg-blue-600 shadow-[0_0_32px_rgba(59,130,246,0.45)] hover:bg-blue-500" : "bg-amber-500 shadow-[0_0_32px_rgba(245,158,11,0.35)] hover:bg-amber-400"}`}
                 >
                   <a href={`tel:${store.phone}`}>
-                    Book a Repair Now
+                    <Phone className="mr-2 h-5 w-5" />
+                    Call Store
                     <ArrowUpRight className="ml-2 h-5 w-5" />
                   </a>
                 </Button>
@@ -2869,7 +2779,7 @@ export default function StoreDetail() {
                     size="lg"
                     variant="outline"
                     asChild
-                    className="rounded-full border-white/12 bg-white/5 px-10 text-white hover:bg-white/10 hover:text-white"
+                    className="rounded-full border-white/12 bg-card/5 px-10 text-white hover:bg-card/10 hover:text-white"
                   >
                     <a href={store.map_url} target="_blank" rel="noopener noreferrer">
                       <MapPin className="mr-2 h-5 w-5" />
@@ -2881,7 +2791,12 @@ export default function StoreDetail() {
 
               {/* Trust row */}
               <div className="mx-auto mt-12 flex max-w-2xl flex-wrap items-center justify-center gap-6">
-                {["Expert Technicians", "Diamond Support Flow", "Trusted Repair Desk", "Direct Contact"].map((trust) => (
+                {[
+                  isDiamond ? "Diamond Tier Store" : "Gold Tier Partner",
+                  store.is_verified ? "Verified Store" : "Active Listing",
+                  "Direct Contact",
+                  "Live Inventory",
+                ].map((trust) => (
                   <div key={trust} className="flex items-center gap-2 text-sm text-white/40">
                     <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                     {trust}

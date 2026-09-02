@@ -34,15 +34,62 @@ import {
   FileText
 } from "lucide-react";
 import { mobileMasterService, Brand, PhoneSeries, PhoneModel, PhoneVariant, VariantPrice, ExpertScore, ModelImage, EmiPlan, ModelEmi } from "@/services/mobileMasterService";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import { Upload } from "lucide-react";
+
+async function uploadToStorage(file: File, folder: string): Promise<string> {
+  if (!file.type.startsWith("image/")) throw new Error("Not an image file");
+  if (file.size > 5 * 1024 * 1024) throw new Error("File exceeds 5MB limit");
+  const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+  const path = `${folder}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
+  const { error } = await supabase.storage.from("uploads").upload(path, file, { upsert: false, cacheControl: "3600", contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from("uploads").getPublicUrl(path).data.publicUrl;
+}
+
+function ImageUploadPicker({ value, onChange, folder, previewClass = "h-10 w-10" }: { value: string; onChange: (url: string) => void; folder: string; previewClass?: string }) {
+  const [uploading, setUploading] = useState(false);
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadToStorage(file, folder);
+      onChange(url);
+      toast.success("Image uploaded");
+    } catch (err: any) {
+      toast.error(err.message ?? "Upload failed");
+    } finally {
+      e.target.value = "";
+      setUploading(false);
+    }
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2 items-center">
+        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://... or upload below" className="flex-1" />
+        <label className="cursor-pointer">
+          <span className="inline-flex items-center gap-1 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {uploading ? "..." : "Upload"}
+          </span>
+          <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
+        </label>
+      </div>
+      {value && <img src={value} alt="preview" className={`${previewClass} object-contain rounded border`} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />}
+    </div>
+  );
+}
 
 export default function MobileMasterManager() {
   const [activeTab, setActiveTab] = useState("brands");
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
   const [selectedSeriesId, setSelectedSeriesId] = useState<string | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [modelSearch, setModelSearch] = useState("");
   
   const queryClient = useQueryClient();
 
@@ -61,6 +108,17 @@ export default function MobileMasterManager() {
   const { data: models, isLoading: loadingModels } = useQuery({
     queryKey: ["master_models", selectedBrandId, selectedSeriesId],
     queryFn: () => mobileMasterService.getModels(selectedBrandId || undefined, selectedSeriesId || undefined),
+  });
+
+  const filteredModels = (models ?? []).filter((model: any) => {
+    const q = modelSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      model.name?.toLowerCase().includes(q) ||
+      model.slug?.toLowerCase().includes(q) ||
+      model.model_number?.toLowerCase().includes(q) ||
+      model.brands?.name?.toLowerCase().includes(q)
+    );
   });
 
   // Mutations
@@ -137,30 +195,38 @@ export default function MobileMasterManager() {
   });
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="space-y-6">
+      <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-primary/5 via-background to-background">
+        <CardContent className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Database className="h-8 w-8 text-primary" />
             Mobile Master Data
           </h1>
-          <p className="text-muted-foreground">Centralized phone database. One Model = One ID.</p>
-        </div>
-      </div>
+          <p className="mt-1 text-muted-foreground">One canonical model ID connects specifications, variants, prices, images, EMI and inventory.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl border bg-background/80 px-4 py-3"><p className="text-xl font-black">{loadingBrands ? "…" : brands?.length ?? 0}</p><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Brands</p></div>
+            <div className="rounded-xl border bg-background/80 px-4 py-3"><p className="text-xl font-black">{selectedBrandId ? (loadingSeries ? "…" : series?.length ?? 0) : "—"}</p><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Series</p></div>
+            <div className="rounded-xl border bg-background/80 px-4 py-3"><p className="text-xl font-black">{loadingModels ? "…" : models?.length ?? 0}</p><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Models</p></div>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Navigation Sidebar */}
-        <Card className="lg:col-span-1 h-fit">
-          <CardHeader>
-            <CardTitle className="text-lg">Hierarchy</CardTitle>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">1. Choose hierarchy</CardTitle>
+            <CardDescription>Filter the workspace first. Selecting a brand unlocks its series; selecting a model unlocks all connected records.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>Select Brand</Label>
+              <Label>Brand</Label>
               <Select value={selectedBrandId || "all"} onValueChange={(v) => {
                 setSelectedBrandId(v === "all" ? null : v);
                 setSelectedSeriesId(null);
                 setSelectedModelId(null);
+                if (v !== "all") setActiveTab("series");
               }}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Brands" />
@@ -174,15 +240,15 @@ export default function MobileMasterManager() {
               </Select>
             </div>
 
-            {selectedBrandId && (
-              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                <Label>Select Series</Label>
+            <div className="space-y-2">
+                <Label>Series</Label>
                 <Select value={selectedSeriesId || "all"} onValueChange={(v) => {
                   setSelectedSeriesId(v === "all" ? null : v);
                   setSelectedModelId(null);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Series" />
+                  setActiveTab("models");
+                }} disabled={!selectedBrandId}>
+                  <SelectTrigger className={!selectedBrandId ? "opacity-60" : ""}>
+                    <SelectValue placeholder={selectedBrandId ? "All Series" : "Select a brand first"} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Series</SelectItem>
@@ -192,27 +258,27 @@ export default function MobileMasterManager() {
                   </SelectContent>
                 </Select>
               </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Main Content Area */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <div className="overflow-x-auto rounded-xl border bg-muted/20 p-1.5">
+            <TabsList className="inline-flex h-auto min-w-full justify-start bg-transparent p-0">
               <TabsTrigger value="brands" className="gap-2">
-                <Tag className="h-4 w-4" /> Brands
+                <Tag className="h-4 w-4" /> 2. Brands
               </TabsTrigger>
               <TabsTrigger value="series" className="gap-2" disabled={!selectedBrandId}>
-                <Layers className="h-4 w-4" /> Series
+                <Layers className="h-4 w-4" /> 3. Series
               </TabsTrigger>
               <TabsTrigger value="models" className="gap-2">
-                <Smartphone className="h-4 w-4" /> Models
+                <Smartphone className="h-4 w-4" /> 4. Models
               </TabsTrigger>
               <TabsTrigger value="connections" className="gap-2" disabled={!selectedModelId}>
-                <Settings2 className="h-4 w-4" /> Connections
+                <Settings2 className="h-4 w-4" /> 5. Connections
               </TabsTrigger>
             </TabsList>
+            </div>
 
             <TabsContent value="brands" className="space-y-4 mt-4">
               <div className="flex justify-between items-center">
@@ -220,8 +286,9 @@ export default function MobileMasterManager() {
                 <AddBrandDialog onAdd={(b) => createBrand.mutate(b)} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {loadingBrands && <div className="col-span-full flex items-center justify-center gap-2 rounded-xl border border-dashed p-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading brands…</div>}
                 {brands?.map(brand => (
-                  <Card key={brand.id} className="group cursor-pointer hover:border-primary transition-colors" onClick={() => setSelectedBrandId(brand.id)}>
+                  <Card key={brand.id} className="group cursor-pointer hover:border-primary transition-colors" onClick={() => { setSelectedBrandId(brand.id); setSelectedSeriesId(null); setSelectedModelId(null); setActiveTab("series"); }}>
                     <CardContent className="p-4 flex items-center gap-4">
                       <div className="h-12 w-12 bg-muted rounded-md flex items-center justify-center font-bold text-lg">
                         {brand.logo ? <img src={brand.logo} alt={brand.name} className="h-full w-full object-contain" /> : brand.name[0]}
@@ -246,6 +313,7 @@ export default function MobileMasterManager() {
                     </CardContent>
                   </Card>
                 ))}
+                {!loadingBrands && brands?.length === 0 && <div className="col-span-full rounded-xl border border-dashed p-10 text-center"><Tag className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-semibold">No brands yet</p><p className="mt-1 text-sm text-muted-foreground">Create the first brand before adding series or models.</p></div>}
               </div>
             </TabsContent>
 
@@ -257,8 +325,9 @@ export default function MobileMasterManager() {
                 <AddSeriesDialog brandId={selectedBrandId!} onAdd={(s) => createSeries.mutate(s)} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {loadingSeries && <div className="col-span-full flex items-center justify-center gap-2 rounded-xl border border-dashed p-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading series…</div>}
                 {series?.map(s => (
-                  <Card key={s.id} className="group cursor-pointer hover:border-primary transition-colors" onClick={() => setSelectedSeriesId(s.id)}>
+                  <Card key={s.id} className="group cursor-pointer hover:border-primary transition-colors" onClick={() => { setSelectedSeriesId(s.id); setSelectedModelId(null); setActiveTab("models"); }}>
                     <CardContent className="p-4 flex items-center gap-4">
                       <div className="h-10 w-10 bg-muted rounded-md flex items-center justify-center">
                         <Layers className="h-5 w-5" />
@@ -281,7 +350,7 @@ export default function MobileMasterManager() {
                     </CardContent>
                   </Card>
                 ))}
-                {series?.length === 0 && (
+                {!loadingSeries && series?.length === 0 && (
                   <div className="col-span-full p-8 text-center border rounded-lg border-dashed">
                     No series found for this brand. You can add models directly under the brand.
                   </div>
@@ -295,7 +364,12 @@ export default function MobileMasterManager() {
                   <h2 className="text-xl font-semibold">Phone Models</h2>
                   <div className="relative w-64">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search models..." className="pl-8" />
+                    <Input
+                      placeholder="Search models..."
+                      className="pl-8"
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                    />
                   </div>
                 </div>
                 <AddModelDialog 
@@ -319,7 +393,8 @@ export default function MobileMasterManager() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {models?.map(model => (
+                  {loadingModels && <TableRow><TableCell colSpan={6} className="py-10 text-center"><span className="inline-flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading models…</span></TableCell></TableRow>}
+                  {filteredModels.map(model => (
                     <TableRow key={model.id} className={selectedModelId === model.id ? "bg-muted/50" : ""}>
                       <TableCell className="font-medium">{model.name}</TableCell>
                       <TableCell>{(model as any).brands?.name}</TableCell>
@@ -350,6 +425,13 @@ export default function MobileMasterManager() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {!loadingModels && filteredModels.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                        No models found. Try another search or add a new model.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TabsContent>
@@ -392,9 +474,33 @@ export default function MobileMasterManager() {
                       icon={<Layers className="h-5 w-5" />}
                       action={<VariantEditor modelId={selectedModelId!} />}
                     />
+                    <ConnectionCard
+                      title="Prices & Purchase"
+                      description="Set variant price, stock status, default offer, EMI flag, retailer, and buy URL."
+                      icon={<Tag className="h-5 w-5" />}
+                      action={<PriceEditor modelId={selectedModelId!} />}
+                    />
+                    <ConnectionCard
+                      title="Gallery"
+                      description="Upload product images used on cards and the detail page gallery."
+                      icon={<Upload className="h-5 w-5" />}
+                      action={<GalleryEditor modelId={selectedModelId!} />}
+                    />
+                    <ConnectionCard
+                      title="EMI Offers"
+                      description="Attach bank plans, monthly amount, and down payment to each variant."
+                      icon={<Database className="h-5 w-5" />}
+                      action={<EmiConnectionEditor modelId={selectedModelId!} />}
+                    />
+                    <ConnectionCard
+                      title="Expert Score"
+                      description="Score display, performance, camera, battery, value, and more."
+                      icon={<CheckCircle2 className="h-5 w-5" />}
+                      action={<ExpertScoreEditor modelId={selectedModelId!} />}
+                    />
                     <ConnectionCard 
                       title="Stock Management" 
-                      description="Update new phone stock and pricing."
+                      description="Create store inventory and marketplace stock linked to this model."
                       icon={<Smartphone className="h-5 w-5" />}
                       href={`/suadmin/products?modelId=${selectedModelId}`}
                     />
@@ -411,6 +517,7 @@ export default function MobileMasterManager() {
 
 function AddBrandDialog({ onAdd }: { onAdd: (data: any) => void }) {
   const [name, setName] = useState("");
+  const [logo, setLogo] = useState("");
   const [open, setOpen] = useState(false);
 
   return (
@@ -427,12 +534,16 @@ function AddBrandDialog({ onAdd }: { onAdd: (data: any) => void }) {
             <Label>Brand Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Apple, Samsung" />
           </div>
+          <div className="space-y-2">
+            <Label>Logo</Label>
+            <ImageUploadPicker value={logo} onChange={setLogo} folder="brands" previewClass="h-10 w-10" />
+          </div>
         </div>
         <DialogFooter>
           <Button onClick={() => {
-            onAdd({ name, slug: slugify(name) });
+            onAdd({ name, slug: slugify(name), logo: logo || null });
             setOpen(false);
-            setName("");
+            setName(""); setLogo("");
           }}>Create Brand</Button>
         </DialogFooter>
       </DialogContent>
@@ -442,6 +553,7 @@ function AddBrandDialog({ onAdd }: { onAdd: (data: any) => void }) {
 
 function EditBrandDialog({ brand, onUpdate }: { brand: any, onUpdate: (id: string, data: any) => void }) {
   const [name, setName] = useState(brand.name);
+  const [logo, setLogo] = useState(brand.logo || "");
   const [open, setOpen] = useState(false);
 
   return (
@@ -460,10 +572,14 @@ function EditBrandDialog({ brand, onUpdate }: { brand: any, onUpdate: (id: strin
             <Label>Brand Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Apple, Samsung" />
           </div>
+          <div className="space-y-2">
+            <Label>Logo</Label>
+            <ImageUploadPicker value={logo} onChange={setLogo} folder="brands" previewClass="h-10 w-10" />
+          </div>
         </div>
         <DialogFooter>
           <Button onClick={() => {
-            onUpdate(brand.id, { name, slug: slugify(name) });
+            onUpdate(brand.id, { name, slug: slugify(name), logo: logo || null });
             setOpen(false);
           }}>Save Changes</Button>
         </DialogFooter>
@@ -510,6 +626,7 @@ function EditModelDialog({ model, brands, series, onUpdate }: { model: any, bran
     series_id: model.series_id || "none",
     model_number: model.model_number || "",
     release_year: model.release_year || new Date().getFullYear(),
+    image: model.image || "",
   });
   const [open, setOpen] = useState(false);
 
@@ -564,14 +681,19 @@ function EditModelDialog({ model, brands, series, onUpdate }: { model: any, bran
               <Input type="number" value={formData.release_year} onChange={(e) => setFormData({...formData, release_year: parseInt(e.target.value)})} />
             </div>
           </div>
+          <div className="space-y-2">
+            <Label>Primary Image</Label>
+            <ImageUploadPicker value={formData.image} onChange={(url) => setFormData({...formData, image: url})} folder="phone-models" previewClass="h-16 w-16" />
+          </div>
         </div>
         <DialogFooter>
           <Button onClick={() => {
             const { series_id, ...rest } = formData;
-            onUpdate(model.id, { 
-              ...rest, 
+            onUpdate(model.id, {
+              ...rest,
+              image: formData.image || null,
               series_id: series_id === "none" ? null : series_id,
-              slug: slugify(formData.name) 
+              slug: slugify(formData.name)
             });
             setOpen(false);
           }}>Update Model</Button>
@@ -588,8 +710,19 @@ function AddModelDialog({ brandId, seriesId, brands, series, onAdd }: { brandId:
     series_id: seriesId || "",
     model_number: "",
     release_year: new Date().getFullYear(),
+    image: "",
   });
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setFormData((current) => ({
+        ...current,
+        brand_id: brandId || current.brand_id || "",
+        series_id: seriesId || current.series_id || "none",
+      }));
+    }
+  }, [brandId, seriesId, open]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -640,15 +773,37 @@ function AddModelDialog({ brandId, seriesId, brands, series, onAdd }: { brandId:
               <Input type="number" value={formData.release_year} onChange={(e) => setFormData({...formData, release_year: parseInt(e.target.value)})} />
             </div>
           </div>
+          <div className="space-y-2">
+            <Label>Primary Image</Label>
+            <ImageUploadPicker value={formData.image} onChange={(url) => setFormData({...formData, image: url})} folder="phone-models" previewClass="h-16 w-16" />
+          </div>
         </div>
         <DialogFooter>
           <Button onClick={() => {
-            onAdd({ 
-              ...formData, 
+            if (!formData.name.trim()) {
+              toast.error("Model name is required");
+              return;
+            }
+            if (!formData.brand_id) {
+              toast.error("Choose a brand first");
+              return;
+            }
+            onAdd({
+              ...formData,
+              name: formData.name.trim(),
+              image: formData.image || null,
               slug: slugify(formData.name),
               series_id: formData.series_id === 'none' ? null : formData.series_id
             });
             setOpen(false);
+            setFormData({
+              name: "",
+              brand_id: brandId || "",
+              series_id: seriesId || "none",
+              model_number: "",
+              release_year: new Date().getFullYear(),
+              image: "",
+            });
           }}>Create Model</Button>
         </DialogFooter>
       </DialogContent>
@@ -747,7 +902,7 @@ function ModelConnections({ modelId, modelName }: { modelId: string, modelName: 
 
 function ConnectionCard({ title, description, icon, action, href }: any) {
   return (
-    <Card className="flex flex-col h-full border-slate-200 hover:border-primary/30 transition-colors">
+    <Card className="flex flex-col h-full border-border hover:border-primary/30 transition-colors">
       <CardHeader className="pb-3">
         <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary mb-3">
           {icon}
@@ -1013,15 +1168,27 @@ function SpecEditor({ modelId }: { modelId: string }) {
 function PriceEditor({ modelId }: { modelId: string }) {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState<Partial<VariantPrice>>({ currency: 'NPR', stock_status: 'in_stock', is_default: false, sort_order: 0 });
+  const [form, setForm] = useState<Partial<VariantPrice>>({ currency: 'NPR', stock_status: 'in_stock', emi_available: false, is_default: false, sort_order: 0 });
 
   const { data: variants } = useQuery({ queryKey: ['variants', modelId], queryFn: () => mobileMasterService.getVariants(modelId) });
   const { data: prices, isLoading } = useQuery({ queryKey: ['variant_prices', modelId], queryFn: () => mobileMasterService.getVariantPrices(modelId) });
   const { data: retailers } = useQuery({ queryKey: ['retailers'], queryFn: () => mobileMasterService.getRetailers() });
 
+  const variantLabel = (variantId?: string | null) => {
+    const variant = (variants ?? []).find(v => v.id === variantId);
+    if (!variant) return "Any variant";
+    return [variant.ram, variant.storage, variant.color].filter(Boolean).join(" / ") || "Base variant";
+  };
+
   const upsert = useMutation({
     mutationFn: (p: Partial<VariantPrice>) => mobileMasterService.upsertVariantPrice({ ...p, model_id: modelId }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['variant_prices', modelId] }); setAdding(false); toast.success('Price saved'); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['variant_prices', modelId] });
+      qc.invalidateQueries({ queryKey: ['model_detail'] });
+      setAdding(false);
+      setForm({ currency: 'NPR', stock_status: 'in_stock', emi_available: false, is_default: false, sort_order: 0 });
+      toast.success('Price saved');
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -1035,11 +1202,21 @@ function PriceEditor({ modelId }: { modelId: string }) {
 
   return (
     <div className="space-y-3">
+      {(prices ?? []).length === 0 && (
+        <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+          No purchase price is configured yet. Add one price to show a purchase panel on the public model page.
+        </div>
+      )}
       {(prices ?? []).map((p) => (
-        <div key={p.id} className="flex items-center gap-3 p-3 border rounded-lg text-sm">
-          <div className="flex-1">
+        <div key={p.id} className="flex items-center gap-3 p-3 border rounded-lg text-sm bg-background">
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-muted-foreground truncate">{variantLabel(p.variant_id)}</div>
             <div className="font-medium">NPR {p.regular_price.toLocaleString()}{p.sale_price ? ` → ${p.sale_price.toLocaleString()}` : ''}</div>
-            <div className="text-muted-foreground">{p.stock_status} · {p.is_default ? 'Default' : ''}</div>
+            <div className="text-muted-foreground flex flex-wrap gap-1.5">
+              <span>{p.stock_status}</span>
+              {p.is_default && <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">Default</Badge>}
+              {p.emi_available && <Badge variant="outline" className="h-5 px-1.5 text-[10px]">EMI</Badge>}
+            </div>
           </div>
           <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => del.mutate(p.id)}>
             <Trash2 className="h-3 w-3" />
@@ -1053,7 +1230,7 @@ function PriceEditor({ modelId }: { modelId: string }) {
               <Label className="text-xs">Variant</Label>
               <Select value={form.variant_id ?? ''} onValueChange={(v) => setForm(f => ({ ...f, variant_id: v }))}>
                 <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Pick variant" /></SelectTrigger>
-                <SelectContent>{(variants ?? []).map(v => <SelectItem key={v.id} value={v.id}>{v.ram}/{v.storage} {v.color}</SelectItem>)}</SelectContent>
+                <SelectContent>{(variants ?? []).map(v => <SelectItem key={v.id} value={v.id}>{[v.ram, v.storage, v.color].filter(Boolean).join(" / ") || "Base variant"}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
@@ -1075,10 +1252,40 @@ function PriceEditor({ modelId }: { modelId: string }) {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label className="text-xs">Retailer</Label>
+              <Select value={form.retailer_id ?? 'none'} onValueChange={(v) => setForm(f => ({ ...f, retailer_id: v === 'none' ? undefined : v }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Tamrakar Complex" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Tamrakar Complex</SelectItem>
+                  {(retailers ?? []).map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Sort Order</Label>
+              <Input className="h-8 text-sm" type="number" value={form.sort_order ?? 0} onChange={e => setForm(f => ({ ...f, sort_order: Number(e.target.value) }))} />
+            </div>
             <div className="col-span-2">
               <Label className="text-xs">Buy URL</Label>
               <Input className="h-8 text-sm" value={form.buy_url ?? ''} onChange={e => setForm(f => ({ ...f, buy_url: e.target.value }))} placeholder="https://..." />
             </div>
+            <label className="col-span-2 flex items-center gap-2 rounded-md border p-2 text-xs">
+              <input
+                type="checkbox"
+                checked={!!form.is_default}
+                onChange={(e) => setForm(f => ({ ...f, is_default: e.target.checked }))}
+              />
+              Make this the default public purchase price
+            </label>
+            <label className="col-span-2 flex items-center gap-2 rounded-md border p-2 text-xs">
+              <input
+                type="checkbox"
+                checked={!!form.emi_available}
+                onChange={(e) => setForm(f => ({ ...f, emi_available: e.target.checked }))}
+              />
+              EMI available for this offer
+            </label>
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={() => upsert.mutate(form)} disabled={!form.variant_id || !form.regular_price || upsert.isPending}>
@@ -1152,10 +1359,11 @@ function GalleryEditor({ modelId }: { modelId: string }) {
   const qc = useQueryClient();
   const [url, setUrl] = useState('');
   const [alt, setAlt] = useState('');
+  const [uploading, setUploading] = useState(false);
   const { data: images, isLoading } = useQuery({ queryKey: ['model_images', modelId], queryFn: () => mobileMasterService.getModelImages(modelId) });
 
   const add = useMutation({
-    mutationFn: () => mobileMasterService.addModelImage({ model_id: modelId, image_url: url, alt_text: alt, sort_order: (images?.length ?? 0) }),
+    mutationFn: (imageUrl: string) => mobileMasterService.addModelImage({ model_id: modelId, image_url: imageUrl, alt_text: alt, sort_order: (images?.length ?? 0) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['model_images', modelId] }); setUrl(''); setAlt(''); toast.success('Image added'); },
     onError: (e: any) => toast.error(e.message),
   });
@@ -1172,6 +1380,21 @@ function GalleryEditor({ modelId }: { modelId: string }) {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const publicUrl = await uploadToStorage(file, `phone-models/${modelId}`);
+      add.mutate(publicUrl);
+    } catch (err: any) {
+      toast.error(err.message ?? "Upload failed");
+    } finally {
+      e.target.value = "";
+      setUploading(false);
+    }
+  };
+
   if (isLoading) return <div className="text-sm text-muted-foreground py-2">Loading...</div>;
 
   return (
@@ -1179,17 +1402,30 @@ function GalleryEditor({ modelId }: { modelId: string }) {
       {(images ?? []).map((img) => (
         <div key={img.id} className="flex items-center gap-2 text-sm border rounded p-2">
           <img src={img.image_url} alt={img.alt_text ?? ''} className="h-10 w-10 object-cover rounded" onError={(e) => { (e.target as HTMLImageElement).src = '/default-product.svg'; }} />
-          <div className="flex-1 truncate">{img.image_url}</div>
-          <Button size="sm" variant={img.is_featured ? 'default' : 'outline'} className="h-6 text-xs" onClick={() => toggleFeatured.mutate({ id: img.id, val: !img.is_featured })}>
-            {img.is_featured ? '★' : '☆'}
+          <div className="flex-1 truncate text-xs text-muted-foreground">{img.image_url}</div>
+          {img.alt_text && <span className="text-xs text-muted-foreground hidden sm:block max-w-[80px] truncate">{img.alt_text}</span>}
+          <Button size="sm" variant={img.is_featured ? 'default' : 'outline'} className="h-6 text-xs px-2" onClick={() => toggleFeatured.mutate({ id: img.id, val: !img.is_featured })}>
+            {img.is_featured ? '★ Featured' : '☆'}
           </Button>
           <Button size="icon" variant="ghost" className="h-6 w-6 text-red-500" onClick={() => del.mutate(img.id)}><Trash2 className="h-3 w-3" /></Button>
         </div>
       ))}
-      <div className="flex gap-2">
-        <Input className="h-8 text-sm flex-1" placeholder="Image URL" value={url} onChange={e => setUrl(e.target.value)} />
-        <Input className="h-8 text-sm w-32" placeholder="Alt text" value={alt} onChange={e => setAlt(e.target.value)} />
-        <Button size="sm" onClick={() => add.mutate()} disabled={!url || add.isPending}>Add</Button>
+      {/* Add image: file upload OR URL */}
+      <div className="border rounded p-3 space-y-2 bg-muted/30">
+        <p className="text-xs font-medium text-muted-foreground">Add Image</p>
+        <div className="flex gap-2 items-center flex-wrap">
+          <label className="cursor-pointer">
+            <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border bg-background text-xs font-medium hover:bg-accent transition-colors">
+              {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+              {uploading ? "Uploading…" : "Upload from device"}
+            </span>
+            <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={uploading || add.isPending} />
+          </label>
+          <span className="text-xs text-muted-foreground">or</span>
+          <Input className="h-8 text-sm flex-1 min-w-[160px]" placeholder="Paste image URL" value={url} onChange={e => setUrl(e.target.value)} />
+          <Input className="h-8 text-sm w-28" placeholder="Alt text" value={alt} onChange={e => setAlt(e.target.value)} />
+          <Button size="sm" className="h-8" onClick={() => add.mutate(url)} disabled={!url || add.isPending || uploading}>Add URL</Button>
+        </div>
       </div>
     </div>
   );

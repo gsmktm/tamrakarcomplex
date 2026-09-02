@@ -6,9 +6,42 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useCompareStore } from "@/hooks/useCompareStore";
 import { cn } from "@/lib/utils";
+import { resolveProductDetailImage } from "@/lib/productPresentation";
 
 interface ProductCardProps {
   product: Product;
+}
+
+function extractPreviousPrice(product: Product): number | null {
+  const specs = product.specs as Record<string, unknown> | null;
+  if (specs && typeof specs.previousPrice === "number") return specs.previousPrice as number;
+  if (specs && typeof specs.previousPrice === "string") {
+    const n = Number(specs.previousPrice);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function extractSpecsBadges(product: Product): string[] {
+  const badges: string[] = [];
+  const specs = product.specs as Record<string, unknown> | null;
+  // Prefer structured specs if present
+  if (specs) {
+    const ram = (specs.ram ?? specs.RAM ?? specs.memory) as string | undefined;
+    const storage = (specs.storage ?? specs.Storage ?? specs.rom) as string | undefined;
+    if (ram && typeof ram === "string") badges.push(String(ram));
+    if (storage && typeof storage === "string") badges.push(String(storage));
+  }
+  // Fallback: parse from name like "Galaxy A07 (4+64GB)" or "Moto G05 (4+64GB)"
+  if (badges.length === 0) {
+    const match = product.name.match(/\(\s*(\d+\s*\+\s*\d+\s*GB|\d+\s*GB)[^)]*\)/i);
+    if (match) badges.push(match[1].replace(/\s+/g, " ").toUpperCase());
+  }
+  // Category hint as third badge when available
+  if (badges.length === 1 && product.category && product.category !== "Smartphones") {
+    badges.push(product.category);
+  }
+  return badges.slice(0, 2);
 }
 
 export function ProductCard({ product }: ProductCardProps) {
@@ -18,6 +51,14 @@ export function ProductCard({ product }: ProductCardProps) {
 
   const isComparing = items.some((item) => item.id === product.id);
   const outOfStock = product.in_stock === false;
+  const thumbnail = resolveProductDetailImage(product);
+  const previousPrice = extractPreviousPrice(product);
+  const specsBadges = extractSpecsBadges(product);
+  const isNew = product.id.startsWith("latest-") || product.featured === true;
+  const discountPct =
+    previousPrice && product.price_value && previousPrice > product.price_value
+      ? Math.round(((previousPrice - (product.price_value as number)) / previousPrice) * 100)
+      : null;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -32,7 +73,7 @@ export function ProductCard({ product }: ProductCardProps) {
       id: product.id,
       name: product.name,
       slug: product.slug,
-      image: product.image,
+      image: thumbnail,
       price: product.price,
       brand: product.brand,
       rating: product.rating,
@@ -55,12 +96,21 @@ export function ProductCard({ product }: ProductCardProps) {
       {/* Image */}
       <div className="relative aspect-square bg-secondary/40 overflow-hidden">
         <SafeImage
-          src={product.image}
+          src={thumbnail}
           alt={product.name}
-          className="h-full w-full object-contain p-5"
+          className="h-full w-full object-contain p-3 sm:p-4"
           aspect="square"
           loading="lazy"
+          width={320}
+          height={320}
         />
+
+        {/* New badge — GSMArena-style top-right */}
+        {isNew && !outOfStock && (
+          <div className="absolute top-2 right-2 bg-success text-success-foreground px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest leading-none">
+            New
+          </div>
+        )}
 
         {/* Rating */}
         {product.rating && (
@@ -128,8 +178,28 @@ export function ProductCard({ product }: ProductCardProps) {
         <h4 className="font-medium text-sm text-foreground line-clamp-2 leading-snug flex-1">
           {product.name}
         </h4>
+        {/* Specs badges — GSMArena-style */}
+        {specsBadges.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {specsBadges.map((badge) => (
+              <span key={badge} className="inline-flex items-center rounded-sm border border-border bg-secondary/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {badge}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="font-syne font-bold text-sm text-success">{product.price}</p>
+          <div className="flex flex-col">
+            <div className="flex items-baseline gap-1.5">
+              <p className="font-syne font-bold text-sm text-success">{product.price}</p>
+              {previousPrice && (
+                <span className="text-[11px] line-through text-muted-foreground">Rs. {previousPrice.toLocaleString()}</span>
+              )}
+            </div>
+            {discountPct !== null && discountPct > 0 && (
+              <span className="text-[10px] font-bold text-success">Save {discountPct}%</span>
+            )}
+          </div>
           {/* Mobile-visible add — hover overlay is desktop-only (skill: hover-vs-tap) */}
           {!outOfStock && (
             <button

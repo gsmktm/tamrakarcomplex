@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tamrakar Complex">
+  <defs>
+    <linearGradient id="tk-bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#161a26"/>
+      <stop offset="1" stop-color="#0e1118"/>
+    </linearGradient>
+    <linearGradient id="tk-gold" x1="20" y1="14" x2="44" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e2c178"/>
+      <stop offset="1" stop-color="#b58a44"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#tk-bg)"/>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="14.25" fill="none" stroke="#c39a52" stroke-opacity="0.28" stroke-width="1.5"/>
+  <!-- Serif "T" monogram, Cormorant-flavored -->
+  <path d="M16 19h32v6.4H35.7V49h-7.4V25.4H16z" fill="url(#tk-gold)"/>
+  <circle cx="32" cy="53.5" r="2.1" fill="#c39a52"/>
+</svg>

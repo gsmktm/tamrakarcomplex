@@ -51,7 +51,7 @@ export function Reveal({
   const delayClass = delay > 0 ? `reveal-delay-${delay}` : "";
 
   return (
-    // @ts-ignore — dynamic tag
+    // @ts-expect-error -- dynamic tag
     <Tag ref={ref} className={cn("reveal", delayClass, className)}>
       {children}
     </Tag>

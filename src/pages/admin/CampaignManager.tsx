@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { MARKETING_BANNERS_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { 
   Plus, 
   Trash2, 
@@ -52,7 +53,7 @@ export default function CampaignManager() {
       try {
         const { data, error } = await supabase
           .from("marketing_banners")
-          .select("*")
+          .select(MARKETING_BANNERS_COLUMNS.join(","))
           .order("sort_order", { ascending: true });
         if (error) throw error;
         return data;

@@ -7,7 +7,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import { CheckCircle2, MapPin, Search, Filter, X, Edit, Trash2, Store, ShieldCheck, ArrowRight, Tag, Clock, Phone, Lock } from "lucide-react";
+import { CheckCircle2, MapPin, Search, Filter, X, Edit, Trash2, Store, ShieldCheck, ArrowRight, Tag, Clock, Phone, Lock, Eye, Images, Sparkles, SlidersHorizontal, ShoppingCart, Zap, MessageCircle } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -23,6 +23,9 @@ import { decodeListingDescription, formatCondition } from "@/lib/listingMeta";
 import { getPublicStorePath } from "@/lib/storeRoutes";
 import { getFallbackStoreCards } from "@/services/publicFallbackData";
 import { canShowPhoneNumber, getPackageBadgeLabel, getPackageBadgeClassName } from "@/lib/storePackages";
+import { useCart } from "@/contexts/CartContext";
+import { buildWhatsAppPurchaseUrl } from "@/lib/marketplaceContact";
+import { absoluteUrl } from "@/lib/seo";
 
 import {
   Select,
@@ -55,7 +58,7 @@ export default function MarketplaceBrowse() {
 
   const [activeCategory, setActiveCategory] = useState<string>((categoryParam || "all").toLowerCase());
   const [activeCondition, setActiveCondition] = useState<string>((conditionParam || "all").toLowerCase());
-  const [priceRange, setPriceRange] = useState<[number, number]>([minPriceParam ?? 0, maxPriceParam ?? 500000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([minPriceParam ?? 0, maxPriceParam ?? 1000000]);
   const [search, setSearch] = useState(searchParam);
   const debouncedSearch = useDebounce(search, 400);
 
@@ -92,6 +95,7 @@ export default function MarketplaceBrowse() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const { addToCart } = useCart();
 
   const updateSearchParams = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams);
@@ -136,6 +140,8 @@ export default function MarketplaceBrowse() {
     package_slug?: string | null;
     services: string[] | null;
     subscription_status: string | null;
+    phone?: string | null;
+    whatsapp?: string | null;
   };
 
   const TIER_ORDER: Record<string, number> = { diamond: 4, gold: 3, silver: 2, free: 1 };
@@ -151,16 +157,19 @@ export default function MarketplaceBrowse() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("stores")
-        .select("id,name,slug,seo_slug,location,logo_url,is_verified,is_featured,package_slug,services,subscription_status")
+        .select("id,name,slug,seo_slug,location,logo_url,is_verified,is_featured,package_slug,services,subscription_status,phone,whatsapp")
         .eq("is_active", true)
-        .limit(20);
+        .limit(200)
+        .abortSignal(AbortSignal.timeout(4000));
 
       if (error || !data?.length) {
         return getFallbackStoreCards(12);
       }
 
-      return sortStoresByTier(data as StoreCard[]).slice(0, 12);
+      return sortStoresByTier(data as StoreCard[]);
     },
+    initialData: () => getFallbackStoreCards(12),
+    retry: false,
     staleTime: 60_000,
   });
 
@@ -200,6 +209,7 @@ export default function MarketplaceBrowse() {
   const totalPages = Math.ceil((listingsData?.total || 0) / ITEMS_PER_PAGE);
   const paginatedListings = listings;
   const verifiedStoresCount = (featuredStores || []).filter((s) => s.is_verified).length;
+  const storeContacts = new Map((featuredStores || []).map((store) => [store.id, store]));
 
   const handleDelete = async (listing: ListingWithShop) => {
     if (!confirm("Are you sure you want to delete this listing?")) return;
@@ -239,12 +249,10 @@ export default function MarketplaceBrowse() {
     setActiveCondition(cond);
 
     const store = params.get("store") || params.get("storeId");
-    if (store !== storeFilterId) {
-      setStoreFilterId(store ? String(store) : null);
-      if (!store) {
-        setResolvedStoreId(null);
-        setStoreFilterName(null);
-      }
+    setStoreFilterId(store ? String(store) : null);
+    if (!store) {
+      setResolvedStoreId(null);
+      setStoreFilterName(null);
     }
     const p = Number(params.get("page")) || 1;
     setPage(p);
@@ -290,7 +298,7 @@ export default function MarketplaceBrowse() {
   }, [storeFilterId]);
 
   useEffect(() => {
-    setPriceRange([minPriceParam ?? 0, maxPriceParam ?? 500000]);
+    setPriceRange([minPriceParam ?? 0, maxPriceParam ?? 1000000]);
   }, [minPriceParam, maxPriceParam]);
   const toggleBrand = (brand: string) => {
     const next = selectedBrands.includes(brand) 
@@ -352,8 +360,8 @@ export default function MarketplaceBrowse() {
         <h3 className="font-semibold mb-4 text-base">Price Range</h3>
         <div className="px-2">
           <Slider
-            defaultValue={[0, 500000]}
-            max={500000}
+            defaultValue={[0, 1000000]}
+            max={1000000}
             step={5000}
             value={priceRange}
             onValueChange={(value) => setPriceRange(value as [number, number])}
@@ -373,7 +381,7 @@ export default function MarketplaceBrowse() {
         onClick={() => {
           setSelectedBrands([]);
           setSelectedConditions([]);
-          setPriceRange([0, 500000]);
+          setPriceRange([0, 1000000]);
           setSearch("");
         }}
       >
@@ -383,7 +391,7 @@ export default function MarketplaceBrowse() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen flex flex-col bg-muted dark:bg-slate-950">
       <SEO
         title="Marketplace - Buy & Sell Electronics in Nepal"
         description="Nepal's premier tech marketplace. Buy, sell, and trade electronics directly with verified stores and trusted community members."
@@ -401,7 +409,7 @@ export default function MarketplaceBrowse() {
         </div>
 
         <div className="container relative py-14 md:py-24 text-center">
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white/90 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest mb-8">
+          <div className="inline-flex items-center gap-2 bg-card/10 backdrop-blur border border-white/20 text-white/90 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest mb-8">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             Nepal's Premier Tech Marketplace
           </div>
@@ -422,7 +430,7 @@ export default function MarketplaceBrowse() {
             {[
               { val: `${listingsData?.total ?? 0}+`, label: "Active Listings" },
               { val: `${verifiedStoresCount}+`, label: "Verified Stores" },
-              { val: "100%", label: "Genuine Products" },
+              { val: "Buyer-first", label: "Product Discovery" },
             ].map(({ val, label }) => (
               <div key={label} className="text-center">
                 <div className="text-2xl font-black text-white">{val}</div>
@@ -432,7 +440,7 @@ export default function MarketplaceBrowse() {
           </div>
 
           <div className="max-w-3xl mx-auto">
-            <div className="flex flex-col sm:flex-row items-center gap-3 bg-white/10 backdrop-blur border border-white/20 p-2 rounded-2xl shadow-xl">
+            <div className="flex flex-col sm:flex-row items-center gap-3 bg-card/10 backdrop-blur border border-white/20 p-2 rounded-2xl shadow-xl">
               <div className="relative flex-1 w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
                 <Input
@@ -480,7 +488,7 @@ export default function MarketplaceBrowse() {
                           className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 border cursor-pointer ${
                             active
                               ? "bg-primary text-white border-primary shadow-glow"
-                              : "bg-white/8 text-white/70 border-white/15 hover:border-white/40 hover:bg-white/15 hover:text-white"
+                              : "bg-card/8 text-white/70 border-white/15 hover:border-white/40 hover:bg-card/15 hover:text-white"
                           }`}
                           onClick={() => {
                             setActiveCategory(c.key);
@@ -520,9 +528,9 @@ export default function MarketplaceBrowse() {
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center">
                 <ShieldCheck className="mr-2 h-6 w-6 text-primary" />
-                Trusted Stores
+                All Marketplace Stores
               </h2>
-              <p className="text-muted-foreground mt-1">Shop from verified tech stores and official retailers.</p>
+              <p className="text-muted-foreground mt-1">Browse every active store currently connected to the marketplace.</p>
             </div>
             <Button variant="ghost" asChild className="text-primary hover:text-primary hover:bg-primary/5 hidden sm:flex">
               <Link to="/stores">View all stores <ArrowRight className="ml-2 h-4 w-4" /></Link>
@@ -536,10 +544,10 @@ export default function MarketplaceBrowse() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {(featuredStores || []).slice(0, 4).map((store) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {(featuredStores || []).map((store) => (
                 <Link to={getPublicStorePath(store)} key={store.id}>
-                  <Card className="hover:shadow-md transition-all hover:border-primary/30 group bg-white dark:bg-slate-900 border-border/60">
+                  <Card className="hover:shadow-md transition-all hover:border-primary/30 group bg-card dark:bg-slate-900 border-border/60">
                     <CardContent className="p-4 flex items-center gap-4">
                       {store.logo_url ? (
                         <img
@@ -583,7 +591,8 @@ export default function MarketplaceBrowse() {
         <section>
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-3xl font-bold tracking-tight">Marketplace Listings</h2>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-[10px] font-bold uppercase tracking-[.18em] text-primary"><Sparkles className="h-3 w-3" /> Live marketplace</div>
+              <h2 className="font-display text-3xl font-black tracking-tight md:text-4xl">Find the right device</h2>
               <p className="text-muted-foreground mt-2">Browse {listingsData?.total || 0} active listings from across Nepal.</p>
             </div>
           </div>
@@ -593,7 +602,7 @@ export default function MarketplaceBrowse() {
             <div className="lg:hidden">
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="outline" className="w-full h-12 flex items-center justify-center gap-2 bg-white">
+                  <Button variant="outline" className="w-full h-12 flex items-center justify-center gap-2 bg-card">
                     <Filter className="h-4 w-4" /> 
                     Show Filters
                   </Button>
@@ -609,10 +618,10 @@ export default function MarketplaceBrowse() {
 
             {/* Desktop Filters */}
             <aside className="hidden lg:block w-72 shrink-0">
-              <div className="sticky top-24 bg-white dark:bg-slate-900 border rounded-2xl p-6 shadow-sm">
+              <div className="sticky top-24 bg-card/90 dark:bg-slate-900/90 border rounded-[2rem] p-6 shadow-[0_24px_60px_-35px_rgba(15,23,42,.5)] backdrop-blur-xl">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-bold">Filters</h2>
-                  <Filter className="h-5 w-5 text-muted-foreground" />
+                  <SlidersHorizontal className="h-5 w-5 text-primary" />
                 </div>
                 <FilterContent />
               </div>
@@ -620,7 +629,7 @@ export default function MarketplaceBrowse() {
 
             {/* Products Grid */}
             <div className="flex-1 min-w-0">
-              <div className="flex flex-col sm:flex-row items-center justify-between bg-white dark:bg-slate-900 border p-3 rounded-xl mb-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-center justify-between bg-card/90 dark:bg-slate-900/90 border p-3 rounded-2xl mb-6 shadow-sm backdrop-blur-xl">
                 <p className="text-sm font-medium text-muted-foreground px-2">
                   Showing <span className="text-foreground">{listings.length}</span> results
                 </p>
@@ -648,7 +657,7 @@ export default function MarketplaceBrowse() {
                 </div>
               ) : listings?.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {paginatedListings.map((listing) => {
+                  {paginatedListings.map((listing, index) => {
                     const { meta } = decodeListingDescription(listing.description);
                     const conditionLabel = formatCondition(listing.condition);
                     const showBrand = listing.brand ? String(listing.brand) : "";
@@ -664,6 +673,27 @@ export default function MarketplaceBrowse() {
                     const locationLabel = listing.location || "Nepal";
                     const shownLocation = isHiddenLocation ? locationLabel.split(",")[0]?.trim() || locationLabel : locationLabel;
                     const store = (listing as ListingWithShop).store;
+                    const imageCount = Array.isArray(listing.images) ? listing.images.filter(Boolean).length : 0;
+                    const isCatalogProduct = listing.source_type === "store_product";
+                    const canCheckout = isCatalogProduct && Boolean(listing.store_id) && Number(listing.stock ?? 0) > 0;
+                    const checkoutProduct = {
+                      id: listing.id,
+                      store_product_id: listing.id,
+                      source_type: "store_product" as const,
+                      name: listing.title,
+                      slug: `marketplace-${listing.id}`,
+                      brand: listing.brand,
+                      price: `NPR ${Number(listing.price).toLocaleString()}`,
+                      price_value: Number(listing.price),
+                      store_id: listing.store_id,
+                      image: listing.images?.[0] ?? null,
+                      images: listing.images,
+                      rating: null,
+                      category: listing.category || "marketplace",
+                      description: listing.description,
+                      in_stock: true,
+                      stock_quantity: listing.stock,
+                    };
 
                     const conditionColor =
                       listing.condition === "new" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" :
@@ -681,22 +711,63 @@ export default function MarketplaceBrowse() {
                       featuredContactVisible: storeIsFeatured,
                       isLoggedIn: !!user,
                     });
+                    const contactStore = listing.store_id ? storeContacts.get(listing.store_id) : undefined;
+                    const whatsappUrl = contact.showWhatsApp && contactStore
+                      ? buildWhatsAppPurchaseUrl(contactStore.whatsapp || contactStore.phone, {
+                          id: listing.id,
+                          title: listing.title,
+                          price: listing.price,
+                          condition: conditionLabel,
+                          storeName: store?.name || listing.shop_name,
+                        }, absoluteUrl(`/marketplace/listing/${listing.id}`))
+                      : null;
+                    const openWhatsApp = () => {
+                      if (!whatsappUrl) return;
+                      if (user && listing.store_id) {
+                        void (supabase as any).rpc("record_marketplace_whatsapp_intent", {
+                          p_store_id: listing.store_id,
+                          p_item_id: listing.id,
+                          p_item_title: listing.title,
+                          p_item_price: listing.price,
+                          p_source_page: "/marketplace",
+                        });
+                      }
+                      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+                    };
 
                     return (
-                      <Link to={`/marketplace/listing/${listing.id}`} key={listing.id} className="group block">
-                        <Card className="h-full overflow-hidden bg-card border-border/50 hover:border-primary/50 hover:shadow-elevated transition-all duration-300 rounded-2xl flex flex-col">
-                          <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+                      <article
+                        key={listing.id}
+                        role="link"
+                        tabIndex={0}
+                        aria-label={`View ${listing.title}`}
+                        onClick={() => navigate(`/marketplace/listing/${listing.id}`)}
+                        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") navigate(`/marketplace/listing/${listing.id}`); }}
+                        className="group block animate-fade-up will-change-transform outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4 rounded-[2rem]"
+                        style={{ animationDelay: `${Math.min(index, 8) * 75}ms` }}
+                      >
+                        <Card className="h-full overflow-hidden bg-card border-border/60 hover:border-primary/40 hover:shadow-[0_28px_70px_-30px_rgba(15,23,42,.4)] transition-all duration-500 rounded-[2rem] flex flex-col group-hover:-translate-y-1.5">
+                          <div className="relative aspect-square bg-[radial-gradient(circle_at_center,hsl(var(--background)),hsl(var(--muted)))] overflow-hidden">
                             <SafeImage
                               src={listing.images && listing.images.length > 0 ? listing.images[0] : null}
                               alt={listing.title}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              aspect="square"
+                              width={480}
+                              height={480}
+                              className={`w-full h-full transition-transform duration-500 group-hover:scale-[1.035] ${isCatalogProduct ? "object-contain p-5 sm:p-7" : "object-cover"}`}
                             />
+                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-white/5" />
 
                             {/* Condition badge */}
                             <div className="absolute top-3 left-3">
                               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border backdrop-blur-sm ${conditionColor}`}>
                                 {conditionLabel}
                               </span>
+                            </div>
+
+                            <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">
+                              {imageCount > 1 ? <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-950/65 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-xl"><Images className="h-3 w-3" />{imageCount}</span> : <span />}
+                              <span className="translate-y-2 rounded-full bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-950 opacity-0 shadow-xl transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"><Eye className="mr-1 inline h-3 w-3" />View product</span>
                             </div>
 
                             {/* Admin/Owner Actions */}
@@ -717,10 +788,10 @@ export default function MarketplaceBrowse() {
                             )}
                           </div>
 
-                          <CardContent className="p-4 flex-1 flex flex-col gap-2">
+                          <CardContent className="p-5 flex-1 flex flex-col gap-2.5">
                             <div className="flex items-start justify-between gap-2">
-                              <span className="text-2xl font-black text-foreground tracking-tight">
-                                Rs.{listing.price.toLocaleString()}
+                              <span className="font-display text-2xl font-black text-foreground tracking-tight">
+                                <span className="mr-1 text-xs font-bold text-muted-foreground">NPR</span>{listing.price.toLocaleString()}
                               </span>
                               {badgeLabel && (
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${badgeCn}`}>
@@ -729,7 +800,7 @@ export default function MarketplaceBrowse() {
                               )}
                             </div>
 
-                            <h3 className="font-semibold text-sm text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
+                            <h3 className="font-bold text-base text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
                               {listing.title}
                             </h3>
 
@@ -744,7 +815,18 @@ export default function MarketplaceBrowse() {
                             </div>
                           </CardContent>
 
-                          <CardFooter className="px-4 py-3 border-t flex flex-col gap-2">
+                          <CardFooter className="px-5 py-4 border-t flex flex-col gap-3 bg-muted/20">
+                            {canCheckout && (
+                              <div className="grid w-full grid-cols-2 gap-2" onClick={(event) => event.stopPropagation()}>
+                                <Button variant="outline" className="h-10 rounded-xl text-xs font-bold" onClick={() => addToCart(checkoutProduct)}><ShoppingCart className="mr-1.5 h-3.5 w-3.5" />Add to cart</Button>
+                                <Button className="h-10 rounded-xl text-xs font-bold" onClick={() => { addToCart(checkoutProduct); navigate("/checkout"); }}><Zap className="mr-1.5 h-3.5 w-3.5" />Buy now</Button>
+                              </div>
+                            )}
+                            {whatsappUrl ? (
+                              <Button className="h-10 w-full rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700" onClick={(event) => { event.stopPropagation(); openWhatsApp(); }}>
+                                <MessageCircle className="mr-1.5 h-4 w-4" />WhatsApp to buy
+                              </Button>
+                            ) : null}
                             <div className="flex items-center justify-between w-full">
                               <div className="flex items-center gap-2 overflow-hidden">
                                 {store ? (
@@ -800,12 +882,12 @@ export default function MarketplaceBrowse() {
                             )}
                           </CardFooter>
                         </Card>
-                      </Link>
+                      </article>
                     );
                   })}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-24 px-4 text-center bg-white dark:bg-slate-900 rounded-2xl border border-dashed">
+                <div className="flex flex-col items-center justify-center py-24 px-4 text-center bg-card dark:bg-slate-900 rounded-2xl border border-dashed">
                   <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mb-4">
                     <Search className="h-8 w-8 text-muted-foreground" />
                   </div>
@@ -909,7 +991,7 @@ export default function MarketplaceBrowse() {
               }}>
                 Post a Listing for Free
               </Button>
-              <Button variant="outline" size="lg" className="h-14 px-8 rounded-xl text-base bg-white/50 dark:bg-slate-900/50 backdrop-blur" asChild>
+              <Button variant="outline" size="lg" className="h-14 px-8 rounded-xl text-base bg-card/50 dark:bg-slate-900/50 backdrop-blur" asChild>
                 <Link to="/stores/apply">Register as a Store</Link>
               </Button>
             </div>

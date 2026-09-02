@@ -19,6 +19,7 @@ export function RequireAuth({ children, allowedRoles }: RequireAuthProps) {
   const [resendSent, setResendSent] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const from = locationToPath(location);
+  const isResolvingAuth = loading || (!!user && !role);
 
   const DEV_MODE = import.meta.env.DEV;
   const isLocalhost =
@@ -41,7 +42,7 @@ export function RequireAuth({ children, allowedRoles }: RequireAuthProps) {
     }
   };
 
-  if (loading) {
+  if (isResolvingAuth) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -16,6 +17,8 @@ const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 
 export function ImageUploader({ value, onChange, folder = "marketplace", disabled }: Props) {
   const [pending, setPending] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = async (files: FileList | null, input: HTMLInputElement) => {
     if (!files || files.length === 0) return;
@@ -59,18 +62,63 @@ export function ImageUploader({ value, onChange, folder = "marketplace", disable
     onChange(value.filter((current) => current !== url));
   };
 
+  const addImageUrl = () => {
+    const candidate = urlInput.trim();
+    if (!candidate) return;
+    try {
+      const parsed = new URL(candidate);
+      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
+    } catch {
+      toast.error("Enter a valid HTTP or HTTPS image URL");
+      return;
+    }
+    if (!value.includes(candidate)) onChange([...value, candidate]);
+    setUrlInput("");
+  };
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <input
+          ref={inputRef}
           type="file"
           accept="image/*"
           multiple
           onChange={(event) => handleFiles(event.target.files, event.currentTarget)}
           disabled={disabled || pending}
+          className="sr-only"
         />
-        <Button type="button" variant="outline" disabled={disabled || pending}>
-          {pending ? "Uploading…" : "Upload"}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={disabled || pending}
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload className="mr-2 h-4 w-4" />
+          {pending ? "Uploading…" : "Upload images"}
+        </Button>
+        <span className="text-xs text-muted-foreground">JPG, PNG or WebP · up to 5MB each</span>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={urlInput}
+          onChange={(event) => setUrlInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              addImageUrl();
+            }
+          }}
+          placeholder="Paste GSMArena or another image URL"
+          disabled={disabled || pending}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={addImageUrl}
+          disabled={disabled || pending || !urlInput.trim()}
+        >
+          Add URL
         </Button>
       </div>
       {value.length > 0 && (

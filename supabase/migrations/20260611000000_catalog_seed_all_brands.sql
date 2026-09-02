@@ -46,11 +46,14 @@ INSERT INTO brands (name, slug, status, country) VALUES
   ('Infinix',  'infinix',  'active', 'Hong Kong'),
   ('Motorola', 'motorola', 'active', 'United States'),
   ('ZTE',      'zte',      'active', 'China'),
-  ('Ai+',      'aiplus',   'active', 'Nepal'),
   ('Tecno',    'tecno',    'active', 'Hong Kong'),
-  ('Itel',     'itel',     'active', 'Hong Kong'),
-  ('Coolpad',  'coolpad',  'active', 'China'),
-  ('Benco',    'benco',    'active', 'China')
+  ('Google',   'google',   'active', 'United States'),
+  ('Nokia',    'nokia',    'active', 'Finland'),
+  ('Huawei',   'huawei',   'active', 'China'),
+  ('Sony',     'sony',     'active', 'Japan'),
+  ('Asus',     'asus',     'active', 'Taiwan'),
+  ('Lenovo',   'lenovo',   'active', 'China'),
+  ('Dell',     'dell',     'active', 'United States')
 ON CONFLICT (slug) DO NOTHING;
 
 -- ── 3. Models ────────────────────────────────────────────────────
@@ -282,16 +285,6 @@ FROM brands b, (VALUES
 WHERE b.slug = 'zte'
 ON CONFLICT (slug) DO NOTHING;
 
--- Ai+
-INSERT INTO phone_models (brand_id, name, slug, status)
-SELECT b.id, m.name, m.slug, 'active'
-FROM brands b, (VALUES
-  ('Ai+ Pulse',   'aiplus-pulse'),
-  ('Ai+ Nova 5G', 'aiplus-nova-5g')
-) AS m(name, slug)
-WHERE b.slug = 'aiplus'
-ON CONFLICT (slug) DO NOTHING;
-
 -- Tecno
 INSERT INTO phone_models (brand_id, name, slug, status)
 SELECT b.id, m.name, m.slug, 'active'
@@ -309,46 +302,79 @@ FROM brands b, (VALUES
 WHERE b.slug = 'tecno'
 ON CONFLICT (slug) DO NOTHING;
 
--- Itel
+-- Google
 INSERT INTO phone_models (brand_id, name, slug, status)
 SELECT b.id, m.name, m.slug, 'active'
 FROM brands b, (VALUES
-  ('Itel A05s', 'itel-a05s'),
-  ('Itel A50C', 'itel-a50c'),
-  ('Itel A50',  'itel-a50'),
-  ('Itel A70',  'itel-a70'),
-  ('Itel A80',  'itel-a80'),
-  ('Itel P55',  'itel-p55')
+  ('Pixel 8a',         'google-pixel-8a'),
+  ('Pixel 9',          'google-pixel-9'),
+  ('Pixel 9 Pro',      'google-pixel-9-pro'),
+  ('Pixel 9 Pro XL',   'google-pixel-9-pro-xl'),
+  ('Pixel 9 Pro Fold', 'google-pixel-9-pro-fold')
 ) AS m(name, slug)
-WHERE b.slug = 'itel'
+WHERE b.slug = 'google'
 ON CONFLICT (slug) DO NOTHING;
 
--- Coolpad
+-- Nokia
 INSERT INTO phone_models (brand_id, name, slug, status)
 SELECT b.id, m.name, m.slug, 'active'
 FROM brands b, (VALUES
-  ('Coolpad 12 NEO Plus', 'coolpad-12-neo-plus'),
-  ('Coolpad 12 NEO',      'coolpad-12-neo'),
-  ('Coolpad C16',         'coolpad-c16'),
-  ('Coolpad C15',         'coolpad-c15'),
-  ('Coolpad X100',        'coolpad-x100')
+  ('Nokia C12',         'nokia-c12'),
+  ('Nokia C32',         'nokia-c32'),
+  ('Nokia G22',         'nokia-g22'),
+  ('Nokia G42 5G',      'nokia-g42-5g'),
+  ('Nokia X30 5G',      'nokia-x30-5g'),
+  ('Nokia XR21',        'nokia-xr21'),
+  ('Nokia G400 5G',     'nokia-g400-5g')
 ) AS m(name, slug)
-WHERE b.slug = 'coolpad'
+WHERE b.slug = 'nokia'
 ON CONFLICT (slug) DO NOTHING;
 
--- Benco
+-- Huawei
 INSERT INTO phone_models (brand_id, name, slug, status)
 SELECT b.id, m.name, m.slug, 'active'
 FROM brands b, (VALUES
-  ('Benco V90i SE',  'benco-v90i-se'),
-  ('Benco V90 Plus', 'benco-v90-plus'),
-  ('Benco V91c',     'benco-v91c'),
-  ('Benco V91',      'benco-v91'),
-  ('Benco V91 Plus', 'benco-v91-plus'),
-  ('Benco V92',      'benco-v92'),
-  ('Benco S1',       'benco-s1'),
-  ('Benco S1 Pro',   'benco-s1-pro'),
-  ('Benco S1 Plus',  'benco-s1-plus')
+  ('Huawei Nova 12',          'huawei-nova-12'),
+  ('Huawei Nova 12 Pro',      'huawei-nova-12-pro'),
+  ('Huawei P60 Pro',          'huawei-p60-pro'),
+  ('Huawei Pura 70 Ultra',    'huawei-pura-70-ultra'),
+  ('Huawei Mate 60 Pro',      'huawei-mate-60-pro'),
+  ('Huawei Mate X5',          'huawei-mate-x5'),
+  ('Huawei Pocket 2',         'huawei-pocket-2')
 ) AS m(name, slug)
-WHERE b.slug = 'benco'
+WHERE b.slug = 'huawei'
+ON CONFLICT (slug) DO NOTHING;
+
+-- Sony
+INSERT INTO phone_models (brand_id, name, slug, status)
+SELECT b.id, m.name, m.slug, 'active'
+FROM brands b, (VALUES
+  ('Xperia 10 VI',     'sony-xperia-10-vi'),
+  ('Xperia 5 V',       'sony-xperia-5-v'),
+  ('Xperia 1 VI',      'sony-xperia-1-vi'),
+  ('Xperia Pro-I',     'sony-xperia-pro-i')
+) AS m(name, slug)
+WHERE b.slug = 'sony'
+ON CONFLICT (slug) DO NOTHING;
+
+-- Asus
+INSERT INTO phone_models (brand_id, name, slug, status)
+SELECT b.id, m.name, m.slug, 'active'
+FROM brands b, (VALUES
+  ('Zenfone 11 Ultra',   'asus-zenfone-11-ultra'),
+  ('ROG Phone 8',        'asus-rog-phone-8'),
+  ('ROG Phone 8 Pro',    'asus-rog-phone-8-pro')
+) AS m(name, slug)
+WHERE b.slug = 'asus'
+ON CONFLICT (slug) DO NOTHING;
+
+-- Lenovo
+INSERT INTO phone_models (brand_id, name, slug, status)
+SELECT b.id, m.name, m.slug, 'active'
+FROM brands b, (VALUES
+  ('ThinkPhone',           'lenovo-thinkphone'),
+  ('Legion Y70',           'lenovo-legion-y70'),
+  ('Legion Phone Duel 2',  'lenovo-legion-phone-duel-2')
+) AS m(name, slug)
+WHERE b.slug = 'lenovo'
 ON CONFLICT (slug) DO NOTHING;

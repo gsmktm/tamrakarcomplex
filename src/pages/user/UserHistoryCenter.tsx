@@ -161,7 +161,7 @@ export default function UserHistoryCenter({ defaultTab }: { defaultTab?: string 
                         )}
                         {item.activity_type !== 'order' && (
                           <div className="py-4">
-                            <p className="text-sm text-muted-foreground bg-white p-4 rounded-xl border border-border/50 italic">
+                            <p className="text-sm text-muted-foreground bg-card p-4 rounded-xl border border-border/50 italic">
                               Additional details and real-time tracking for {item.activity_type} requests are coming soon.
                             </p>
                             <div className="mt-4 flex gap-2">

@@ -297,7 +297,7 @@ export default function SellWizard() {
           fetchListing();
       }
     }
-  }, [id, session, navigate, toast, form]);
+  }, [id, session, isAdmin, navigate, toast, form]);
 
   useEffect(() => {
     const hydrateProfileCompletion = async () => {

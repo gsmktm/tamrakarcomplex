@@ -14,7 +14,7 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col min-h-screen bg-muted dark:bg-slate-950">
       <SEO title="404 - Page Not Found" description="The page you requested could not be found at Tamrakar Complex." noindex />
       <Header />
       
@@ -33,7 +33,7 @@ const NotFound = () => {
         <div className="container max-w-4xl mx-auto text-center z-10">
           <div className="relative inline-block mb-8">
             <div className="absolute inset-0 animate-ping opacity-20 bg-primary rounded-full" />
-            <div className="relative bg-white dark:bg-slate-900 p-8 rounded-full shadow-2xl border border-primary/10">
+            <div className="relative bg-card dark:bg-slate-900 p-8 rounded-full shadow-2xl border border-primary/10">
               <WifiOff className="h-20 w-20 text-primary animate-pulse" />
             </div>
             <div className="absolute -top-2 -right-2 bg-red-500 text-white p-2 rounded-full shadow-lg">
@@ -46,7 +46,7 @@ const NotFound = () => {
               <h1 className="text-8xl md:text-9xl font-black font-display tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-slate-900 to-slate-500 dark:from-white dark:to-slate-700">
                 404
               </h1>
-              <h2 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-slate-900 dark:text-white">
+              <h2 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-foreground dark:text-white">
                 Connection Lost!
               </h2>
             </div>
@@ -86,12 +86,12 @@ const NotFound = () => {
                 <Link 
                   key={item.label}
                   to={item.href} 
-                  className="group p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300"
+                  className="group p-6 rounded-3xl bg-card dark:bg-slate-900 border border-border dark:border-slate-800 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300"
                 >
                   <div className="text-3xl mb-3 group-hover:scale-125 transition-transform duration-300">
                     {item.icon}
                   </div>
-                  <div className="font-semibold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
+                  <div className="font-semibold text-foreground dark:text-white group-hover:text-primary transition-colors">
                     {item.label}
                   </div>
                 </Link>
@@ -99,7 +99,7 @@ const NotFound = () => {
             </div>
           </div>
           
-          <div className="mt-16 text-slate-400 dark:text-slate-600">
+          <div className="mt-16 text-slate-400 dark:text-muted-foreground">
             <button 
               onClick={() => window.history.back()}
               className="inline-flex items-center gap-2 hover:text-primary transition-colors font-medium"

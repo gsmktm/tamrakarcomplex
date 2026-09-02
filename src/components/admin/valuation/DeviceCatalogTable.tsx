@@ -59,12 +59,14 @@ export const DeviceCatalogTable = () => {
       ]);
 
       if (catalogResult.error) throw catalogResult.error;
+      if (rulesResult.error) throw rulesResult.error;
 
+      type RuleRow = { id: string; device_id: string; base_price: number | null };
       const ruleMap = new Map(
-        (rulesResult.data ?? []).map((r) => [r.device_id, { id: r.id, base_price: r.base_price }])
+        ((rulesResult.data ?? []) as RuleRow[]).map((r) => [r.device_id, { id: r.id, base_price: r.base_price }])
       );
 
-      return (catalogResult.data ?? []).map((d) => ({
+      return ((catalogResult.data ?? []) as DeviceCatalogRow[]).map((d) => ({
         ...d,
         base_price: ruleMap.get(d.id)?.base_price ?? null,
         rule_id: ruleMap.get(d.id)?.id ?? null,
@@ -124,7 +126,10 @@ export const DeviceCatalogTable = () => {
           .eq("id", ruleId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("valuation_rules").insert(payload);
+        // upsert on device_id prevents duplicate rows on double-save
+        const { error } = await supabase
+          .from("valuation_rules")
+          .upsert(payload, { onConflict: "device_id" });
         if (error) throw error;
       }
     },

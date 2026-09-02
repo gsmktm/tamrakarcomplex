@@ -1,7 +1,31 @@
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { SafeImage } from "@/components/common/SafeImage";
+import { Smartphone } from "lucide-react";
 import type { ModelListItem } from "@/services/mobileMasterService";
+
+const BRAND_COLORS: Record<string, string> = {
+  A: "from-blue-500/20 to-blue-400/10 text-blue-600",
+  S: "from-indigo-500/20 to-indigo-400/10 text-indigo-600",
+  X: "from-orange-500/20 to-orange-400/10 text-orange-600",
+  O: "from-red-500/20 to-red-400/10 text-red-600",
+  R: "from-yellow-500/20 to-yellow-400/10 text-yellow-600",
+  V: "from-teal-500/20 to-teal-400/10 text-teal-600",
+  I: "from-gray-500/20 to-gray-400/10 text-gray-600",
+  N: "from-purple-500/20 to-purple-400/10 text-purple-600",
+};
+const defaultGradient = "from-muted to-muted/50 text-muted-foreground";
+
+function ModelImagePlaceholder({ name }: { name: string }) {
+  const initial = name.charAt(0).toUpperCase();
+  const colors = BRAND_COLORS[initial] ?? defaultGradient;
+  return (
+    <div className={`w-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br ${colors.split(" ").slice(0, 2).join(" ")}`} style={{ minHeight: 180 }}>
+      <span className={`text-5xl font-black select-none ${colors.split(" ")[2] ?? "text-muted-foreground"} opacity-30`}>{initial}</span>
+      <Smartphone className="h-8 w-8 text-muted-foreground/20" />
+    </div>
+  );
+}
 
 interface ModelCardProps {
   model: ModelListItem;
@@ -33,17 +57,23 @@ export function ModelCard({ model, className = '' }: ModelCardProps) {
   return (
     <Link
       to={`/mobile/${model.slug}`}
-      className={`group flex flex-col rounded-xl border bg-card hover:border-primary/40 hover:shadow-lg transition-all duration-200 overflow-hidden ${className}`}
+      className={`group flex min-w-0 flex-col rounded-xl border bg-card hover:border-primary/40 hover:shadow-lg transition-all duration-200 overflow-hidden ${className}`}
     >
       {/* Image */}
-      <div className="relative bg-muted/20 flex items-center justify-center" style={{ minHeight: 180 }}>
-        <SafeImage
-          src={model.image}
-          alt={model.name}
-          className="w-full object-contain p-4 group-hover:scale-[1.04] transition-transform duration-300"
-          style={{ maxHeight: 200 }}
-          aspect="square"
-        />
+      <div className="relative overflow-hidden flex items-center justify-center aspect-square min-h-[150px] sm:min-h-[180px]">
+        {model.image ? (
+          <SafeImage
+            src={model.image}
+            alt={model.name}
+            className="w-full object-contain p-4 group-hover:scale-[1.04] transition-transform duration-300"
+            style={{ maxHeight: 200 }}
+            aspect="square"
+          />
+        ) : (
+          <div className="w-full group-hover:scale-[1.02] transition-transform duration-300">
+            <ModelImagePlaceholder name={model.name} />
+          </div>
+        )}
         {/* Badges */}
         <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
           {model.is_upcoming && (
@@ -67,8 +97,8 @@ export function ModelCard({ model, className = '' }: ModelCardProps) {
       </div>
 
       {/* Content */}
-      <div className="flex flex-col flex-1 p-3 gap-1.5">
-        <div className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-2">
+      <div className="flex min-w-0 flex-col flex-1 p-3 gap-1.5">
+        <div className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-2 break-words">
           {model.name}
         </div>
 
@@ -81,15 +111,32 @@ export function ModelCard({ model, className = '' }: ModelCardProps) {
 
         {/* Storage options */}
         {storageLabel && (
-          <div className="text-[11px] text-muted-foreground">{storageLabel}</div>
+          <div className="text-[11px] text-muted-foreground line-clamp-1">{storageLabel}</div>
         )}
 
         {/* Price */}
-        <div className="mt-auto pt-1.5">
-          <span className={`text-sm font-bold ${model.min_price ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+        <div className="mt-auto pt-1.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+          <span className={`text-sm font-bold leading-tight ${model.min_price ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
             {price}
           </span>
+          {model.exchange_max_value && (
+            <span className="w-fit text-[10px] text-primary font-semibold bg-primary/10 px-1.5 py-0.5 rounded">
+              Exchange रु{model.exchange_max_value.toLocaleString('en-NP')}
+            </span>
+          )}
         </div>
+
+        {/* Ecosystem signals */}
+        {(model.repair_available || model.unlocking_available) && (
+          <div className="flex gap-1 flex-wrap pt-1 border-t mt-1">
+            {model.repair_available && (
+              <span className="text-[9px] font-bold uppercase tracking-wide text-orange-600 bg-orange-50 dark:bg-orange-950/40 px-1.5 py-0.5 rounded">Repair</span>
+            )}
+            {model.unlocking_available && (
+              <span className="text-[9px] font-bold uppercase tracking-wide text-blue-600 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded">Unlock</span>
+            )}
+          </div>
+        )}
       </div>
     </Link>
   );

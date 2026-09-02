@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { 
   Smartphone, 
   Battery, 
@@ -21,8 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useDiagnosticsBySymptom } from "@/hooks/useRepairDiagnostics";
 
 const SYMPTOMS = [
   { id: "power", label: "Power & Startup", icon: Zap, color: "text-amber-500", bg: "bg-amber-500/10" },
@@ -39,17 +38,7 @@ export function DiagnosticsFlow() {
   const [step, setStep] = useState<"symptoms" | "diagnoses">("symptoms");
   const [selectedSymptom, setSelectedSymptom] = useState<string | null>(null);
 
-  const { data: allDiagnoses, isLoading } = useQuery({
-    queryKey: ["repair-diagnostics"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("repair_diagnostics")
-        .select("*")
-        .eq("is_active", true);
-      if (error) throw error;
-      return data;
-    }
-  });
+  const { data: currentDiagnoses = [], isLoading } = useDiagnosticsBySymptom(selectedSymptom);
 
   const handleSymptomSelect = (id: string) => {
     setSelectedSymptom(id);
@@ -61,25 +50,20 @@ export function DiagnosticsFlow() {
     setSelectedSymptom(null);
   };
 
-  const currentDiagnoses = useMemo(() => {
-    if (!selectedSymptom || !allDiagnoses) return [];
-    return allDiagnoses.filter(d => d.symptom_id === selectedSymptom);
-  }, [selectedSymptom, allDiagnoses]);
-
   return (
     <div className="space-y-8">
       {isLoading && (
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Smart Diagnostics...</p>
+        <div className="flex flex-col items-center justify-center py-20 gap-4" role="status" aria-live="polite">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
+          <p className="text-muted-foreground font-bold uppercase tracking-widest text-xs">Loading Smart Diagnostics...</p>
         </div>
       )}
 
       {!isLoading && step === "symptoms" ? (
         <div className="space-y-6">
           <div className="text-center space-y-2">
-            <h3 className="text-2xl font-black text-slate-900">What's wrong with your device?</h3>
-            <p className="text-slate-500">Select the primary issue to get an instant diagnosis and cost estimate.</p>
+            <h3 className="text-2xl font-black text-foreground">What's wrong with your device?</h3>
+            <p className="text-muted-foreground">Select the primary issue to get an instant diagnosis and cost estimate.</p>
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -87,12 +71,12 @@ export function DiagnosticsFlow() {
               <button
                 key={s.id}
                 onClick={() => handleSymptomSelect(s.id)}
-                className="group flex flex-col items-center p-6 bg-white rounded-[2rem] border-2 border-slate-100 hover:border-primary hover:shadow-xl transition-all duration-300"
+                className="group flex min-h-32 flex-col items-center p-6 bg-card rounded-[2rem] border-2 border-border hover:border-primary hover:shadow-xl transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <div className={cn("h-14 w-14 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110", s.bg, s.color)}>
                   <s.icon className="h-7 w-7" />
                 </div>
-                <span className="font-bold text-sm text-slate-700 group-hover:text-primary transition-colors text-center">{s.label}</span>
+                <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors text-center">{s.label}</span>
               </button>
             ))}
           </div>
@@ -104,8 +88,8 @@ export function DiagnosticsFlow() {
               <ArrowLeft className="h-4 w-4" />
               Back to Symptoms
             </Button>
-            <div className="h-4 w-px bg-slate-200" />
-            <h3 className="font-black text-slate-900 capitalize">
+            <div className="h-4 w-px bg-border" />
+            <h3 className="font-black text-foreground capitalize">
               {SYMPTOMS.find(s => s.id === selectedSymptom)?.label} Issues
             </h3>
           </div>
@@ -113,7 +97,7 @@ export function DiagnosticsFlow() {
           <div className="grid gap-4">
             {currentDiagnoses.length > 0 ? (
               currentDiagnoses.map((d, i) => (
-                <Card key={i} className="rounded-[2rem] border-slate-200 overflow-hidden group hover:border-primary/30 transition-all">
+                <Card key={i} className="rounded-[2rem] border-border overflow-hidden group hover:border-primary/30 transition-all">
                   <CardContent className="p-0">
                     <div className="flex flex-col md:flex-row">
                       <div className="p-8 flex-1 space-y-4">
@@ -124,18 +108,18 @@ export function DiagnosticsFlow() {
                           )}>
                             {d.severity === "high" ? <AlertTriangle className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
                           </div>
-                          <h4 className="text-xl font-black text-slate-900">{d.title}</h4>
+                          <h4 className="text-xl font-black text-foreground">{d.title}</h4>
                         </div>
                         <div className="space-y-2">
-                          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Symptom</p>
-                          <p className="text-slate-600 font-medium">{d.symptom_description}</p>
+                          <p className="text-sm font-bold text-muted-foreground/60 uppercase tracking-widest">Symptom</p>
+                          <p className="text-muted-foreground font-medium">{d.symptom_description}</p>
                         </div>
                         <div className="space-y-2">
-                          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Expert Solution</p>
-                          <p className="text-slate-600 font-medium">{d.solution_description}</p>
+                          <p className="text-sm font-bold text-muted-foreground/60 uppercase tracking-widest">Expert Solution</p>
+                          <p className="text-muted-foreground font-medium">{d.solution_description}</p>
                         </div>
                       </div>
-                      <div className="bg-slate-50 p-8 md:w-64 flex flex-col justify-center items-center text-center gap-4 border-l border-slate-100">
+                      <div className="bg-muted p-8 md:w-64 flex flex-col justify-center items-center text-center gap-4 border-l border-border">
                         <div>
                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Estimated Cost</p>
                           <p className="text-xl font-black text-primary">{d.cost_range}</p>
@@ -152,9 +136,9 @@ export function DiagnosticsFlow() {
                 </Card>
               ))
             ) : (
-              <div className="p-12 text-center bg-white rounded-[3rem] border-4 border-dashed border-slate-100 space-y-4">
+              <div className="p-12 text-center bg-card rounded-[3rem] border-4 border-dashed border-border space-y-4">
                 <Search className="h-12 w-12 text-slate-200 mx-auto" />
-                <p className="text-slate-500 font-bold uppercase tracking-widest">No common diagnoses found for this issue.</p>
+                <p className="text-muted-foreground font-bold uppercase tracking-widest">No common diagnoses found for this issue.</p>
                 <Button className="rounded-xl font-bold" asChild>
                   <Link to="/repair/custom">Get Custom Quote</Link>
                 </Button>

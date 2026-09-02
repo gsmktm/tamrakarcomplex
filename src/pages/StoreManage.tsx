@@ -29,7 +29,7 @@ interface StoreWithSubscriptions extends StoreRow {
   store_subscriptions?: (StoreSubscriptionRow & { packages?: PackageRow })[] | null;
 }
 import { SEO } from "@/components/common/SEO";
-import { getErrorMessage } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 import type { StorePageInsert, StorePageRow, StoreRow, StoreUpdate } from "@/types/app";
 
 type PageFormState = {
@@ -95,7 +95,9 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
   const isPanel = location.pathname.startsWith("/storeadmin");
   
   // For the panel version, we use the storeId prop or the paramId
-  const id = storeId || paramId;
+  const requestedStore = storeId || paramId;
+  const requestedStoreIsUuid = !!requestedStore
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedStore);
 
   const [activeTab, setActiveTab] = useState("details");
   const [pageForm, setPageForm] = useState<PageFormState>(emptyPageForm);
@@ -104,15 +106,25 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
     theme_slug: "default",
   });
 
-  const { data: store, isLoading: isStoreLoading } = useQuery<StoreWithSubscriptions>({
-    queryKey: ["store", id],
+  const {
+    data: store,
+    isLoading: isStoreLoading,
+    isError: isStoreError,
+    error: storeError,
+  } = useQuery<StoreWithSubscriptions>({
+    queryKey: ["store-manage", requestedStore],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("stores")
-        .select("*, store_subscriptions(*, packages(*))")
-        .eq("id", id)
-        .single();
+        .select("*, store_subscriptions(*, packages(*))");
+
+      query = requestedStoreIsUuid
+        ? query.eq("id", requestedStore!)
+        : query.eq("slug", requestedStore!);
+
+      const { data, error } = await query.maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Store not found");
       
       // Sync local state with fetched data
       if (data) {
@@ -124,8 +136,11 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
       
       return data;
     },
-    enabled: !!id,
+    enabled: !!requestedStore,
+    retry: 1,
   });
+  const resolvedStoreId = store?.id;
+  const publicStorePath = `/stores/${store?.slug || requestedStore || ""}`;
 
   useEffect(() => {
     if (store && user && store.owner_id !== user.id) {
@@ -139,39 +154,40 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
 
         if (!data) {
           toast.error("You do not have permission to manage this store.");
-          navigate(`/stores/${id}`);
+          navigate(publicStorePath);
         }
       };
 
       checkAdmin();
     }
-  }, [id, navigate, store, user]);
+  }, [navigate, publicStorePath, store, user]);
 
   const { data: pages } = useQuery<StorePageRow[]>({
-    queryKey: ["store_pages", id],
+    queryKey: ["store_pages", resolvedStoreId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("store_pages")
         .select("*")
-        .eq("store_id", id)
+        .eq("store_id", resolvedStoreId!)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!id,
+    enabled: !!resolvedStoreId,
   });
 
   const pageSlugs = useMemo(() => new Set((pages ?? []).map((page) => page.slug)), [pages]);
 
   const updateStoreMutation = useMutation({
     mutationFn: async (values: StoreUpdate) => {
-      const { error } = await supabase.from("stores").update(values).eq("id", id);
+      if (!resolvedStoreId) throw new Error("Store is not loaded");
+      const { error } = await supabase.from("stores").update(values).eq("id", resolvedStoreId);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Store details updated successfully");
-      queryClient.invalidateQueries({ queryKey: ["store", id] });
+      queryClient.invalidateQueries({ queryKey: ["store-manage", requestedStore] });
       queryClient.invalidateQueries({ queryKey: ["stores"] });
     },
     onError: (error: unknown) => {
@@ -181,13 +197,14 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
 
   const createPageMutation = useMutation({
     mutationFn: async (values: Omit<StorePageInsert, "store_id">) => {
-      const { error } = await supabase.from("store_pages").insert({ ...values, store_id: id });
+      if (!resolvedStoreId) throw new Error("Store is not loaded");
+      const { error } = await supabase.from("store_pages").insert({ ...values, store_id: resolvedStoreId });
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Page created successfully");
       setPageForm(emptyPageForm);
-      queryClient.invalidateQueries({ queryKey: ["store_pages", id] });
+      queryClient.invalidateQueries({ queryKey: ["store_pages", resolvedStoreId] });
     },
     onError: (error: unknown) => {
       toast.error(`Error: ${getErrorMessage(error)}`);
@@ -203,7 +220,7 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
     onSuccess: () => {
       toast.success("Page updated successfully");
       setPageForm(emptyPageForm);
-      queryClient.invalidateQueries({ queryKey: ["store_pages", id] });
+      queryClient.invalidateQueries({ queryKey: ["store_pages", resolvedStoreId] });
     },
     onError: (error: unknown) => {
       toast.error(`Error: ${getErrorMessage(error)}`);
@@ -220,14 +237,14 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
       if (pageForm.id) {
         setPageForm(emptyPageForm);
       }
-      queryClient.invalidateQueries({ queryKey: ["store_pages", id] });
+      queryClient.invalidateQueries({ queryKey: ["store_pages", resolvedStoreId] });
     },
     onError: (error: unknown) => {
       toast.error(`Error: ${getErrorMessage(error)}`);
     },
   });
 
-  if (isStoreLoading || !store) {
+  if (isStoreLoading) {
     return (
       <div className="flex min-h-screen flex-col">
         <SEO title="Manage Store" description="Manage store information and custom pages." noindex />
@@ -236,6 +253,31 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
           <Loader2 className="animate-spin" />
         </div>
         <Footer />
+      </div>
+    );
+  }
+
+  if (isStoreError || !store) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <SEO title="Store unavailable" description="The requested store could not be loaded." noindex />
+        {!isPanel && <Header />}
+        <main className="container flex flex-1 items-center justify-center py-20">
+          <Card className="w-full max-w-lg">
+            <CardHeader>
+              <CardTitle>Store could not be loaded</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {getErrorMessage(storeError) || "Check the store address and try again."}
+              </p>
+              <Button asChild>
+                <Link to="/stores">Back to stores</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+        {!isPanel && <Footer />}
       </div>
     );
   }
@@ -318,7 +360,7 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
   const isSavingPage = createPageMutation.isPending || updatePageMutation.isPending;
 
   return (
-    <div className={cn("flex min-h-screen flex-col", isPanel ? "bg-transparent min-h-0" : "bg-slate-50")}>
+    <div className={cn("flex min-h-screen flex-col", isPanel ? "bg-transparent min-h-0" : "bg-muted")}>
       <SEO title={`Manage ${store.name}`} description="Edit store details and custom store pages." noindex />
       {!isPanel && <Header />}
       <main className={cn("flex-1 py-8", isPanel ? "px-0 py-0" : "container")}>
@@ -326,7 +368,7 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
           <div className="flex items-center gap-4">
             {!isPanel && (
               <Button variant="ghost" size="icon" asChild>
-                <Link to={`/stores/${id}`}>
+                <Link to={publicStorePath}>
                   <ArrowLeft className="h-5 w-5" />
                 </Link>
               </Button>
@@ -351,7 +393,7 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
               </Button>
             )}
             <Button variant="outline" asChild>
-              <Link to={`/stores/${id}`}>
+              <Link to={publicStorePath}>
                 <Eye className="mr-2 h-4 w-4" />
                 View Store
               </Link>

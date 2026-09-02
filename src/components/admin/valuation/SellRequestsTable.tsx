@@ -40,12 +40,12 @@ interface SellRequest {
   condition: string;
   defects: string[];
   quoted_value: number;
-  status: "new" | "scheduled" | "completed" | "cancelled";
+  status: "new" | "contacted" | "inspection_booked" | "completed" | "rejected" | "cancelled";
   user?: {
     email: string;
   };
   stores?: {
-    store_name: string;
+    name: string;
   } | null;
 }
 
@@ -91,72 +91,32 @@ export const SellRequestsTable = ({ storeId }: { storeId?: string }) => {
   const { data: requests, isLoading } = useQuery({
     queryKey: ["admin-sell-requests", storeId],
     queryFn: async () => {
-      try {
-        let query = supabase
-          .from("leads_quotes")
-          .select("*, stores(store_name)");
-        
-        if (storeId) {
-          query = query.eq("store_id", storeId);
-        }
-
-        const { data, error } = await query.order("created_at", { ascending: false });
-        
-        if (error) throw error;
-        return (data ?? []).map(mapLeadQuoteRow);
-      } catch (e: unknown) {
-        // Fallback: read contact_messages where subject indicates fallback lead
-        const { data: msgs, error: cmError } = await supabase
-          .from("contact_messages")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (cmError) throw cmError;
-        const leads = (msgs ?? [])
-          .filter((m) => (m.subject || "").toLowerCase().includes("sell lead"))
-          .map((m) => {
-            let payload: unknown = {};
-            try {
-              payload = JSON.parse(m.message || "{}");
-            } catch {
-              // Ignore malformed fallback payloads and keep the lead visible.
-            }
-            const p = payload as Record<string, unknown>;
-            const dev = (p.device as Record<string, unknown>) || {};
-            return {
-              id: m.id,
-              created_at: m.created_at,
-              user_id: "", // unknown in fallback
-              type: "cash",
-              device: {
-                brand: (dev.brand as string) || "-",
-                model: (dev.model as string) || "-",
-                storage: (dev.storage as string) || undefined,
-                ram: (dev.ram as string) || undefined,
-              },
-              condition: typeof p.condition === "string" ? p.condition : "good",
-              defects: Array.isArray(p.defects) ? p.defects.filter((item): item is string => typeof item === "string") : [],
-              quoted_value: Number(p?.quoted_value as number) || 0,
-              status: "new",
-            } as SellRequest;
-          });
-        return leads as unknown as SellRequest[];
-      }
+      let query = (supabase as any)
+        .from("sell_phone_leads")
+        .select("id,created_at,user_id,assigned_store_id,brand,model,storage,condition,defects,quoted_value,status,stores:assigned_store_id(name)");
+      if (storeId) query = query.eq("assigned_store_id", storeId);
+      const { data, error } = await query.order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((row: any): SellRequest => ({
+        id: row.id,
+        created_at: row.created_at,
+        user_id: row.user_id || "",
+        type: "sell",
+        store_id: row.assigned_store_id,
+        device: { brand: row.brand || "-", model: row.model || "-", storage: row.storage || undefined },
+        condition: row.condition || "used",
+        defects: Array.isArray(row.defects) ? row.defects : [],
+        quoted_value: Number(row.quoted_value || 0),
+        status: row.status || "new",
+        stores: row.stores,
+      }));
     },
   });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: SellRequest["status"] }) => {
-      // If leads_quotes exists, update; if fallback, no-op
-      try {
-        const { error } = await supabase
-          .from("leads_quotes")
-          .update({ status })
-          .eq("id", id);
-        if (error) throw error;
-      } catch {
-        // Fallback mode - cannot update status in contact_messages
-        return;
-      }
+      const { error } = await (supabase as any).from("sell_phone_leads").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-sell-requests"] });
@@ -201,7 +161,7 @@ export const SellRequestsTable = ({ storeId }: { storeId?: string }) => {
                   {req.stores ? (
                     <div className="flex items-center gap-1.5 text-primary">
                       <Store className="h-3 w-3" />
-                      <span className="text-xs font-bold">{req.stores.store_name}</span>
+                      <span className="text-xs font-bold">{req.stores.name}</span>
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground italic">Marketplace</span>
@@ -221,7 +181,7 @@ export const SellRequestsTable = ({ storeId }: { storeId?: string }) => {
                 <TableCell>
                   <Badge className={`
                     ${req.status === 'new' ? 'bg-blue-500' : ''}
-                    ${req.status === 'scheduled' ? 'bg-yellow-500' : ''}
+                    ${req.status === 'contacted' || req.status === 'inspection_booked' ? 'bg-yellow-500' : ''}
                     ${req.status === 'completed' ? 'bg-green-500' : ''}
                     ${req.status === 'cancelled' ? 'bg-gray-500' : ''}
                   `}>
@@ -238,8 +198,10 @@ export const SellRequestsTable = ({ storeId }: { storeId?: string }) => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="contacted">Contacted</SelectItem>
+                      <SelectItem value="inspection_booked">Inspection booked</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>

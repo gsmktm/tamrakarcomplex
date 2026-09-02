@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { 
   ArrowLeft, 
@@ -31,6 +31,7 @@ import { Progress } from "@/components/ui/progress";
 import { submitStoreApplicationWithFlow } from "@/services/submissionService";
 import { isValidEmail, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeText } from "@/lib/security";
 import { cn } from "@/lib/utils";
+import { STORE_SUBSCRIPTION_PACKAGES, getStorePackageMeta } from "@/lib/storePackages";
 
 type StoreApplyForm = {
   storeName: string;
@@ -45,6 +46,8 @@ type StoreApplyForm = {
   licenseUrl: string;
   whatsapp: string;
   viber: string;
+  planSlug: string;
+  billingCycle: "monthly" | "yearly";
 };
 
 const initialForm: StoreApplyForm = {
@@ -60,12 +63,17 @@ const initialForm: StoreApplyForm = {
   licenseUrl: "",
   whatsapp: "",
   viber: "",
+  planSlug: "free",
+  billingCycle: "monthly",
 };
 
 type Step = 1 | 2 | 3;
 
 export default function StoreApply() {
-  const [form, setForm] = useState<StoreApplyForm>(initialForm);
+  const [searchParams] = useSearchParams();
+  const requestedPlan = searchParams.get("plan")?.toLowerCase() ?? "free";
+  const validPlan = STORE_SUBSCRIPTION_PACKAGES.some((plan) => plan.slug === requestedPlan) ? requestedPlan : "free";
+  const [form, setForm] = useState<StoreApplyForm>({ ...initialForm, planSlug: validPlan });
   const [step, setStep] = useState<Step>(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [lastApplicationId, setLastApplicationId] = useState<string | null>(null);
@@ -96,6 +104,8 @@ export default function StoreApply() {
         license_url: form.licenseUrl,
         whatsapp: form.whatsapp,
         viber: form.viber,
+        requested_package_slug: form.planSlug,
+        billing_cycle: form.billingCycle,
       });
 
       return result;
@@ -104,7 +114,7 @@ export default function StoreApply() {
       toast.success(result.message || "Store application sent successfully!");
       setLastApplicationId(result.applicationId);
       setIsSubmitted(true);
-      setForm(initialForm);
+      setForm({ ...initialForm, planSlug: validPlan });
     },
     onError: (error: Error) => {
       console.error("Store application error:", error);
@@ -115,6 +125,10 @@ export default function StoreApply() {
   const updateField = (field: keyof StoreApplyForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
+
+  const selectedPlan = STORE_SUBSCRIPTION_PACKAGES.find((plan) => plan.slug === form.planSlug) ?? STORE_SUBSCRIPTION_PACKAGES[0];
+  const selectedPlanMeta = getStorePackageMeta(selectedPlan.slug);
+  const selectedPrice = form.billingCycle === "yearly" ? selectedPlan.yearly_price : selectedPlan.monthly_price;
 
   const nextStep = () => {
     if (step === 1) {
@@ -206,7 +220,7 @@ export default function StoreApply() {
                 </div>
                 <h3 className="font-bold">Check your inbox</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  We've sent a confirmation message to your email. We'll also reach out via phone if we need more info.
+                  Your database reference is shown above. Our team will reach out by email or phone after reviewing the application.
                 </p>
               </div>
             </div>
@@ -309,6 +323,18 @@ export default function StoreApply() {
             </aside>
 
             <div className="space-y-6">
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Requested package</p>
+                    <p className="text-xl font-bold">{selectedPlanMeta.displayName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      NPR {selectedPrice.toLocaleString()} · {form.billingCycle}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" asChild><Link to="/stores/pricing">Change plan</Link></Button>
+                </CardContent>
+              </Card>
               <div className="mb-8">
                 <div className="flex justify-between mb-2 text-sm font-medium">
                   <span className={cn(step >= 1 ? "text-primary" : "text-muted-foreground")}>Personal Info</span>
@@ -447,6 +473,20 @@ export default function StoreApply() {
 
                     {step === 3 && (
                       <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-3 rounded-xl border p-4">
+                          <Label>Billing period</Label>
+                          <div className="grid grid-cols-2 gap-3">
+                            {(["monthly", "yearly"] as const).map((cycle) => (
+                              <Button key={cycle} type="button" variant={form.billingCycle === cycle ? "default" : "outline"}
+                                onClick={() => updateField("billingCycle", cycle)} className="capitalize">
+                                {cycle}{cycle === "yearly" && selectedPlan.monthly_price > 0 ? " · save 2 months" : ""}
+                              </Button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Payment is requested only after your business is approved. A paid package is never activated from a browser redirect alone.
+                          </p>
+                        </div>
                         <div className="space-y-3">
                           <Label className="flex items-center gap-2">
                             <ImageIcon className="h-4 w-4" />

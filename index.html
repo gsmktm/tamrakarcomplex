@@ -3,6 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <script>
+      (() => {
+        try {
+          const saved = localStorage.getItem("theme");
+          const theme = saved === "light" || saved === "dark"
+            ? saved
+            : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          document.documentElement.classList.add(theme);
+          document.documentElement.style.colorScheme = theme;
+        } catch {
+          document.documentElement.classList.add("light");
+        }
+      })();
+    </script>
     <title>Tamrakar Complex - Tech News, Reviews & Gadget Prices in Nepal</title>
     <meta name="description" content="Your trusted source for the latest tech news, smartphone reviews, laptop prices, and gadget comparisons in Nepal. Stay updated with Tamrakar Complex." />
     <meta name="author" content="Tamrakar Complex" />
@@ -22,7 +37,9 @@
     <meta name="twitter:description" content="Latest tech news, reviews & gadget prices in Nepal" />
     <meta name="twitter:image" content="https://tamrakarcomplex.com/og-image.png" />
 
-    <link rel="icon" type="image/png" href="/favicon.ico" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
   </head>
 
   <body>

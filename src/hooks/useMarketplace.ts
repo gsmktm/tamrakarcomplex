@@ -227,7 +227,12 @@ export function useCreateListing() {
           .single();
 
         if (!store) throw new Error("Store not found");
-        if (store.owner_id !== user.id && store.owner_user_id !== user.id) throw new Error("Not store owner");
+        const [{ data: adminMembership }, { data: staffMembership }] = await Promise.all([
+          supabase.from("store_admins").select("store_id").eq("store_id", input.store_id).eq("user_id", user.id).eq("status", "active").maybeSingle(),
+          (supabase as any).from("store_staff").select("store_id").eq("store_id", input.store_id).eq("user_id", user.id).eq("status", "active").maybeSingle(),
+        ]);
+        const canPostForStore = store.owner_id === user.id || store.owner_user_id === user.id || Boolean(adminMembership || staffMembership);
+        if (!canPostForStore) throw new Error("You do not have permission to post for this store");
 
         const packageSlug = resolveEffectiveStorePackage(store);
         const entitlements = getStoreEntitlements(packageSlug);

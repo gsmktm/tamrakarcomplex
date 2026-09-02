@@ -3,6 +3,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useCart } from "@/contexts/CartContext";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
@@ -18,9 +19,14 @@ type VerifyPaymentResponse = {
 
 export default function OrderSuccess() {
   const [searchParams] = useSearchParams();
+  const { clearCart } = useCart();
   const oid = searchParams.get("oid") ?? searchParams.get("order_id") ?? searchParams.get("pid");
   const encodedData = searchParams.get("data");
-  
+  const isDemo = searchParams.get("demo") === "1";
+
+  // Khalti ePayment return: ?provider=khalti&pidx=...
+  const khaltiPidx = searchParams.get("pidx");
+
   // Legacy params for backward compatibility
   const legacyRefId = searchParams.get("refId") ?? searchParams.get("ref_id") ?? searchParams.get("rid");
   const legacyAmount = searchParams.get("amt") ?? searchParams.get("amount");
@@ -42,10 +48,46 @@ export default function OrderSuccess() {
         
         if (!orderError && orderData) {
           setOrder(orderData);
+
+          const settleAndReport = async (payload: Record<string, unknown>, failureMessage: string, successMessage: string) => {
+            const { data: verifyData, error: verifyError } = await supabase.functions.invoke<VerifyPaymentResponse>(
+              "verify-payment",
+              { body: payload },
+            );
+
+            if (verifyError || verifyData?.success === false) {
+              setPaymentStatus("failed");
+              setStatusMessage(verifyData?.error || verifyError?.message || failureMessage);
+            } else {
+              // Cart is cleared only after settlement is confirmed.
+              clearCart();
+              setPaymentStatus("success");
+              setStatusMessage(verifyData?.message || successMessage);
+            }
+          };
+
           if (orderData.payment_method === "esewa") {
             if (orderData.payment_status === "paid") {
+              clearCart();
               setPaymentStatus("success");
               setStatusMessage("Your eSewa payment has been verified.");
+            } else if (isDemo) {
+              // Demo mode: settle the pending payment without a gateway round-trip.
+              // verify-payment only auto-passes while the provider is in demo mode
+              // (the decision is entirely server-side from the provider registry).
+              await settleAndReport(
+                {
+                  orderId: oid,
+                  provider: "esewa",
+                  transaction_data: {
+                    oid,
+                    amt: orderData.total_amount,
+                    refId: `demo-${oid}`,
+                  },
+                },
+                "We could not verify your demo payment.",
+                "Your demo payment has been verified.",
+              );
             } else {
               let verificationPayload: any = null;
 
@@ -73,28 +115,46 @@ export default function OrderSuccess() {
               }
 
               if (verificationPayload) {
-                const { data: verifyData, error: verifyError } = await supabase.functions.invoke<VerifyPaymentResponse>(
-                  "verify-payment",
-                  {
-                    body: verificationPayload,
-                  },
+                await settleAndReport(
+                  verificationPayload,
+                  "We could not verify your eSewa payment.",
+                  "Your eSewa payment has been verified.",
                 );
-
-                if (verifyError || verifyData?.success === false) {
-                  setPaymentStatus("failed");
-                  setStatusMessage(verifyData?.error || verifyError?.message || "We could not verify your eSewa payment.");
-                } else {
-                  setPaymentStatus("success");
-                  setStatusMessage(verifyData?.message || "Your eSewa payment has been verified.");
-                }
               } else {
                 setPaymentStatus("pending");
                 setStatusMessage("We are waiting for eSewa verification details before confirming payment.");
               }
             }
-          } else {
+          } else if (orderData.payment_method === "khalti" || khaltiPidx) {
+            if (orderData.payment_status === "paid") {
+              clearCart();
+              setPaymentStatus("success");
+              setStatusMessage("Your Khalti payment has been verified.");
+            } else if (khaltiPidx) {
+              // Khalti ePayment return: settle by looking up the pidx server-side.
+              await settleAndReport(
+                {
+                  orderId: oid,
+                  provider: "khalti",
+                  pidx: khaltiPidx,
+                },
+                "We could not verify your Khalti payment.",
+                "Your Khalti payment has been verified.",
+              );
+            } else {
+              setPaymentStatus("pending");
+              setStatusMessage("We are waiting for Khalti verification details before confirming payment.");
+            }
+          } else if (orderData.payment_method === "cod") {
+            // COD has no online settlement — order confirmation is the success state.
+            clearCart();
             setPaymentStatus("success");
             setStatusMessage("Your order has been placed successfully.");
+          } else {
+            // Non-COD method without gateway data: keep pending rather than
+            // falsely reporting success (e.g. a stranded demo order).
+            setPaymentStatus("pending");
+            setStatusMessage("We are waiting for payment verification before confirming your order.");
           }
         } else {
           setPaymentStatus("failed");
@@ -108,7 +168,7 @@ export default function OrderSuccess() {
       setStatusMessage("Missing order information.");
       setLoading(false);
     }
-  }, [oid, encodedData, legacyRefId, legacyAmount]);
+  }, [oid, encodedData, legacyRefId, legacyAmount, isDemo, khaltiPidx, clearCart]);
 
   if (loading) {
     return (

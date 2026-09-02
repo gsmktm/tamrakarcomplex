@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 
 const { execFileSync, spawn } = require("child_process");
+const { mkdtempSync, rmSync } = require("fs");
+const { tmpdir } = require("os");
+const { join } = require("path");
 
 const chromePath = process.env.CHROME_BIN || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const checkPort = process.env.CHECK_PORT || "4174";
 const baseUrl = process.env.CHECK_BASE_URL || `http://127.0.0.1:${checkPort}`;
 const routes = [
+  "/marketplace",
+  "/sell-your-phone",
   "/stores",
   "/stores/abc-mobile-center",
   "/store-admin",
@@ -30,20 +35,54 @@ async function waitForServer(url, timeoutMs = 20000) {
   return false;
 }
 
+async function fetchStatus(url, attempts = 3) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      return { status: response.status, error: "" };
+    } catch (error) {
+      lastError = error;
+      await sleep(300);
+    }
+  }
+  return { status: 0, error: lastError?.message || "fetch failed" };
+}
+
 function dumpDom(url) {
-  return execFileSync(
-    chromePath,
-    [
-      "--headless=new",
-      "--disable-gpu",
-      "--no-first-run",
-      "--no-default-browser-check",
-      "--virtual-time-budget=5000",
-      "--dump-dom",
-      url,
-    ],
-    { encoding: "utf8", maxBuffer: 1024 * 1024 * 4, stdio: ["ignore", "pipe", "ignore"] },
-  );
+  const profileDir = mkdtempSync(join(tmpdir(), "tamrakar-chrome-"));
+  try {
+    try {
+      return execFileSync(
+        chromePath,
+        [
+          "--headless=new",
+          "--disable-gpu",
+          "--no-first-run",
+          "--no-default-browser-check",
+          `--user-data-dir=${profileDir}`,
+          "--virtual-time-budget=5000",
+          "--dump-dom",
+          url,
+        ],
+        {
+          encoding: "utf8",
+          maxBuffer: 1024 * 1024 * 4,
+          stdio: ["ignore", "pipe", "ignore"],
+          timeout: 15000,
+        },
+      );
+    } catch (error) {
+      // Chrome can keep a background connection open after printing the fully
+      // rendered DOM. Treat that captured DOM as the test result.
+      if (typeof error.stdout === "string" && error.stdout.includes('id="root"')) {
+        return error.stdout;
+      }
+      throw error;
+    }
+  } finally {
+    rmSync(profileDir, { recursive: true, force: true });
+  }
 }
 
 async function main() {
@@ -62,12 +101,9 @@ async function main() {
       const url = `${baseUrl}${route}`;
       let status = 0;
       let fetchError = "";
-      try {
-        const response = await fetch(url);
-        status = response.status;
-      } catch (error) {
-        fetchError = error.message;
-      }
+      const fetchResult = await fetchStatus(url);
+      status = fetchResult.status;
+      fetchError = fetchResult.error;
 
       let dom = "";
       let chromeError = "";

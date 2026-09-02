@@ -38,13 +38,22 @@ type NavGroup = {
 export default function StoreAdminLayout() {
   const location = useLocation();
   const { signOut, role } = useAuth();
-  const { permissions } = usePermissions();
+  const { permissions, storeAdminPermissions, storeAdminPermissionsLoaded } = usePermissions();
   const [navQuery, setNavQuery] = useState("");
 
   const panelRole: AppRole = location.pathname.startsWith("/staff") ? "staffadmin" : "storeadmin";
+  // Once grants are loaded, filter menu items by the granted module keys;
+  // while loading, pass undefined so gated items stay visible (no flash).
+  const effectiveStorePerms = panelRole === "storeadmin" && storeAdminPermissionsLoaded
+    ? storeAdminPermissions
+    : undefined;
   const menuGroups = useMemo(
-    () => getFilteredMenu(panelRole, panelRole === "staffadmin" && role === "staffadmin" ? permissions : null),
-    [panelRole, role, permissions]
+    () => getFilteredMenu(
+      panelRole,
+      panelRole === "staffadmin" && role === "staffadmin" ? permissions : null,
+      effectiveStorePerms
+    ),
+    [panelRole, role, permissions, effectiveStorePerms]
   );
 
   const filteredGroups = useMemo(() => {

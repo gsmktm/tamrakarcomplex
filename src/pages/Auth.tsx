@@ -55,6 +55,7 @@ export default function Auth() {
     user, 
     role, 
     loading: authLoading,
+    signInAsDev,
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -269,6 +270,11 @@ export default function Auth() {
                     ? "Sign in to your account"
                     : "Join Tamrakar Complex today"}
             </p>
+            {!isRecoveryMode && !isResetRequestMode && from !== "/" ? (
+              <p className="mt-3 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                After sign in, you will return to <span className="font-mono text-foreground">{from}</span>.
+              </p>
+            ) : null}
           </div>
 
           {!isRecoveryMode && !isResetRequestMode ? (
@@ -297,6 +303,61 @@ export default function Auth() {
               >
                 Continue with Google
               </Button>
+              
+              {import.meta.env.DEV && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground">dev mode quick sign in</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={async () => {
+                        setLoading(true);
+                        await signInAsDev("suadmin");
+                        setLoading(false);
+                        toast({ title: "Signed in as Super Admin!" });
+                      }}
+                      disabled={loading}
+                      className="w-full"
+                    >
+                      SuAdmin
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="default"
+                      onClick={async () => {
+                        setLoading(true);
+                        await signInAsDev("staffadmin");
+                        setLoading(false);
+                        toast({ title: "Signed in as Staff Admin!" });
+                      }}
+                      disabled={loading}
+                      className="w-full"
+                    >
+                      StaffAdmin
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={async () => {
+                        setLoading(true);
+                        await signInAsDev("storeadmin");
+                        setLoading(false);
+                        toast({ title: "Signed in as Store Admin!" });
+                      }}
+                      disabled={loading}
+                      className="w-full"
+                    >
+                      StoreAdmin
+                    </Button>
+                  </div>
+                </>
+              )}
+
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-px bg-border" />
                 <span className="text-xs text-muted-foreground">or</span>

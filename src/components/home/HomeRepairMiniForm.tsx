@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Wrench, MapPin, Smartphone, Send, Search, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,9 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { useRepairSubmit } from "@/hooks/useRepairSubmit";
+import { useRepairDevices } from "@/hooks/useRepair";
 import { useAuth } from "@/hooks/useAuth";
+import { isValidNepalPhone } from "@/lib/security";
 import { toast } from "sonner";
 
 const PROBLEM_TYPES = [
@@ -39,23 +41,48 @@ export const HomeRepairMiniForm = () => {
 
   const [trackCode, setTrackCode] = useState("");
 
+  // Fetch repair devices from DB
+  const { data: devices = [] } = useRepairDevices();
+
+  // Unique brands derived from repair_devices table
+  const brands = useMemo(() => {
+    const brandSet = new Set(devices.map((d) => d.brand).filter(Boolean));
+    return Array.from(brandSet).sort();
+  }, [devices]);
+
+  // Models filtered by selected brand
+  const models = useMemo(() => {
+    if (!formData.device_brand) return [];
+    return devices
+      .filter((d) => d.brand === formData.device_brand)
+      .map((d) => d.name)
+      .sort();
+  }, [devices, formData.device_brand]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!user) {
-      toast.error("Please login to book a repair");
-      navigate(`/auth?redirect=/repair`);
-      return;
-    }
 
     if (!formData.device_brand || !formData.device_model || !formData.issue_type || !formData.phone) {
       toast.error("Please fill all required fields");
       return;
     }
 
+    if (!isValidNepalPhone(formData.phone)) {
+      toast.error("Enter a valid Nepal mobile number (97/98 + 8 digits)");
+      return;
+    }
+
     try {
-      await repairMutation.mutateAsync(formData);
-      toast.success("Repair request submitted successfully!");
+      const result = await repairMutation.mutateAsync({
+        ...formData,
+        name: user?.user_metadata?.full_name || user?.email || undefined,
+        email: user?.email ?? null,
+      });
+      const trackingId = (result as { tracking_id?: string })?.tracking_id;
+      toast.success(trackingId ? `Repair request submitted! Tracking: ${trackingId}` : "Repair request submitted successfully!");
+      if (trackingId) {
+        navigate(`/repair/track?id=${encodeURIComponent(trackingId)}`);
+      }
       setFormData({
         device_brand: "",
         device_model: "",
@@ -72,7 +99,7 @@ export const HomeRepairMiniForm = () => {
   const handleTrack = (e: React.FormEvent) => {
     e.preventDefault();
     if (trackCode.trim()) {
-      navigate(`/repair-tracking?code=${trackCode.trim()}`);
+      navigate(`/repair/track?id=${encodeURIComponent(trackCode.trim().toUpperCase())}`);
     }
   };
 
@@ -130,37 +157,52 @@ export const HomeRepairMiniForm = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-2xl text-slate-900">
+          <div className="bg-card rounded-[2.5rem] p-8 md:p-10 shadow-2xl text-foreground">
             <h3 className="text-2xl font-black mb-8">Book Instant Repair</h3>
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-xs font-black uppercase text-slate-500">Device Brand</label>
-                  <Input 
-                    placeholder="e.g. iPhone, Samsung" 
-                    className="h-12 rounded-xl border-slate-200"
+                  <label className="text-xs font-black uppercase text-muted-foreground">Device Brand</label>
+                  <Select
                     value={formData.device_brand}
-                    onChange={(e) => setFormData({...formData, device_brand: e.target.value})}
-                  />
+                    onValueChange={(v) => setFormData({ ...formData, device_brand: v, device_model: "" })}
+                  >
+                    <SelectTrigger className="h-12 rounded-xl border-border">
+                      <SelectValue placeholder="Select Brand" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {brands.map((b) => (
+                        <SelectItem key={b} value={b}>{b}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black uppercase text-slate-500">Model Name</label>
-                  <Input 
-                    placeholder="e.g. 15 Pro, S23 Ultra" 
-                    className="h-12 rounded-xl border-slate-200"
+                  <label className="text-xs font-black uppercase text-muted-foreground">Model Name</label>
+                  <Select
                     value={formData.device_model}
-                    onChange={(e) => setFormData({...formData, device_model: e.target.value})}
-                  />
+                    onValueChange={(v) => setFormData({ ...formData, device_model: v })}
+                    disabled={!formData.device_brand}
+                  >
+                    <SelectTrigger className="h-12 rounded-xl border-border">
+                      <SelectValue placeholder={formData.device_brand ? "Select Model" : "Select brand first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase text-slate-500">Problem Type</label>
+                <label className="text-xs font-black uppercase text-muted-foreground">Problem Type</label>
                 <Select 
                   value={formData.issue_type} 
                   onValueChange={(v) => setFormData({...formData, issue_type: v})}
                 >
-                  <SelectTrigger className="h-12 rounded-xl border-slate-200">
+                  <SelectTrigger className="h-12 rounded-xl border-border">
                     <SelectValue placeholder="Select Issue" />
                   </SelectTrigger>
                   <SelectContent>
@@ -171,24 +213,24 @@ export const HomeRepairMiniForm = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-xs font-black uppercase text-slate-500">Phone Number</label>
+                  <label className="text-xs font-black uppercase text-muted-foreground">Phone Number</label>
                   <div className="relative">
                     <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input 
                       placeholder="98XXXXXXXX" 
-                      className="h-12 pl-11 rounded-xl border-slate-200"
+                      className="h-12 pl-11 rounded-xl border-border"
                       value={formData.phone}
                       onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black uppercase text-slate-500">Your Location</label>
+                  <label className="text-xs font-black uppercase text-muted-foreground">Your Location</label>
                   <div className="relative">
                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <Input 
                       placeholder="City / Area" 
-                      className="h-12 pl-11 rounded-xl border-slate-200"
+                      className="h-12 pl-11 rounded-xl border-border"
                       value={formData.location}
                       onChange={(e) => setFormData({...formData, location: e.target.value})}
                     />

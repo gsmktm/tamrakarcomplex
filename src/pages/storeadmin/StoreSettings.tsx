@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { STORES_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ export default function StoreSettings() {
       // Assuming stores table has settings JSON or separate columns
       const { data, error } = await supabase
         .from("stores")
-        .select("*")
+        .select(STORES_COLUMNS.join(","))
         .or(`owner_id.eq.${user?.id},owner_user_id.eq.${user?.id}`)
         .single();
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { STORE_MEDIA_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,7 @@ export default function StoreMediaManager() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("store_media")
-        .select("*")
+        .select(STORE_MEDIA_COLUMNS.join(","))
         .eq("store_id", store?.id)
         .eq("media_type", "gallery")
         .order("sort_order", { ascending: true });

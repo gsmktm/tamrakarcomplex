@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { REPAIR_REQUESTS_COLUMNS, UNLOCK_REQUESTS_COLUMNS, SELL_PHONE_LEADS_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { useAuth } from "@/hooks/useAuth";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,11 +24,13 @@ import MobileInventoryManager from "@/components/admin/storeadmin/MobileInventor
 import LeadManager from "@/pages/admin/LeadManager";
 import { getStoreEntitlements } from "@/lib/storePackages";
 import { getPublicStorePath } from "@/lib/storeRoutes";
+import { resolveStorePackageContext } from "@/lib/storePackageRuntime";
 
 export default function StoreAdminDashboard() {
   const { user, role } = useAuth();
   const queryClient = useQueryClient();
   const isSuperAdmin = role === "suadmin";
+  const { storeIds: myStoreIds } = useStoreMembership(user?.id);
   const [selectedManagedStoreId, setSelectedManagedStoreId] = useState<string | null>(null);
 
   const { data: stores, isLoading: isStoresLoading } = useQuery({
@@ -38,13 +42,11 @@ export default function StoreAdminDashboard() {
           .from("stores")
           .select(`
             *,
-            store_subscriptions (
-              *,
-              packages (*)
-            )
+            package:store_packages (*),
+            store_subscriptions (*)
           `)
           .order("created_at", { ascending: false });
-        
+
         if (error) throw error;
         return (data || []).map(store => ({
           ...store,
@@ -53,40 +55,18 @@ export default function StoreAdminDashboard() {
       }
 
       // If store admin, fetch stores where user is an admin or owner
-      const { data: adminMemberships, error: adminError } = await supabase
-        .from("store_admins")
-        .select("store_id")
-        .eq("user_id", user?.id)
-        .eq("status", "active");
-
-      if (adminError) throw adminError;
-
-      const accessibleStoreIds = adminMemberships?.map(m => m.store_id) || [];
-
-      // Also include stores where user is the owner (legacy)
-      const { data: ownedStores, error: ownedError } = await supabase
-        .from("stores")
-        .select("id")
-        .or(`owner_id.eq.${user?.id},owner_user_id.eq.${user?.id}`);
-      
-      if (ownedError) throw ownedError;
-      
-      const allStoreIds = Array.from(new Set([...accessibleStoreIds, ...(ownedStores?.map(s => s.id) || [])]));
-
-      if (allStoreIds.length === 0) return [];
+      if (myStoreIds.length === 0) return [];
 
       const { data, error } = await supabase
         .from("stores")
         .select(`
           *,
-          store_subscriptions (
-            *,
-            packages (*)
-          )
+          package:store_packages (*),
+          store_subscriptions (*)
         `)
-        .in("id", allStoreIds)
+        .in("id", myStoreIds)
         .order("created_at", { ascending: false });
-      
+
       if (error) throw error;
       
       return (data || []).map(store => ({
@@ -166,7 +146,7 @@ export default function StoreAdminDashboard() {
       if (storeIds.length === 0) return [];
       const { data, error } = await supabase
         .from("repair_requests")
-        .select("*")
+        .select(REPAIR_REQUESTS_COLUMNS.join(","))
         .in("assigned_store_id", storeIds)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -181,7 +161,7 @@ export default function StoreAdminDashboard() {
       if (storeIds.length === 0) return [];
       const { data, error } = await supabase
         .from("unlock_requests")
-        .select("*")
+        .select(UNLOCK_REQUESTS_COLUMNS.join(","))
         .in("assigned_store_id", storeIds)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -196,7 +176,7 @@ export default function StoreAdminDashboard() {
       if (storeIds.length === 0) return [];
       const { data, error } = await supabase
         .from("sell_phone_leads")
-        .select("*")
+        .select(SELL_PHONE_LEADS_COLUMNS.join(","))
         .in("assigned_store_id", storeIds)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -207,8 +187,23 @@ export default function StoreAdminDashboard() {
 
   const updateRepairMutation = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; status?: string; internal_notes?: string }) => {
-      const { error } = await supabase.from("repair_requests").update(updates).eq("id", id);
-      if (error) throw error;
+      if (updates.status) {
+        const status = updates.status === "pending" ? "new" : updates.status === "in_progress" ? "repairing" : updates.status;
+        delete updates.status;
+        const { error } = await supabase.rpc("transition_repair_status", {
+          p_repair_id: id,
+          p_to_status: status,
+          p_note: updates.internal_notes ?? null,
+        });
+        if (error) throw error;
+      }
+      if (updates.internal_notes) {
+        const { error } = await supabase.rpc("update_repair_admin_fields", {
+          p_repair_id: id,
+          p_internal_notes: updates.internal_notes ?? null,
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-store-repairs"] });
@@ -221,8 +216,12 @@ export default function StoreAdminDashboard() {
   });
 
   const updateUnlockMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; status?: string; notes?: string }) => {
-      const { error } = await supabase.from("unlock_requests").update(updates).eq("id", id);
+    mutationFn: async ({ id, status, notes }: { id: string; status?: string; notes?: string }) => {
+      const { error } = await supabase.rpc("update_unlock_request_status", {
+        p_request_id: id,
+        p_status: status ?? null,
+        p_notes: notes ?? null,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -236,8 +235,12 @@ export default function StoreAdminDashboard() {
   });
 
   const updateSellLeadMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; status?: string; notes?: string }) => {
-      const { error } = await supabase.from("sell_phone_leads").update(updates).eq("id", id);
+    mutationFn: async ({ id, status, notes }: { id: string; status?: string; notes?: string }) => {
+      const { error } = await supabase.rpc("update_sell_lead_status", {
+        p_lead_id: id,
+        p_status: status ?? null,
+        p_notes: notes ?? null,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -259,7 +262,8 @@ export default function StoreAdminDashboard() {
   }
 
   const primaryStore = stores?.find(s => s.id === selectedManagedStoreId) || stores?.[0];
-  const primaryPackage = primaryStore?.package_slug || primaryStore?.store_subscriptions?.packages?.slug || "free";
+  const packageContext = resolveStorePackageContext(primaryStore ?? {});
+  const primaryPackage = packageContext.effectivePackageSlug;
   const entitlements = getStoreEntitlements(primaryPackage);
   
   // Comprehensive Completion Logic
@@ -540,7 +544,7 @@ export default function StoreAdminDashboard() {
                           <div className="mt-4 flex items-center justify-between">
                             <div className="flex flex-wrap gap-1">
                               <Badge variant="secondary" className="text-[9px] uppercase tracking-wider">
-                                {store.store_subscriptions?.packages?.name || "Basic"}
+                                {resolveStorePackageContext(store).package?.name || "Basic"}
                               </Badge>
                               {store.status !== 'active' && (
                                 <Badge variant="outline" className="text-[9px] uppercase text-red-500 border-red-200">
@@ -626,14 +630,16 @@ export default function StoreAdminDashboard() {
                   <CardTitle className="text-base">Subscription Plan</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {primaryStore?.store_subscriptions ? (
+                  {packageContext.isActivePaid ? (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{primaryStore.store_subscriptions.packages.name}</span>
-                        <Badge variant="outline" className="bg-white/50 border-primary/20">Active</Badge>
+                        <span className="text-sm font-medium">{packageContext.package?.name || primaryPackage}</span>
+                        <Badge variant="outline" className="bg-card/50 border-primary/20">Active</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Renews on {format(new Date(primaryStore.store_subscriptions.end_date), "MMM d, yyyy")}
+                        {packageContext.subscriptionEndDate
+                          ? `Renews or expires on ${format(new Date(packageContext.subscriptionEndDate), "MMM d, yyyy")}`
+                          : "Active until changed by your subscription administrator"}
                       </p>
                       <Button variant="link" className="px-0 h-auto text-xs" asChild>
                         <Link to="/storeadmin/my-subscription">View Billing Details</Link>
@@ -708,8 +714,12 @@ export default function StoreAdminDashboard() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="in_progress">In Repair</SelectItem>
+                              <SelectItem value="inspection">Inspection</SelectItem>
+                              <SelectItem value="quote_pending">Quote Pending</SelectItem>
+                              <SelectItem value="quote_approved">Quote Approved</SelectItem>
+                              <SelectItem value="repairing">In Repair</SelectItem>
+                              <SelectItem value="quality_check">Quality Check</SelectItem>
+                              <SelectItem value="ready">Ready</SelectItem>
                               <SelectItem value="completed">Completed</SelectItem>
                               <SelectItem value="cancelled">Cancelled</SelectItem>
                             </SelectContent>

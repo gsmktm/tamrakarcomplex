@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
 import { handleSupabaseError, isConnectionError } from "@/lib/supabaseErrorHandler";
 import { AppRole } from "@/types/auth";
-import { Search, Trash2, Plus, Shield, User as UserIcon, Mail, Activity, Lock, Loader2, AlertCircle } from "lucide-react";
+import { Search, Trash2, Plus, Shield, User as UserIcon, Mail, Activity, Lock, Loader2, AlertCircle, Eye } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -30,20 +31,15 @@ export default function UserManager() {
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<{ id: string; name: string; email: string } | null>(null);
 
-  const { data: users, isLoading, error: usersError } = useQuery({
+  const { data: users, isLoading, error: usersError, refetch: refetchUsers, isFetching } = useQuery({
     queryKey: ["admin_users"],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase.rpc("get_admin_users_list_secure");
-        if (error) {
-          handleSupabaseError(error, "UserManager: Failed to fetch users list");
-          return [];
-        }
-        return data || [];
-      } catch (err) {
-        handleSupabaseError(err, "UserManager: Error loading users");
-        return [];
+      const { data, error } = await supabase.rpc("get_admin_users_list_secure");
+      if (error) {
+        handleSupabaseError(error, "UserManager: Failed to fetch users list");
+        throw error;
       }
+      return data || [];
     },
     retry: 1,
   });
@@ -75,7 +71,9 @@ export default function UserManager() {
 
   const revokeAllRolesMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase.from("user_roles").delete().eq("user_id", userId);
+      const { error } = await supabase.rpc("revoke_user_roles", {
+        p_target_user_id: userId,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -92,14 +90,14 @@ export default function UserManager() {
   const { data: userStats } = useQuery({
     queryKey: ["user-management-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("id", { count: "exact", head: true });
+      const { count, error } = await supabase.from("profiles").select("id", { count: "exact", head: true });
       if (error) throw error;
       
       const { data: roles, error: rolesError } = await supabase.from("user_roles").select("role");
       if (rolesError) throw rolesError;
 
       const stats = {
-        total: data || 0,
+        total: count || 0,
         admins: roles?.filter(r => ['suadmin', 'staffadmin', 'admin'].includes(r.role)).length || 0,
         merchants: roles?.filter(r => r.role === 'storeadmin').length || 0,
         active_24h: 0 // Placeholder
@@ -220,7 +218,7 @@ export default function UserManager() {
             <div className="p-8 space-y-4">
               {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
-          ) : usersError || (users && users.length === 0 && !isLoading) ? (
+          ) : usersError ? (
             <div className="p-8 text-center space-y-3">
               <div className="flex justify-center">
                 <AlertCircle className="h-8 w-8 text-amber-500" />
@@ -228,10 +226,11 @@ export default function UserManager() {
               <div>
                 <p className="font-medium text-sm">Unable to load users</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {usersError ? "Database connection issue. Please try again." : "No users found or database is offline."}
+                  {getErrorMessage(usersError)}
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              <Button variant="outline" size="sm" onClick={() => void refetchUsers()} disabled={isFetching}>
+                {isFetching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Retry
               </Button>
             </div>
@@ -272,6 +271,13 @@ export default function UserManager() {
                         {u.id}
                       </TableCell>
                       <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                        >
+                          <Link to={`/suadmin/users/${u.id}`}><Eye className="h-4 w-4" /></Link>
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -287,7 +293,13 @@ export default function UserManager() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {filteredUsers?.length === 0 && (
+                  {users?.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
+                        No registered users yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredUsers?.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
                         No users found matching your search.

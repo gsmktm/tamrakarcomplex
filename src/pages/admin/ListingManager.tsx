@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { SELL_LISTINGS_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { ImageUploader } from "@/components/common/ImageUploader";
+import { SafeImage } from "@/components/common/SafeImage";
+import { resolveListingImage } from "@/lib/phoneImages";
 import { getErrorMessage } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import type { SellListingRow } from "@/types/app";
@@ -92,7 +95,7 @@ const ListingManager = () => {
     queryKey: ["admin_listings", role, user?.id],
     queryFn: async () => {
       try {
-        let query = supabase.from("sell_listings").select("*");
+         let query = supabase.from("sell_listings").select(SELL_LISTINGS_COLUMNS.join(","));
         
         if (!isPlatformAdmin && user?.id) {
           const { data: ownedStores } = await supabase
@@ -199,6 +202,7 @@ const ListingManager = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin_listings"] });
       queryClient.invalidateQueries({ queryKey: ["marketplace-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["sell_listing", editingListing?.id] });
       setIsEditOpen(false);
       setEditingListing(null);
       toast.success("Listing updated successfully");
@@ -283,6 +287,7 @@ const ListingManager = () => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Image</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Title</TableHead>
               <TableHead>Price</TableHead>
@@ -298,13 +303,13 @@ const ListingManager = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center h-24">
+                <TableCell colSpan={11} className="text-center h-24">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                 </TableCell>
               </TableRow>
             ) : filteredListings?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center h-24">
+                <TableCell colSpan={11} className="text-center h-24">
                   No listings found.
                 </TableCell>
               </TableRow>
@@ -312,10 +317,24 @@ const ListingManager = () => {
               filteredListings?.map((listing) => (
                 <TableRow key={listing.id}>
                   <TableCell>
+                    <SafeImage
+                      src={resolveListingImage(
+                        listing.title,
+                        listing.brand,
+                        listing.images,
+                        listing.model,
+                      )}
+                      alt=""
+                      className="h-12 w-12 rounded-md border bg-muted object-contain"
+                      width={48}
+                      height={48}
+                    />
+                  </TableCell>
+                  <TableCell>
                     <Badge variant="outline" className={
-                      listing.listing_type === 'buy' ? 'bg-blue-100 text-blue-800' :
-                      listing.listing_type === 'exchange' ? 'bg-purple-100 text-purple-800' :
-                      'bg-green-100 text-green-800'
+                      listing.listing_type === 'buy' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                      listing.listing_type === 'exchange' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                     }>
                       {listing.listing_type || 'sell'}
                     </Badge>
@@ -405,7 +424,7 @@ const ListingManager = () => {
       </div>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Listing</DialogTitle>
           </DialogHeader>

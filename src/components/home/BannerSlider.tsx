@@ -109,7 +109,7 @@ export function BannerSlider() {
             onClick={() => setCurrent(i)}
             className={cn(
               "h-1.5 transition-all duration-500 rounded-full",
-              i === current ? "w-8 bg-primary" : "w-2 bg-white/30 hover:bg-white/50"
+              i === current ? "w-8 bg-primary" : "w-2 bg-card/30 hover:bg-card/50"
             )}
           />
         ))}

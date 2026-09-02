@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { EXCHANGE_REQUESTS_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { useAuth } from "@/hooks/useAuth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ export default function ExchangeManager() {
   const { data: requests, isLoading } = useQuery({
     queryKey: ["exchange_requests", searchTerm, activeStoreId],
     queryFn: async () => {
-      let query = supabase.from("exchange_requests").select("*");
+      let query = supabase.from("exchange_requests").select(EXCHANGE_REQUESTS_COLUMNS.join(","));
       if (searchTerm) {
         query = query.or(`customer_name.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%`);
       }

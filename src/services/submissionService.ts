@@ -124,21 +124,34 @@ export async function submitStoreApplicationWithFlow(values: any) {
       status: "pending" as const,
     };
 
-    // Flow Step 2: Insert store application into database
-    const { error: insertError, data: applicationData } = await supabase
-      .from("store_applications")
-      .insert(sanitizedData)
-      .select()
-      .single();
+    // Flow Step 2: submit through a narrow RPC. Anonymous applicants can INSERT
+    // but cannot SELECT application rows, so insert().select() is intentionally
+    // avoided to prevent a successful write being reported as a failure.
+    const { error: insertError, data: applicationId } = await supabase.rpc("submit_store_application" as any, {
+      p_owner_name: sanitizedData.owner_name,
+      p_store_name: sanitizedData.store_name,
+      p_phone: sanitizedData.phone,
+      p_email: sanitizedData.email,
+      p_location: sanitizedData.location,
+      p_shop_number: sanitizedData.shop_number || null,
+      p_business_type: sanitizedData.business_type || null,
+      p_message: sanitizedData.message || null,
+      p_logo_url: sanitizedData.logo_url || null,
+      p_license_url: sanitizedData.license_url || null,
+      p_whatsapp: sanitizedData.whatsapp || null,
+      p_viber: sanitizedData.viber || null,
+      p_requested_package_slug: String(values.requested_package_slug || "free"),
+      p_billing_cycle: values.billing_cycle === "yearly" ? "yearly" : "monthly",
+    } as any);
 
     if (insertError) {
       console.error("Database insertion failed:", insertError);
       throw new Error(`Failed to submit application: ${insertError.message}`);
     }
 
-    if (!applicationData) throw new Error("Failed to create store application");
+    if (!applicationId || typeof applicationId !== "string") throw new Error("Failed to create store application reference");
 
-    const applicationId = applicationData.id;
+    const applicationData = { ...sanitizedData, id: applicationId };
 
     // Flow Step 3: Create audit log entry
     const currentUserId = await resolveCurrentUserId();
@@ -149,12 +162,6 @@ export async function submitStoreApplicationWithFlow(values: any) {
       sanitizedData
     );
     if (auditError) console.warn("Audit log creation failed:", auditError);
-
-    // Flow Step 4: Notify admin via contact message
-    await notifyAdminStoreApplicationSubmitted(applicationData);
-
-    // Flow Step 5: Send confirmation to applicant
-    await sendApplicationConfirmation(applicationData);
 
     return {
       success: true,

@@ -9,119 +9,96 @@ const w = (C: React.ComponentType) => (
 );
 
 // Dashboard & Profile
-const SuperAdminDashboard = lazy(() => import("@/pages/suadmin/SuperAdminDashboard"));
-const SuperAdminProfilePage = lazy(() => import("@/pages/suadmin/SuperAdminProfilePage"));
+const CommandCenterHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.CommandCenterHub })));
 
 // Staff control
-const StaffAdminManager = lazy(() => import("@/pages/suadmin/StaffAdminManager"));
-const PermissionMatrix = lazy(() => import("@/pages/suadmin/PermissionMatrix"));
-const StaffTaskManager = lazy(() => import("@/pages/suadmin/StaffTaskManager"));
-const StaffPerformance = lazy(() => import("@/pages/suadmin/StaffPerformanceManager"));
-
-// Exchange oversight
-const ExchangeManager = lazy(() => import("@/pages/storeadmin/ExchangeManager"));
-
-// Store admin control
-const StoreAdminManager = lazy(() => import("@/pages/suadmin/StoreAdminManager"));
-const StoreAdminPermissionManager = lazy(() => import("@/pages/suadmin/StoreAdminPermissionManager"));
-const StoreAdminTaskManager = lazy(() => import("@/pages/suadmin/StoreAdminTaskManager"));
-const StoreStaffManager = lazy(() => import("@/pages/suadmin/StoreStaffManager"));
+const TeamAccessManager = lazy(() => import("@/pages/suadmin/TeamAccessManager"));
+const CustomersHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.CustomersHub })));
+const PlatformOperationsHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.PlatformOperationsHub })));
+const StoreNetworkHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.StoreNetworkHub })));
+const BillingHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.BillingHub })));
+const PublishingHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.PublishingHub })));
+const EngagementHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.EngagementHub })));
+const GrowthInsightsHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.GrowthInsightsHub })));
+const SystemHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.SystemHub })));
 
 // User control
-const UserManager = lazy(() => import("@/pages/admin/UserManager"));
-const UserRewardManager = lazy(() => import("@/pages/suadmin/UserRewardManager"));
-const UserRiskManager = lazy(() => import("@/pages/suadmin/UserRiskManager"));
-
-// Commerce
-const StoreManager = lazy(() => import("@/pages/admin/StoreManager"));
-const StoreApplicationManager = lazy(() => import("@/pages/admin/StoreApplicationManager"));
-const ProductManager = lazy(() => import("@/pages/admin/ProductManager"));
-const MobileMasterManager = lazy(() => import("@/pages/admin/MobileMasterManager"));
-const PriceListManager = lazy(() => import("@/pages/admin/PriceListManager"));
-const EmiPlanManager = lazy(() => import("@/pages/admin/EmiPlanManager"));
-const BrandManager = lazy(() => import("@/pages/admin/BrandManager"));
-const DeviceVerificationManager = lazy(() => import("@/pages/admin/DeviceVerificationManager"));
-const OrderManager = lazy(() => import("@/pages/admin/OrderManager"));
-const LeadManager = lazy(() => import("@/pages/admin/LeadManager"));
-const PayoutManager = lazy(() => import("@/pages/admin/PayoutManager"));
-const SubscriptionManager = lazy(() => import("@/pages/admin/SubscriptionManager"));
-
-// Content
-const ArticleManager = lazy(() => import("@/pages/admin/ArticleManager"));
-const GuideManager = lazy(() => import("@/pages/admin/GuideManager"));
-const ContentManager = lazy(() => import("@/pages/admin/ContentManager"));
-const ListingManager = lazy(() => import("@/pages/admin/ListingManager"));
-const RepairManager = lazy(() => import("@/pages/admin/RepairManager"));
-const UnlockingManager = lazy(() => import("@/pages/admin/UnlockingManager"));
-const CampaignManager = lazy(() => import("@/pages/admin/CampaignManager"));
-
-// Monitoring & Settings
-const Analytics = lazy(() => import("@/pages/admin/Analytics"));
-const SeoManager = lazy(() => import("@/pages/admin/SeoManager"));
-const ValuationManager = lazy(() => import("@/pages/admin/ValuationManager"));
-const AuditLogs = lazy(() => import("@/pages/suadmin/AuditLogs"));
-const Maintenance = lazy(() => import("@/pages/suadmin/Maintenance"));
-const PlatformHealth = lazy(() => import("@/pages/suadmin/PlatformHealth"));
-const Settings = lazy(() => import("@/pages/admin/Settings"));
-const ContactManager = lazy(() => import("@/pages/admin/ContactManager"));
-const ChatBotManager = lazy(() => import("@/pages/admin/ChatBotManager"));
-const PollManager = lazy(() => import("@/pages/admin/PollManager"));
-const AdminConsole = lazy(() => import("@/pages/admin/AdminConsole"));
+const UserDeepProfile = lazy(() => import("@/pages/suadmin/UserDeepProfile"));
 
 export const superAdminRoutes = [
-  { path: "/suadmin", element: w(SuperAdminDashboard) },
-  { path: "/suadmin/me", element: w(SuperAdminProfilePage) },
+  { path: "/suadmin", element: w(CommandCenterHub) },
+  { path: "/suadmin/me", element: w(CommandCenterHub) },
 
   // Staff control
-  { path: "/suadmin/staff-admins", element: w(StaffAdminManager) },
-  { path: "/suadmin/staff-permissions", element: w(PermissionMatrix) },
-  { path: "/suadmin/staff-tasks", element: w(StaffTaskManager) },
-  { path: "/suadmin/staff-performance", element: w(StaffPerformance) },
-  { path: "/suadmin/store-admins", element: w(StoreAdminManager) },
-  { path: "/suadmin/store-admin-permissions", element: w(StoreAdminPermissionManager) },
-  { path: "/suadmin/store-admin-tasks", element: w(StoreAdminTaskManager) },
-  { path: "/suadmin/store-staff", element: w(StoreStaffManager) },
+  { path: "/suadmin/team-access", element: w(TeamAccessManager) },
+  { path: "/suadmin/staff-admins", element: w(TeamAccessManager) },
+  { path: "/suadmin/staff-permissions", element: w(TeamAccessManager) },
+  { path: "/suadmin/staff-tasks", element: w(TeamAccessManager) },
+  { path: "/suadmin/staff-performance", element: w(TeamAccessManager) },
 
   // User control
-  { path: "/suadmin/users", element: w(UserManager) },
-  { path: "/suadmin/user-rewards", element: w(UserRewardManager) },
-  { path: "/suadmin/user-risk", element: w(UserRiskManager) },
+  { path: "/suadmin/customers", element: w(CustomersHub) },
+  { path: "/suadmin/users", element: w(CustomersHub) },
+  { path: "/suadmin/users/:id", element: w(UserDeepProfile) },
+  { path: "/suadmin/user-rewards", element: w(CustomersHub) },
+  { path: "/suadmin/user-risk", element: w(CustomersHub) },
 
   // Commerce
-  { path: "/suadmin/stores", element: w(StoreManager) },
-  { path: "/suadmin/store-applications", element: w(StoreApplicationManager) },
-  { path: "/suadmin/products", element: w(ProductManager) },
-  { path: "/suadmin/master-data", element: w(MobileMasterManager) },
-  { path: "/suadmin/price-list", element: w(PriceListManager) },
-  { path: "/suadmin/price-list-simple", element: w(PriceListManager) },
-  { path: "/suadmin/emi-plans", element: w(EmiPlanManager) },
-  { path: "/suadmin/brands", element: w(BrandManager) },
-  { path: "/suadmin/device-verification", element: w(DeviceVerificationManager) },
-  { path: "/suadmin/orders", element: w(OrderManager) },
-  { path: "/suadmin/leads", element: w(LeadManager) },
-  { path: "/suadmin/payouts", element: w(PayoutManager) },
-  { path: "/suadmin/subscriptions", element: w(SubscriptionManager) },
-  { path: "/suadmin/campaigns", element: w(CampaignManager) },
-  { path: "/suadmin/exchanges", element: w(ExchangeManager) },
+  { path: "/suadmin/operations", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/catalog", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/products", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/master-data", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/price-list", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/price-list-simple", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/emi-plans", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/brands", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/device-verification", element: w(PlatformOperationsHub) },
+
+  { path: "/suadmin/store-network", element: w(StoreNetworkHub) },
+  { path: "/suadmin/stores", element: w(StoreNetworkHub) },
+  { path: "/suadmin/store-applications", element: w(StoreNetworkHub) },
+  { path: "/suadmin/store-admins", element: w(StoreNetworkHub) },
+  { path: "/suadmin/store-admin-permissions", element: w(StoreNetworkHub) },
+  { path: "/suadmin/store-admin-tasks", element: w(StoreNetworkHub) },
+  { path: "/suadmin/store-staff", element: w(StoreNetworkHub) },
+
+  { path: "/suadmin/commerce", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/orders", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/leads", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/listings", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/campaigns", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/exchanges", element: w(PlatformOperationsHub) },
+
+  { path: "/suadmin/billing", element: w(BillingHub) },
+  { path: "/suadmin/payouts", element: w(BillingHub) },
+  { path: "/suadmin/subscriptions", element: w(BillingHub) },
+  { path: "/suadmin/payment-methods", element: w(BillingHub) },
 
   // Content
-  { path: "/suadmin/articles", element: w(ArticleManager) },
-  { path: "/suadmin/guides", element: w(GuideManager) },
-  { path: "/suadmin/content", element: w(ContentManager) },
-  { path: "/suadmin/listings", element: w(ListingManager) },
-  { path: "/suadmin/repairs", element: w(RepairManager) },
-  { path: "/suadmin/unlocking", element: w(UnlockingManager) },
+  { path: "/suadmin/publishing", element: w(PublishingHub) },
+  { path: "/suadmin/articles", element: w(PublishingHub) },
+  { path: "/suadmin/guides", element: w(PublishingHub) },
+  { path: "/suadmin/content", element: w(PublishingHub) },
+
+  { path: "/suadmin/engagement", element: w(EngagementHub) },
+  { path: "/suadmin/messages", element: w(EngagementHub) },
+  { path: "/suadmin/chatbot", element: w(EngagementHub) },
+  { path: "/suadmin/polls", element: w(EngagementHub) },
+
+  { path: "/suadmin/service-desk", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/repairs", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/unlocking", element: w(PlatformOperationsHub) },
+  { path: "/suadmin/valuation", element: w(PlatformOperationsHub) },
 
   // Monitoring
-  { path: "/suadmin/analytics", element: w(Analytics) },
-  { path: "/suadmin/seo", element: w(SeoManager) },
-  { path: "/suadmin/valuation", element: w(ValuationManager) },
-  { path: "/suadmin/audit", element: w(AuditLogs) },
-  { path: "/suadmin/maintenance", element: w(Maintenance) },
-  { path: "/suadmin/health", element: w(PlatformHealth) },
-  { path: "/suadmin/settings", element: w(Settings) },
-  { path: "/suadmin/messages", element: w(ContactManager) },
-  { path: "/suadmin/chatbot", element: w(ChatBotManager) },
-  { path: "/suadmin/polls", element: w(PollManager) },
-  { path: "/suadmin/console", element: w(AdminConsole) },
+  { path: "/suadmin/growth", element: w(GrowthInsightsHub) },
+  { path: "/suadmin/analytics", element: w(GrowthInsightsHub) },
+  { path: "/suadmin/seo", element: w(GrowthInsightsHub) },
+
+  { path: "/suadmin/system", element: w(SystemHub) },
+  { path: "/suadmin/audit", element: w(SystemHub) },
+  { path: "/suadmin/maintenance", element: w(SystemHub) },
+  { path: "/suadmin/health", element: w(SystemHub) },
+  { path: "/suadmin/settings", element: w(SystemHub) },
+  { path: "/suadmin/console", element: w(SystemHub) },
 ];

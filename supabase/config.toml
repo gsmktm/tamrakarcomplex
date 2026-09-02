@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.import-gadgetbyte-products]
 verify_jwt = true
 
+[functions.cleanup-product-catalog]
+verify_jwt = true
+
 [functions.bootstrap-admin]
 verify_jwt = true
 

@@ -319,7 +319,7 @@ BEGIN
     SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.priority ASC, t.updated_at DESC), '[]'::jsonb)
     INTO v_training
     FROM (
-      SELECT id, question, answer, category, keywords, priority
+      SELECT id, question, answer, category, keywords, priority, updated_at
       FROM public.chatbot_training_items
       WHERE is_active = true
         AND (

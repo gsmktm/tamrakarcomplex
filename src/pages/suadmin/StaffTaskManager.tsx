@@ -4,6 +4,7 @@ import { CalendarDays, Loader2, Plus, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { ADMIN_TASKS_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { useAuth } from "@/hooks/useAuth";
 import { STAFF_PERMISSION_MODULES, type StaffPermissionModule } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { getErrorMessage } from "@/lib/utils";
 
 type StaffMember = {
   user_id: string;
@@ -33,22 +35,38 @@ type AdminTask = {
 };
 
 const MODULE_LABELS: Record<StaffPermissionModule, string> = {
+  dashboard: "Dashboard",
+  stores: "Stores",
+  store_admins: "Store Admins",
+  store_permissions: "Store Permissions",
+  products: "Products",
   price_list: "Price List",
   brands: "Brands",
-  device_verification: "Device Verification",
-  stores: "Stores",
-  subscriptions: "Subscriptions",
-  marketplace: "Marketplace",
   orders: "Orders",
-  payments: "Payments",
+  leads: "Leads",
   payouts: "Payouts",
-  valuation: "Valuation",
+  subscriptions: "Subscriptions",
+  articles: "Articles",
+  guides: "Guides",
+  content_pages: "Content Pages",
+  community_listings: "Community Listings",
+  repair_requests: "Repair Requests",
+  unlocking_requests: "Unlocking Requests",
+  analytics: "Analytics",
+  seo_growth: "SEO & Growth",
+  valuation_manager: "Valuation Manager",
+  audit_logs: "Audit Logs",
+  mailbox: "Mailbox",
+  chatbot_config: "Chatbot Config",
+  user_polls: "User Polls",
+  marketplace: "Marketplace",
+  device_verification: "Device Verification",
   repairs: "Repairs",
   unlocking: "Unlocking",
   content: "Content",
   users: "Users",
-  analytics: "Analytics",
   settings: "Settings",
+  valuation: "Valuation",
 };
 
 export default function StaffTaskManager() {
@@ -88,11 +106,16 @@ export default function StaffTaskManager() {
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["staff-tasks", role, user?.id],
     queryFn: async () => {
-      let query = supabase.from("admin_tasks").select("*").eq("assigned_role_type", "staffadmin");
-      if (!isSuperAdmin) query = query.eq("assigned_to_user_id", user?.id);
-      const { data, error } = await query.order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as AdminTask[];
+      try {
+        let query = supabase.from("admin_tasks").select(ADMIN_TASKS_COLUMNS.join(",")).eq("assigned_role_type", "staffadmin");
+        if (!isSuperAdmin) query = query.eq("assigned_to_user_id", user?.id);
+        const { data, error } = await query.order("created_at", { ascending: false });
+        if (error) throw error;
+        return (data ?? []) as AdminTask[];
+      } catch (error) {
+        console.warn("Unable to load staff tasks", error);
+        return [] as AdminTask[];
+      }
     },
     enabled: !!user?.id,
   });
@@ -124,7 +147,7 @@ export default function StaffTaskManager() {
       queryClient.invalidateQueries({ queryKey: ["staff-tasks"] });
       toast.success("Task assigned");
     },
-    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Failed to assign task"),
+    onError: (error: unknown) => toast.error("Failed to assign task", { description: getErrorMessage(error) }),
   });
 
   const updateTaskStatus = useMutation({
@@ -143,7 +166,7 @@ export default function StaffTaskManager() {
       queryClient.invalidateQueries({ queryKey: ["staff-tasks"] });
       toast.success("Task updated");
     },
-    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Failed to update task"),
+    onError: (error: unknown) => toast.error("Failed to update task", { description: getErrorMessage(error) }),
   });
 
   return (

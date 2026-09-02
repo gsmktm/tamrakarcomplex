@@ -6,6 +6,19 @@ const jsonHeaders = (req: Request) => ({ ...getCorsHeaders(req), "Content-Type":
 type ImportRequest = {
   sitemapUrl?: string;
   limit?: number;
+  priceOnly?: boolean;
+  brandFilter?: string;
+  updateMode?: "upsert" | "priceOnly";
+};
+
+type JsonLdProduct = {
+  "@type"?: string;
+  name?: string;
+  image?: string | string[];
+  description?: string;
+  brand?: { name?: string } | string;
+  offers?: { price?: string | number; priceCurrency?: string; availability?: string } | Array<{ price?: string | number; priceCurrency?: string; availability?: string }>;
+  additionalProperty?: Array<{ name?: string; value?: string }>;
 };
 
 function getJwtUserId(authorizationHeader: string | null): string | null {
@@ -23,21 +36,8 @@ function getJwtUserId(authorizationHeader: string | null): string | null {
   return parsed.sub ?? null;
 }
 
-function titleCaseFromSlug(slug: string): string {
-  const cleaned = slug
-    .replace(/-price-in-nepal$/i, "")
-    .replace(/-in-nepal$/i, "")
-    .replace(/-price$/i, "")
-    .replace(/-review$/i, "")
-    .replace(/-news$/i, "");
-  const words = cleaned.split("-").filter(Boolean);
-  return words
-    .map((w) => (w.length <= 2 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)))
-    .join(" ");
-}
-
-function categoryFromUrl(url: string): string {
-  const u = url.toLowerCase();
+function categoryFromProduct(name: string, url: string): string {
+  const u = `${name} ${url}`.toLowerCase();
   if (u.includes("laptop")) return "Laptops";
   if (u.includes("tablet")) return "Tablets";
   if (u.includes("watch")) return "Smartwatches";
@@ -69,6 +69,73 @@ function parseSitemap(xml: string) {
     .map((loc) => ({ loc, image: null }));
 }
 
+function parseProductJsonLd(html: string): JsonLdProduct | null {
+  const scripts = Array.from(html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi));
+  for (const script of scripts) {
+    try {
+      const parsed = JSON.parse(script[1]);
+      const nodes = Array.isArray(parsed) ? parsed : parsed?.["@graph"] || [parsed];
+      const product = nodes.find((node: JsonLdProduct) => node?.["@type"] === "Product");
+      if (product) return product;
+    } catch {
+      // Ignore malformed structured-data blocks and try the next block.
+    }
+  }
+  return null;
+}
+
+function slugMatchesBrand(slug: string, name: string, brand: string): boolean {
+  if (!brand) return true;
+  const b = brand.toLowerCase();
+  return `${slug} ${name}`.toLowerCase().includes(b);
+}
+
+async function fetchStructuredProduct(entry: { loc: string; image: string | null }) {
+  const response = await fetch(entry.loc, {
+    headers: { "User-Agent": "tamrakar-complex-catalog-sync/2.0", Accept: "text/html,application/xhtml+xml" },
+  });
+  if (!response.ok) throw new Error(`Product page returned ${response.status}`);
+  const html = await response.text();
+  const product = parseProductJsonLd(html);
+  if (!product?.name) throw new Error("Product structured data is missing");
+
+  const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers;
+  const priceValue = Math.round(Number(offer?.price));
+  if (!Number.isFinite(priceValue) || priceValue <= 0 || (offer?.priceCurrency && offer.priceCurrency !== "NPR")) {
+    throw new Error("Valid NPR price is missing");
+  }
+
+  const pathname = new URL(entry.loc).pathname;
+  const slug = pathname.replace(/\/+$/, "").split("/").filter(Boolean).pop();
+  if (!slug) throw new Error("Product slug is missing");
+  const brand = typeof product.brand === "string" ? product.brand : product.brand?.name || "";
+  const image = Array.isArray(product.image) ? product.image[0] : product.image || entry.image;
+  const specs = Object.fromEntries(
+    (product.additionalProperty || [])
+      .filter((property) => property.name && property.value)
+      .map((property) => [property.name as string, property.value as string]),
+  );
+
+  const inStock = String(offer?.availability || "").toLowerCase().endsWith("instock");
+
+  return {
+    slug,
+    name: product.name.trim(),
+    brand: brand.trim() || null,
+    category: categoryFromProduct(product.name, entry.loc),
+    price: `Rs. ${priceValue.toLocaleString("en-IN")}`,
+    price_value: priceValue,
+    image: image || null,
+    specs: Object.keys(specs).length ? { "Key specifications": specs } : null,
+    description: `${product.name.trim()} Nepal price, availability, and specifications reference. Confirm the final variant and seller offer before purchase.`,
+    source_url: entry.loc,
+    source_site: "gadgetbytenepal.com",
+    featured: false,
+    in_stock: inStock,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: getCorsHeaders(req) });
@@ -93,9 +160,11 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { sitemapUrl, limit }: ImportRequest = await req.json().catch(() => ({}));
+    const { sitemapUrl, limit, priceOnly, brandFilter, updateMode }: ImportRequest = await req.json().catch(() => ({}));
     const url = sitemapUrl?.trim() || "https://www.gadgetbytenepal.com/sitemaps/products.xml";
-    const max = Math.min(Math.max(Number(limit ?? 200), 1), 2000);
+    const max = Math.min(Math.max(Number(limit ?? 50), 1), 500);
+    const priceMode = priceOnly === true || updateMode === "priceOnly";
+    const brand = brandFilter?.trim() || "";
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -125,11 +194,12 @@ Deno.serve(async (req: Request) => {
     if (isStaff) {
       const { data: perms } = await admin
         .from("staffadmin_permissions")
-        .select("can_create")
+        .select("can_create, can_edit")
         .eq("user_id", userId)
         .eq("module_key", "price_list")
         .maybeSingle();
-      if (!perms?.can_create) {
+      const canDo = priceMode ? perms?.can_edit : perms?.can_create;
+      if (!canDo) {
         return new Response(JSON.stringify({ error: "Forbidden" }), {
           status: 403,
           headers: jsonHeaders(req),
@@ -152,62 +222,96 @@ Deno.serve(async (req: Request) => {
     }
 
     const xml = await sitemapRes.text();
-    const parsed = parseSitemap(xml).slice(0, max);
+    let parsedSitemap = parseSitemap(xml);
 
-    const products = parsed
-      .map(({ loc, image }) => {
-        let pathname = "";
-        try {
-          pathname = new URL(loc).pathname;
-        } catch {
-          return null;
+    if (brand) {
+      parsedSitemap = parsedSitemap.filter((e) => {
+        const pathname = new URL(e.loc).pathname.toLowerCase();
+        return pathname.includes(brand.toLowerCase().replace(/\s+/g, "-"));
+      });
+    }
+    parsedSitemap = parsedSitemap.slice(0, max);
+
+    const products: Awaited<ReturnType<typeof fetchStructuredProduct>>[] = [];
+    const failures: Array<{ url: string; error: string }> = [];
+    for (let index = 0; index < parsedSitemap.length; index += 5) {
+      const batch = parsedSitemap.slice(index, index + 5);
+      const results = await Promise.allSettled(batch.map(fetchStructuredProduct));
+      results.forEach((result, batchIndex) => {
+        if (result.status === "fulfilled") {
+          const p = result.value;
+          if (brand && !slugMatchesBrand(p.slug, p.name, p.brand || brand)) return;
+          products.push(p);
+        } else {
+          failures.push({ url: batch[batchIndex].loc, error: result.reason?.message || "Parse failed" });
         }
-        const slug = pathname.replace(/\/+$/, "").split("/").filter(Boolean).pop();
-        if (!slug) return null;
-
-        return {
-          slug,
-          name: titleCaseFromSlug(slug),
-          category: categoryFromUrl(loc),
-          price: "N/A",
-          image,
-          source_url: loc,
-          source_site: "gadgetbytenepal.com",
-          featured: false,
-          in_stock: true,
-        };
-      })
-      .filter((p): p is NonNullable<typeof p> => !!p);
+      });
+    }
 
     const uniqueBySlug = new Map<string, (typeof products)[number]>();
     for (const p of products) uniqueBySlug.set(p.slug, p);
-    const uniqueProducts = Array.from(uniqueBySlug.values());
+    const allSynced = Array.from(uniqueBySlug.values());
 
-    const slugs = uniqueProducts.map((p) => p.slug);
-    const existing = new Set<string>();
+    let synced = 0;
+    let updatedPrices = 0;
+    let skippedNewProducts = 0;
 
-    for (let i = 0; i < slugs.length; i += 500) {
-      const chunk = slugs.slice(i, i + 500);
-      const { data: rows, error } = await admin.from("products").select("slug").in("slug", chunk);
-      if (error) throw error;
-      for (const row of rows ?? []) {
-        if (row.slug) existing.add(row.slug);
+    if (priceMode) {
+      const slugs = allSynced.map((product) => product.slug);
+      const existingBySlug = new Map<string, string>();
+      for (let index = 0; index < slugs.length; index += 200) {
+        const { data: rows, error } = await admin
+          .from("products")
+          .select("id, slug")
+          .in("slug", slugs.slice(index, index + 200));
+        if (error) throw error;
+        for (const row of rows || []) {
+          if (row.slug) existingBySlug.set(row.slug, row.id);
+        }
       }
-    }
 
-    const toInsert = uniqueProducts.filter((p) => !existing.has(p.slug));
+      const toUpdate = allSynced.filter((product) => existingBySlug.has(product.slug));
+      skippedNewProducts = allSynced.length - toUpdate.length;
 
-    if (toInsert.length > 0) {
-      const { error } = await admin.from("products").insert(toInsert);
-      if (error) throw error;
+      // Use UPDATE statements instead of partial upserts: a partial insert can fail
+      // required-column checks before PostgreSQL resolves the slug conflict.
+      for (let index = 0; index < toUpdate.length; index += 10) {
+        const results = await Promise.all(
+          toUpdate.slice(index, index + 10).map(async (product) => {
+            const { error } = await admin
+              .from("products")
+              .update({
+                price: product.price,
+                price_value: product.price_value,
+                in_stock: product.in_stock,
+                updated_at: product.updated_at,
+                source_url: product.source_url,
+                source_site: product.source_site,
+              })
+              .eq("id", existingBySlug.get(product.slug) as string);
+            if (error) throw error;
+          }),
+        );
+        updatedPrices += results.length;
+      }
+      synced = updatedPrices;
+    } else {
+      const { error: upsertError } = await admin.from("products").upsert(allSynced, { onConflict: "slug" });
+      if (upsertError) throw upsertError;
+      synced = allSynced.length;
     }
 
     return new Response(
       JSON.stringify({
         sitemapUrl: url,
-        parsed: uniqueProducts.length,
-        inserted: toInsert.length,
-        skipped: uniqueProducts.length - toInsert.length,
+        mode: priceMode ? "price" : "full",
+        brandFilter: brand || null,
+        parsed: allSynced.length,
+        synced,
+        updatedPrices,
+        skippedNewProducts,
+        failed: failures.length,
+        failures: failures.slice(0, 20),
       }),
       { headers: jsonHeaders(req) },
     );

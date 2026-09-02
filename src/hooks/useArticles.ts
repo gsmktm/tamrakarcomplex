@@ -19,6 +19,9 @@ export interface Article {
   views: number | null;
   created_at: string;
   updated_at: string;
+  meta_title?: string | null;
+  meta_description?: string | null;
+  og_image?: string | null;
 }
 
 export interface ArticlesListOptions {
@@ -32,7 +35,7 @@ export function useArticlesList(options: ArticlesListOptions = {}) {
   return useQuery({
     queryKey: ["articles", "list", { limit, category }],
     queryFn: async () => {
-      let query = supabase.from("articles").select("*").order("created_at", { ascending: false });
+      let query = supabase.from("articles").select("*").eq("published", true).order("created_at", { ascending: false });
 
       if (category && category.trim()) {
         query = query.eq(
@@ -68,7 +71,7 @@ export function useArticles(limit?: number) {
   return useQuery({
     queryKey: ["articles", limit],
     queryFn: async () => {
-      let query = supabase.from("articles").select("*").order("created_at", { ascending: false });
+      let query = supabase.from("articles").select("*").eq("published", true).order("created_at", { ascending: false });
 
       if (limit) {
         query = query.limit(limit);
@@ -89,6 +92,7 @@ export function useFeaturedArticles() {
       const { data, error } = await supabase
         .from("articles")
         .select("*")
+        .eq("published", true)
         .eq("featured", true)
         .order("created_at", { ascending: false })
         .limit(3);
@@ -104,7 +108,7 @@ export function useArticle(slug: string) {
   return useQuery({
     queryKey: ["article", slug],
     queryFn: async () => {
-      const { data, error } = await supabase.from("articles").select("*").eq("slug", slug).maybeSingle();
+      const { data, error } = await supabase.from("articles").select("*").eq("slug", slug).eq("published", true).maybeSingle();
 
       if (error) throw error;
 
@@ -121,6 +125,7 @@ export function useArticlesByCategory(category: string) {
       const { data, error } = await supabase
         .from("articles")
         .select("*")
+        .eq("published", true)
         .eq(
           "category",
           category as "mobile" | "laptop" | "tablet" | "audio" | "watch" | "gaming" | "news" | "review" | "comparison" | "guide" | "price",
@@ -132,5 +137,24 @@ export function useArticlesByCategory(category: string) {
       return data as Article[];
     },
     enabled: !!category,
+  });
+}
+
+export function useArticleProducts(articleId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["articleProducts", articleId],
+    queryFn: async () => {
+      if (!articleId) return [];
+      
+      const { data, error } = await supabase
+        .from("article_products")
+        .select("product_id, products(*)")
+        .eq("article_id", articleId);
+
+      if (error) throw error;
+      
+      return data?.map(item => item.products).filter(Boolean) || [];
+    },
+    enabled: !!articleId,
   });
 }

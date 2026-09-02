@@ -1,14 +1,28 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Database, ShieldAlert, RefreshCw, Trash2, HardDrive, Server } from "lucide-react";
+import { ShieldAlert, RefreshCw, Trash2, HardDrive, Server } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Maintenance() {
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const { data: sysMetrics } = useQuery({
+    queryKey: ["maintenance-metrics"],
+    queryFn: async () => {
+      const t0 = performance.now();
+      const [{ count: profileCount }, bucketsResult] = await Promise.all([
+        supabase.from("profiles").select("*", { count: "exact", head: true }),
+        supabase.storage.listBuckets(),
+      ]);
+      const latency = Math.round(performance.now() - t0);
+      const buckets = bucketsResult.data ?? [];
+      return { latency, bucketCount: buckets.length, profileCount: profileCount ?? 0 };
+    },
+    staleTime: 60000,
+  });
 
   const handleSyncStats = async () => {
     setIsSyncing(true);
@@ -65,7 +79,7 @@ export default function Maintenance() {
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               <span className="text-2xl font-bold">Healthy</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Last backup: 2h ago</p>
+            <p className="text-xs text-muted-foreground mt-1">Supabase managed · {sysMetrics?.profileCount ?? "—"} users</p>
           </CardContent>
         </Card>
 
@@ -75,9 +89,8 @@ export default function Maintenance() {
             <CardTitle className="text-sm font-medium">Storage Usage</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">14.2 GB</div>
-            <Progress value={65} className="h-1 mt-2" />
-            <p className="text-xs text-muted-foreground mt-1">65% of 25GB capacity</p>
+            <div className="text-2xl font-bold">{sysMetrics?.bucketCount ?? "—"} buckets</div>
+            <p className="text-xs text-muted-foreground mt-1">Storage buckets in use</p>
           </CardContent>
         </Card>
 
@@ -87,8 +100,8 @@ export default function Maintenance() {
             <CardTitle className="text-sm font-medium">API Response</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">124ms</div>
-            <p className="text-xs text-muted-foreground mt-1">P95 latency over 24h</p>
+            <div className="text-2xl font-bold">{sysMetrics ? `${sysMetrics.latency}ms` : "—"}</div>
+            <p className="text-xs text-muted-foreground mt-1">Live API round-trip</p>
           </CardContent>
         </Card>
       </div>
@@ -123,19 +136,4 @@ export default function Maintenance() {
       </div>
     </div>
   );
-}
-
-function Progress({ value, className }: { value: number, className?: string }) {
-  return (
-    <div className={cn("w-full bg-muted rounded-full overflow-hidden", className)}>
-      <div 
-        className="bg-primary h-full transition-all duration-500" 
-        style={{ width: `${value}%` }} 
-      />
-    </div>
-  );
-}
-
-function cn(...classes: (string | undefined | false)[]): string {
-  return classes.filter(Boolean).join(" ");
 }

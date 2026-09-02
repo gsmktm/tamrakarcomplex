@@ -11,9 +11,9 @@ export function normalizeRole(role?: string | null): AppRole {
   
   switch (normalized) {
     case "suadmin":
+    case "admin":
       return "suadmin";
     case "staffadmin":
-    case "admin":
       return "staffadmin";
     case "storeadmin":
     case "store_owner":
@@ -34,6 +34,20 @@ export function normalizeRole(role?: string | null): AppRole {
 
 export function getRoleFromEmail(email?: string | null): AppRole | null {
   if (!email) return null;
+  
+  // Dev mode quick test emails
+  if (import.meta.env.DEV) {
+    if (email.toLowerCase().includes("suadmin") || email.toLowerCase().includes("admin")) {
+      return "suadmin";
+    }
+    if (email.toLowerCase().includes("staff")) {
+      return "staffadmin";
+    }
+    if (email.toLowerCase().includes("store")) {
+      return "storeadmin";
+    }
+  }
+  
   return null;
 }
 

@@ -144,7 +144,7 @@ export function Footer() {
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="border-white/20 bg-white/10 text-white placeholder:text-white/45"
+                  className="border-white/20 bg-card/10 text-white placeholder:text-white/45"
                   required
                 />
                 <Button type="submit" className="hero-gradient shrink-0 gap-2 hover:opacity-90" disabled={loading}>
@@ -161,14 +161,46 @@ export function Footer() {
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
           <div className="col-span-2 md:col-span-4 lg:col-span-2">
             <Link to="/" className="mb-4 flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5">
-                <img src={logo} alt="Tamrakar Complex" className="h-full w-full object-contain" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm p-1">
+                <img src={logo} alt="Tamrakar Complex" width={32} height={32} className="h-7 w-7 object-contain" loading="lazy" />
               </div>
               <span className="font-display text-xl font-bold">
                 Tamrakar<span className="text-primary">Complex</span>
               </span>
             </Link>
-            <p className="mb-5 max-w-md text-sm text-white/65">{config.description}</p>
+            <p className="mb-6 max-w-md text-sm text-white/65">{config.description}</p>
+
+            <div className="mb-6 max-w-md">
+              <h4 className="mb-3 font-display font-semibold">Contact</h4>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-2 text-sm text-white/65">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{contactInfo.address}</span>
+                </li>
+                <li className="flex flex-wrap items-center gap-2 text-sm text-white/65">
+                  <Phone className="h-4 w-4 shrink-0" />
+                  <a href={`tel:${contactInfo.phone}`} className="transition-colors hover:text-primary">
+                    {contactInfo.phone}
+                  </a>
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=${contactInfo.whatsapp}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-2 flex items-center gap-1 text-[#25D366] transition-colors hover:text-[#128C7E]"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    <span>Chat</span>
+                  </a>
+                </li>
+                <li className="flex items-center gap-2 text-sm text-white/65">
+                  <Mail className="h-4 w-4 shrink-0" />
+                  <a href={`mailto:${contactInfo.email}`} className="break-all transition-colors hover:text-primary">
+                    {contactInfo.email}
+                  </a>
+                </li>
+              </ul>
+            </div>
+
             {config.showSocialIcons ? (
               <div className="flex gap-2">
                 {config.socialLinks.facebook && config.socialLinks.facebook !== "#" ? (
@@ -176,7 +208,7 @@ export function Footer() {
                     href={config.socialLinks.facebook}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-primary hover:text-navy"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
                     <Facebook className="h-4 w-4" />
                   </a>
@@ -186,7 +218,7 @@ export function Footer() {
                     href={config.socialLinks.twitter}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-primary hover:text-navy"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
                     <Twitter className="h-4 w-4" />
                   </a>
@@ -196,7 +228,7 @@ export function Footer() {
                     href={config.socialLinks.instagram}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-primary hover:text-navy"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
                     <Instagram className="h-4 w-4" />
                   </a>
@@ -206,7 +238,7 @@ export function Footer() {
                     href={config.socialLinks.youtube}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-primary hover:text-navy"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
                     <Youtube className="h-4 w-4" />
                   </a>
@@ -216,7 +248,7 @@ export function Footer() {
                     href={config.socialLinks.linkedin}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-primary hover:text-navy"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
                     <Linkedin className="h-4 w-4" />
                   </a>
@@ -240,38 +272,12 @@ export function Footer() {
             </div>
           ))}
 
-          <div>
-            <h4 className="mb-4 font-display font-semibold">Contact</h4>
-            <ul className="space-y-3">
-              <li className="flex items-start gap-2 text-sm text-white/65">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{contactInfo.address}</span>
-              </li>
-              <li className="flex items-center gap-2 text-sm text-white/65">
-                <Phone className="h-4 w-4 shrink-0" />
-                <span>{contactInfo.phone}</span>
-                <a
-                  href={`https://api.whatsapp.com/send?phone=${contactInfo.whatsapp}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[#25D366] hover:text-[#128C7E] transition-colors ml-2"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <span className="hidden sm:inline">Chat</span>
-                </a>
-              </li>
-              <li className="flex items-center gap-2 text-sm text-white/65">
-                <Mail className="h-4 w-4 shrink-0" />
-                <span>{contactInfo.email}</span>
-              </li>
-            </ul>
-          </div>
         </div>
 
         <div className="mt-10 border-t border-white/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-white/50">
           <div>{config.copyrightText}</div>
           {visitorCount !== null && (
-            <div className="flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+            <div className="flex items-center gap-2 bg-card/5 px-3 py-1 rounded-full border border-white/10">
               <Users className="h-3.5 w-3.5 text-primary" />
               <span className="font-medium">
                 Total Visitors: <span className="text-white">{visitorCount.toLocaleString()}</span>

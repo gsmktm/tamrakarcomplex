@@ -1,5 +1,5 @@
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,10 +22,16 @@ import { gsmArenaService, GsmArenaProduct } from "@/services/gsmArenaService";
 import { evostoreService, EvostoreProduct } from "@/services/evostoreService";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/useAuth";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { isAdminRole } from "@/lib/roles";
 import { fetchStoreTierOverrides, resolveTierForStore } from "@/lib/storeTier";
 import { getStoreEntitlements } from "@/lib/storePackages";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
+import { ImageUploader } from "@/components/common/ImageUploader";
+import { SafeImage } from "@/components/common/SafeImage";
+import { canonicalProductKey, formatNprPrice, groupDuplicateProducts, parseNprPrice } from "@/lib/productCatalogNormalization";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { PRODUCTS_COLUMNS, PAGINATION } from "@/lib/supabaseColumnMaps";
 
 interface ProductFormValues {
   name: string;
@@ -77,7 +83,6 @@ interface DBProduct {
 
 const ProductManager = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
   const [isGsmImportOpen, setIsGsmImportOpen] = useState(false);
   const [gsmSearchQuery, setGsmSearchQuery] = useState("");
   const [gsmResults, setGsmResults] = useState<GsmArenaProduct[]>([]);
@@ -94,8 +99,12 @@ const ProductManager = () => {
   const pageSize = 54;
   const [importUrl, setImportUrl] = useState("https://www.gadgetbytenepal.com/sitemaps/products.xml");
   const [importLimit, setImportLimit] = useState(200);
+  const [isPriceSyncOpen, setIsPriceSyncOpen] = useState(false);
+  const [priceSyncMode, setPriceSyncMode] = useState<"priceOnly" | "full">("priceOnly");
+  const [priceSyncLimit, setPriceSyncLimit] = useState(500);
+  const [priceSyncBrand, setPriceSyncBrand] = useState<string>("All");
   const queryClient = useQueryClient();
-  const { register, handleSubmit, reset, setValue, watch, control } = useForm<ProductFormValues>({
+  const { register, handleSubmit, reset, setValue, watch } = useForm<ProductFormValues>({
     defaultValues: {
       featured: false,
       in_stock: true,
@@ -112,11 +121,58 @@ const ProductManager = () => {
     },
   });
 
-  const formValues = watch();
+  const watchedStoreId = watch("store_id");
+  const watchedCategory = watch("category");
+  const watchedFeatured = watch("featured");
+  const watchedInStock = watch("in_stock");
+  const watchedImage = watch("image");
+  const watchedImages = watch("images");
 
   const { user, role } = useAuth();
   const isPlatformAdmin = role === "suadmin" || role === "staffadmin";
   const isStoreAdmin = role === "storeadmin";
+  const { storeIds } = useStoreMembership(user?.id);
+
+  const parseList = (value: string | undefined, separator: "comma" | "line") => {
+    const parts = separator === "comma" ? value?.split(",") : value?.split("\n");
+    return parts?.map((s) => s.trim()).filter(Boolean) ?? [];
+  };
+
+  const parseSpecs = (value: string | undefined) => {
+    if (!value?.trim()) return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      throw new Error('Specs must be valid JSON. Example: {"ram":"8GB","storage":"256GB"}');
+    }
+  };
+
+  const normalizeStoreId = (value: string | undefined | null) => {
+    if (!value || value === "none") return null;
+    return value;
+  };
+
+  const normalizeSlug = (value: string | undefined, fallback: string) =>
+    (value?.trim() || fallback)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+  const galleryImages = useMemo(() => parseList(watchedImages, "comma"), [watchedImages]);
+  const previewImages = useMemo(() => [watchedImage, ...galleryImages].filter(Boolean).slice(0, 6), [watchedImage, galleryImages]);
+
+  const updateGalleryImages = (urls: string[]) => {
+    const uniqueUrls = Array.from(new Set(urls.map((url) => url.trim()).filter(Boolean)));
+    setValue("images", uniqueUrls.join(", "), { shouldDirty: true });
+    if (!watchedImage && uniqueUrls[0]) {
+      setValue("image", uniqueUrls[0], { shouldDirty: true });
+    }
+  };
+
+  const handlePrimaryImageSelect = (url: string) => {
+    setValue("image", url, { shouldDirty: true });
+    toast.success("Primary image updated");
+  };
 
   const { data: allStores } = useQuery({
     queryKey: ["all-stores-list"],
@@ -131,66 +187,53 @@ const ProductManager = () => {
   const { data: myStores } = useQuery({
     queryKey: ["my-stores-list", user?.id],
     queryFn: async () => {
-      // Get store IDs from store_admins or owner_id
-      const { data: memberships } = await supabase
-        .from("store_admins")
-        .select("store_id")
-        .eq("user_id", user?.id)
-        .eq("status", "active");
-      
-      const { data: ownedStores } = await supabase
-        .from("stores")
-        .select("id, name")
-        .eq("owner_id", user?.id);
-      
-      const allStoreIds = Array.from(new Set([
-        ...(memberships || []).map(m => m.store_id),
-        ...(ownedStores || []).map(s => s.id)
-      ]));
-
-      if (allStoreIds.length === 0) return [];
+      if (storeIds.length === 0) return [];
 
       const { data, error } = await supabase
         .from("stores")
         .select("id, name")
-        .in("id", allStoreIds)
+        .in("id", storeIds)
         .order("name");
-        
+
       if (error) throw error;
       return data;
     },
-    enabled: isStoreAdmin && !!user?.id,
+    enabled: isStoreAdmin && !!user?.id && storeIds.length > 0,
   });
 
   const { data: products, isLoading, error: productsError } = useQuery<DBProduct[]>({
-    queryKey: ["products", role, user?.id],
+    queryKey: ["products", role, user?.id, page, selectedBrand, selectedStore, statusFilter, sortConfig],
     queryFn: async () => {
       try {
-        let query = supabase.from("products").select("*");
-        
-        if (isStoreAdmin && user?.id && !isPlatformAdmin) {
-          // Get store IDs from store_admins or owner_id
-          const { data: memberships } = await supabase
-            .from("store_admins")
-            .select("store_id")
-            .eq("user_id", user.id)
-            .eq("status", "active");
-          
-          const { data: ownedStores } = await supabase
-            .from("stores")
-            .select("id")
-            .eq("owner_id", user.id);
-          
-          const allStoreIds = Array.from(new Set([
-            ...(memberships || []).map(m => m.store_id),
-            ...(ownedStores || []).map(s => s.id)
-          ]));
-          
-          query = query.in("store_id", allStoreIds);
+        const cols = PRODUCTS_COLUMNS.join(",");
+        let query = supabase.from("products").select(`${cols}, stores!inner(name)`);
+
+        if (isStoreAdmin && !isPlatformAdmin) {
+          query = query.in("store_id", storeIds);
         }
 
-        const { data, error } = await query.order("created_at", { ascending: false });
-        
+        if (selectedBrand !== "All") {
+          query = query.eq("brand", selectedBrand);
+        }
+
+        if (selectedStore !== "All") {
+          query = query.eq("store_id", selectedStore);
+        }
+
+        if (search.trim()) {
+          query = query.ilike("name", `%${search.trim()}%`);
+        }
+
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+
+        const { data, error } = await query
+          .order(
+            sortConfig.key === "sn" ? "store_id" : (sortConfig.key as string),
+            { ascending: sortConfig.direction === "asc" }
+          )
+          .range(from, to);
+
         if (error) throw error;
         return (data || []) as unknown as DBProduct[];
       } catch (err) {
@@ -204,7 +247,7 @@ const ProductManager = () => {
   const createMutation = useMutation({
     mutationFn: async (values: ProductFormValues) => {
       // ─── Package Limit Enforcement ───────────────────────────────────
-      const targetStoreId = values.store_id || null;
+      const targetStoreId = normalizeStoreId(values.store_id);
       if (isStoreAdmin && targetStoreId) {
         // Fetch store details to get package tier
         const { data: storeData } = await supabase
@@ -234,25 +277,32 @@ const ProductManager = () => {
       }
       // ──────────────────────────────────────────────────────────────────
 
-      const images =
-        values.images
-          ?.split(",")
-          .map((s) => s.trim())
-          .filter(Boolean) ?? [];
-      const highlights =
-        values.highlights
-          ?.split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean) ?? [];
-      const specs = values.specs?.trim() ? JSON.parse(values.specs) : null;
+      const images = parseList(values.images, "comma");
+      const highlights = parseList(values.highlights, "line");
+      const specs = parseSpecs(values.specs);
+      const primaryImage = values.image || images[0] || null;
+      const priceValue = parseNprPrice(values.price);
+      const normalizedName = values.name.trim();
+      const normalizedBrand = values.brand.trim();
+
+      const { data: existing } = await supabase
+        .from("products")
+        .select("id,name,brand")
+        .ilike("name", normalizedName)
+        .ilike("brand", normalizedBrand)
+        .limit(10);
+      if ((existing || []).some((row) => canonicalProductKey({ ...row, store_id: targetStoreId }) === canonicalProductKey({ name: normalizedName, brand: normalizedBrand, store_id: targetStoreId }))) {
+        throw new Error("This brand and model already exists. Edit the existing product instead of creating a duplicate.");
+      }
 
       const { error } = await supabase.from("products").insert({
-        name: values.name,
-        price: values.price,
+        name: normalizedName,
+        price: formatNprPrice(priceValue),
+        price_value: priceValue,
         category: values.category,
         brand: values.brand,
         series: values.series || null,
-        image: values.image,
+        image: primaryImage,
         images: images.length > 0 ? images : null,
         highlights: highlights.length > 0 ? highlights : null,
         specs,
@@ -263,47 +313,45 @@ const ProductManager = () => {
         in_stock: values.in_stock,
         rating: values.rating ? Number(values.rating) : null,
         reviews_count: values.reviews_count ? Number(values.reviews_count) : null,
-        slug: values.slug?.trim() || values.name.toLowerCase().replace(/\s+/g, "-"),
-        store_id: values.store_id || null,
+        slug: normalizeSlug(values.slug, values.name),
+        store_id: targetStoreId,
         video_url: values.video_url || null,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["catalog-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["admin_content_pages"] });
       setIsOpen(false);
       reset();
       toast.success("Product created successfully");
     },
     onError: (error) => {
-      toast.error(`Error creating product: ${error.message}`);
+      toast.error("Error creating product", { description: error.message });
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async (values: ProductFormValues) => {
       if (!editingProduct) throw new Error("No product selected");
-      const images =
-        values.images
-          ?.split(",")
-          .map((s) => s.trim())
-          .filter(Boolean) ?? [];
-      const highlights =
-        values.highlights
-          ?.split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean) ?? [];
-      const specs = values.specs?.trim() ? JSON.parse(values.specs) : null;
+      const images = parseList(values.images, "comma");
+      const highlights = parseList(values.highlights, "line");
+      const specs = parseSpecs(values.specs);
+      const targetStoreId = normalizeStoreId(values.store_id);
+      const primaryImage = values.image || images[0] || null;
+      const priceValue = parseNprPrice(values.price);
 
       const { error } = await supabase
         .from("products")
         .update({
           name: values.name,
-          price: values.price,
+          price: formatNprPrice(priceValue),
+          price_value: priceValue,
           category: values.category,
           brand: values.brand,
           series: values.series || null,
-          image: values.image,
+          image: primaryImage,
           images: images.length > 0 ? images : null,
           highlights: highlights.length > 0 ? highlights : null,
           specs,
@@ -314,8 +362,8 @@ const ProductManager = () => {
           in_stock: values.in_stock,
           rating: values.rating ? Number(values.rating) : null,
           reviews_count: values.reviews_count ? Number(values.reviews_count) : null,
-          slug: values.slug?.trim() || editingProduct.slug,
-          store_id: values.store_id || editingProduct.store_id,
+          slug: normalizeSlug(values.slug, editingProduct.slug || values.name),
+          store_id: targetStoreId,
           video_url: values.video_url || null,
         })
         .eq("id", editingProduct.id);
@@ -323,13 +371,15 @@ const ProductManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["catalog-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["admin_content_pages"] });
       setIsOpen(false);
       setEditingProduct(null);
       reset();
       toast.success("Product updated successfully");
     },
     onError: (error) => {
-      toast.error(`Error updating product: ${error.message}`);
+      toast.error("Error updating product", { description: error.message });
     },
   });
 
@@ -340,6 +390,8 @@ const ProductManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["catalog-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["admin_content_pages"] });
       toast.success("Product deleted successfully");
     },
     onError: (error) => {
@@ -354,6 +406,8 @@ const ProductManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["catalog-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["admin_content_pages"] });
       setSelectedProducts([]);
       toast.success("Bulk update successful");
     },
@@ -370,6 +424,8 @@ const ProductManager = () => {
       toast.success(`Deleted ${selectedProducts.length} products`);
       setSelectedProducts([]);
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["catalog-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["admin_content_pages"] });
     } catch (e: any) {
       toast.error(`Bulk delete failed: ${e.message}`);
     }
@@ -390,32 +446,22 @@ const ProductManager = () => {
   };
 
   const handleRemoveDuplicates = async () => {
-    if (!confirm("Are you sure you want to remove duplicate products based on slug? This action cannot be undone.")) return;
-    
-    const slugMap = new Map<string, DBProduct>();
-    const duplicates: string[] = [];
-
-    (products || []).forEach(p => {
-        if (slugMap.has(p.slug)) {
-            duplicates.push(p.id);
-        } else {
-            slugMap.set(p.slug, p);
-        }
-    });
+    const duplicates = groupDuplicateProducts(products || []).flatMap((group) => group.duplicates.map((product) => product.id));
 
     if (duplicates.length === 0) {
         toast.info("No duplicates found");
         return;
     }
 
+    if (!confirm(`Remove ${duplicates.length} redundant brand/model rows? The best-quality record in each group will be preserved. This cannot be undone.`)) return;
+
     try {
-        let deletedCount = 0;
-        // Delete in batches
-        for (const id of duplicates) {
-            await deleteMutation.mutateAsync(id);
-            deletedCount++;
-        }
-        toast.success(`Removed ${deletedCount} duplicate products`);
+        const { error } = await supabase.from("products").delete().in("id", duplicates);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ["products"] });
+        queryClient.invalidateQueries({ queryKey: ["catalog-overview"] });
+        queryClient.invalidateQueries({ queryKey: ["admin_content_pages"] });
+        toast.success(`Removed ${duplicates.length} duplicate products`);
     } catch (e) {
         console.error(e);
         toast.error("Failed to remove some duplicates");
@@ -472,12 +518,30 @@ const ProductManager = () => {
   };
   // ─────────────────────────────────────────────────────────────────────────
 
-  const selectedStoreId = watch("store_id");
+  const selectedStoreId = normalizeStoreId(watchedStoreId);
   const currentStoreProductCount = products?.filter(p => p.store_id === selectedStoreId).length || 0;
   const productLimit = -1; // enforced server-side in createMutation
   const isAtLimit = productLimit >= 0 && currentStoreProductCount >= productLimit;
 
   const onSubmit = (values: ProductFormValues) => {
+    const primaryImage = values.image.trim() || parseList(values.images, "comma")[0] || "";
+    const missingPublishFields = [
+      !values.name.trim() && "name",
+      !normalizeSlug(values.slug, values.name) && "slug",
+      !values.description.trim() && "description",
+      !primaryImage && "image",
+      !values.brand.trim() && "brand",
+      !values.category.trim() && "category",
+      !values.price.trim() && "price",
+    ].filter(Boolean);
+
+    if (values.in_stock && missingPublishFields.length > 0) {
+      toast.error("Product saved as unavailable", {
+        description: `Complete ${missingPublishFields.join(", ")} before enabling stock and search indexing.`,
+      });
+      values = { ...values, in_stock: false, featured: false };
+    }
+
     // ─── Auto-SEO Generation ─────────────────────────────────────────────
     // Generate Meta Title and Description automatically if not provided
     const seoValues = { ...values };
@@ -511,32 +575,64 @@ const ProductManager = () => {
     }
   };
 
-  // Deprecated: Edge Function not available in this environment
-  /*
   const importMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (opts?: { priceOnly?: boolean; limitOverride?: number; brandOverride?: string; sitemapOverride?: string }) => {
       await assertEdgeFunctionAvailable("import-gadgetbyte-products");
       const { data, error } = await supabase.functions.invoke("import-gadgetbyte-products", {
         body: {
-          sitemapUrl: importUrl,
-          limit: importLimit,
+          sitemapUrl: opts?.sitemapOverride ?? importUrl,
+          limit: opts?.limitOverride ?? importLimit,
+          priceOnly: opts?.priceOnly ?? false,
+          brandFilter: opts?.brandOverride && opts.brandOverride !== "All" ? opts.brandOverride : undefined,
+          updateMode: opts?.priceOnly ? "priceOnly" : "upsert",
         },
       });
       if (error) throw error;
-      return data as { inserted?: number; skipped?: number; parsed?: number; sitemapUrl?: string };
+      return data as { synced?: number; failed?: number; parsed?: number; sitemapUrl?: string; updatedPrices?: number; skippedNewProducts?: number; mode?: string; brandFilter?: string | null };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      setIsImportOpen(false);
-      toast.success(
-        `Imported ${data?.inserted ?? 0} products (skipped ${data?.skipped ?? 0}).`,
-      );
+      queryClient.invalidateQueries({ queryKey: ["catalog-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["admin_content_pages"] });
+      if (data?.mode === "price") {
+        const brandInfo = data.brandFilter ? ` for ${data.brandFilter}` : "";
+        toast.success(
+          `Price sync complete${brandInfo}: ${data.updatedPrices ?? 0} prices updated · ${data.skippedNewProducts ?? 0} new pages skipped · ${data.failed ?? 0} errors.`,
+        );
+      } else {
+        const brandInfo = data.brandFilter ? ` for ${data.brandFilter}` : "";
+        toast.success(
+          `Synced${brandInfo} ${data?.synced ?? 0} verified products (${data?.failed ?? 0} pages skipped).`,
+        );
+      }
+      setIsPriceSyncOpen(false);
     },
     onError: (error) => {
       toast.error(`Import failed: ${formatEdgeFunctionError(error)}`);
     },
   });
-  */
+
+  const cleanupCatalogMutation = useMutation({
+    mutationFn: async () => {
+      await assertEdgeFunctionAvailable("cleanup-product-catalog");
+      const { data: preview, error: previewError } = await supabase.functions.invoke("cleanup-product-catalog", { body: { apply: false } });
+      if (previewError) throw previewError;
+      const removeCount = Number(preview?.invalid || 0) + Number(preview?.duplicates || 0);
+      if (!removeCount) return preview;
+      if (!confirm(`Catalog audit found ${preview.invalid} invalid/mock rows and ${preview.duplicates} duplicate rows. Remove them and preserve ${preview.remaining} valid products?`)) {
+        return { ...preview, cancelled: true };
+      }
+      const { data, error } = await supabase.functions.invoke("cleanup-product-catalog", { body: { apply: true } });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data?.cancelled) return;
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast.success(`Catalog cleaned: ${data?.removed || 0} removed, ${data?.normalized || 0} normalized.`);
+    },
+    onError: (error) => toast.error(`Catalog cleanup failed: ${formatEdgeFunctionError(error)}`),
+  });
 
   // GSMArena Import Logic
   const handleGsmSearch = async () => {
@@ -731,6 +827,15 @@ const ProductManager = () => {
     if (!open) {
       setEditingProduct(null);
       reset({
+        name: "",
+        price: "",
+        category: "Smartphones",
+        brand: "",
+        series: "",
+        image: "",
+        description: "",
+        store_id: "",
+        video_url: "",
         featured: false,
         in_stock: true,
         images: "",
@@ -742,12 +847,21 @@ const ProductManager = () => {
         rating: "",
         reviews_count: "",
       });
+      setCatalogQuery("");
+      setCatalogResults([]);
+      setCatalogOpen(false);
     }
   };
 
   const uniqueBrands = Array.from(
     new Set((products || []).map((p) => p.brand).filter(Boolean))
   ).sort();
+
+  const duplicateGroups = useMemo(() => groupDuplicateProducts(products || []), [products]);
+  const duplicateByPrimaryId = useMemo(() => new Map(duplicateGroups.map((group) => [group.primary.id, group])), [duplicateGroups]);
+  const duplicateRows = duplicateGroups.reduce((total, group) => total + group.duplicates.length, 0);
+  const priceConflictGroups = duplicateGroups.filter((group) => group.hasPriceConflict).length;
+  const visibleProducts = duplicateGroups.map((group) => group.primary);
 
   const handleSort = (key: keyof DBProduct | "sn") => {
     setSortConfig((current) => ({
@@ -756,7 +870,7 @@ const ProductManager = () => {
     }));
   };
 
-  const filteredProducts = (products || [])
+  const filteredProducts = visibleProducts
     .filter((product) =>
       product.name.toLowerCase().includes(search.toLowerCase())
     )
@@ -771,6 +885,8 @@ const ProductManager = () => {
       if (statusFilter === "featured") return !!product.featured;
       if (statusFilter === "instock") return product.in_stock !== false;
       if (statusFilter === "outofstock") return product.in_stock === false;
+      if (statusFilter === "duplicates") return (duplicateByPrimaryId.get(product.id)?.duplicates.length || 0) > 0;
+      if (statusFilter === "priceconflict") return duplicateByPrimaryId.get(product.id)?.hasPriceConflict || false;
       return true;
     })
     .sort((a, b) => {
@@ -838,9 +954,114 @@ const ProductManager = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Products</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isPlatformAdmin && (
+            <Dialog open={isPriceSyncOpen} onOpenChange={(open) => !importMutation.isPending && setIsPriceSyncOpen(open)}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Sync GadgetByte Prices
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[560px]">
+                <DialogHeader>
+                  <DialogTitle>Sync GadgetByte Nepal</DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-5 py-2">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                    Price-only mode updates matched products by slug and never creates a new catalog entry.
+                  </div>
+
+                  <div className="flex items-start gap-3 rounded-lg border p-4">
+                    <Checkbox
+                      id="price-only-sync"
+                      checked={priceSyncMode === "priceOnly"}
+                      onCheckedChange={(checked) => setPriceSyncMode(checked === true ? "priceOnly" : "full")}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="price-only-sync">Update prices only</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {priceSyncMode === "priceOnly"
+                          ? "Updates price, availability, and source metadata for existing products."
+                          : "Full sync can create new products and replace imported product details."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="price-sync-brand">Brand</Label>
+                      <Select value={priceSyncBrand} onValueChange={setPriceSyncBrand}>
+                        <SelectTrigger id="price-sync-brand">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">All brands</SelectItem>
+                          {uniqueBrands.map((brand) => (
+                            <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="price-sync-limit">Maximum pages</Label>
+                      <Input
+                        id="price-sync-limit"
+                        type="number"
+                        min={1}
+                        max={500}
+                        value={priceSyncLimit}
+                        onChange={(event) => setPriceSyncLimit(Math.min(500, Math.max(1, Number(event.target.value) || 1)))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="price-sync-sitemap">Product sitemap</Label>
+                    <Input
+                      id="price-sync-sitemap"
+                      type="url"
+                      value={importUrl}
+                      onChange={(event) => setImportUrl(event.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsPriceSyncOpen(false)} disabled={importMutation.isPending}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => importMutation.mutate({
+                        priceOnly: priceSyncMode === "priceOnly",
+                        limitOverride: priceSyncLimit,
+                        brandOverride: priceSyncBrand,
+                        sitemapOverride: importUrl,
+                      })}
+                      disabled={importMutation.isPending || !importUrl.trim()}
+                    >
+                      {importMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                      {importMutation.isPending ? "Syncing…" : priceSyncMode === "priceOnly" ? "Sync Prices" : "Run Full Sync"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
+            <Button
+              variant="outline"
+              className="gap-2 text-amber-700"
+              onClick={() => cleanupCatalogMutation.mutate()}
+              disabled={cleanupCatalogMutation.isPending}
+            >
+              {cleanupCatalogMutation.isPending ? <Loader2 className="animate-spin h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+              Clean Invalid Brands & Models
+            </Button>
+
             <Button 
               variant="outline" 
               size="icon"
@@ -874,10 +1095,11 @@ const ProductManager = () => {
           <Button 
             variant="outline" 
             className="gap-2 text-red-500 hover:text-red-600"
-            onClick={handleRemoveDuplicates}
-          >
-            <Trash2 className="h-4 w-4" /> Remove Duplicates
-          </Button>
+              onClick={handleRemoveDuplicates}
+              disabled={duplicateRows === 0}
+            >
+            <Trash2 className="h-4 w-4" /> Remove Duplicates {duplicateRows > 0 ? `(${duplicateRows})` : ""}
+            </Button>
 
           <Dialog open={isOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
@@ -885,14 +1107,14 @@ const ProductManager = () => {
                 <Plus className="h-4 w-4" /> Add Product
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh]">
+            <DialogContent className="max-h-[92vh] p-0 sm:max-w-[980px]">
               <DialogHeader>
-                <DialogTitle>
+                <DialogTitle className="px-6 pt-6">
                   {editingProduct ? "Edit Product" : "Add New Product"}
                 </DialogTitle>
               </DialogHeader>
-              <ScrollArea className="pr-4">
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
+              <ScrollArea className="max-h-[calc(92vh-92px)] px-6">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pb-24 pt-2">
                   {/* Master Catalog Auto-Fill */}
                   {!editingProduct && (
                     <div className="grid gap-2 relative">
@@ -920,9 +1142,7 @@ const ProductManager = () => {
                               className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
                               onClick={() => applyMasterCatalogEntry(entry)}
                             >
-                              {entry.image && (
-                                <img src={entry.image} alt={entry.name} className="h-8 w-8 rounded object-contain bg-muted shrink-0" />
-                              )}
+                              <SafeImage src={entry.image} alt={entry.name} className="h-8 w-8 rounded object-contain bg-muted shrink-0" />
                               <div className="min-w-0">
                                 <div className="font-medium truncate">{entry.name}</div>
                                 <div className="text-xs text-muted-foreground">{entry.brand}{entry.release_year ? ` · ${entry.release_year}` : ""}</div>
@@ -946,8 +1166,8 @@ const ProductManager = () => {
                     <div className="grid gap-2">
                       <Label htmlFor="store_id">Assign to Store</Label>
                       <Select 
-                        value={formValues.store_id || "none"} 
-                        onValueChange={(val) => setValue("store_id", val)}
+                        value={watchedStoreId || "none"}
+                        onValueChange={(val) => setValue("store_id", val === "none" ? "" : val, { shouldDirty: true })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a store" />
@@ -984,8 +1204,8 @@ const ProductManager = () => {
                   <div className="grid gap-2">
                     <Label htmlFor="category">Category</Label>
                     <Select 
-                      value={formValues.category || "Smartphones"} 
-                      onValueChange={(val) => setValue("category", val)}
+                      value={watchedCategory || "Smartphones"}
+                      onValueChange={(val) => setValue("category", val, { shouldDirty: true })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select Category" />
@@ -1005,13 +1225,55 @@ const ProductManager = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="image">Primary Image URL</Label>
-                    <Input id="image" {...register("image")} />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="images">Additional Image URLs (comma separated)</Label>
-                    <Textarea id="images" {...register("images")} />
+                  <div className="grid gap-4 rounded-lg border p-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+                    <div className="space-y-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="image">Primary Image URL</Label>
+                        <div className="flex gap-2">
+                          <Input id="image" {...register("image")} placeholder="https://example.com/product.jpg" />
+                          {watchedImage ? (
+                            <Button type="button" variant="outline" size="icon" asChild>
+                              <a href={watchedImage} target="_blank" rel="noreferrer" aria-label="Open primary image">
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="images">Gallery Image URLs</Label>
+                        <Textarea id="images" {...register("images")} placeholder="Paste image URLs separated by commas" className="min-h-24" />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Upload Images</Label>
+                        <ImageUploader value={galleryImages} onChange={updateGalleryImages} folder="products" disabled={createMutation.isPending || updateMutation.isPending} />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <Label>Desktop Preview</Label>
+                      <div className="aspect-square overflow-hidden rounded-md border bg-muted">
+                        {watchedImage ? (
+                          <SafeImage src={watchedImage} alt="Primary product preview" className="h-full w-full object-contain" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No primary image</div>
+                        )}
+                      </div>
+                      {previewImages.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-2">
+                          {previewImages.map((url, index) => (
+                            <button
+                              key={`${url}-${index}`}
+                              type="button"
+                              className={cn("aspect-square overflow-hidden rounded border bg-muted", url === watchedImage && "ring-2 ring-primary")}
+                              onClick={() => handlePrimaryImageSelect(url)}
+                              title="Use as primary image"
+                            >
+                              <SafeImage src={url} alt={`Product preview ${index + 1}`} className="h-full w-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="highlights">Highlights (one per line)</Label>
@@ -1053,7 +1315,7 @@ const ProductManager = () => {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="featured"
-                        checked={!!formValues.featured}
+                        checked={!!watchedFeatured}
                         onCheckedChange={(checked) => setValue("featured", !!checked)}
                       />
                       <Label htmlFor="featured">Featured</Label>
@@ -1061,7 +1323,7 @@ const ProductManager = () => {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="in_stock"
-                        checked={!!formValues.in_stock}
+                        checked={!!watchedInStock}
                         onCheckedChange={(checked) => setValue("in_stock", !!checked)}
                       />
                       <Label htmlFor="in_stock">In Stock</Label>
@@ -1078,16 +1340,45 @@ const ProductManager = () => {
                     </div>
                   )}
 
-                  <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || (isAtLimit && !editingProduct)}>
-                    {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {editingProduct ? "Update Product" : "Add Product"}
-                  </Button>
+                  <div className="sticky bottom-0 -mx-6 border-t bg-background/95 px-6 py-4 backdrop-blur">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        {editingProduct ? "Changes update the live product after save." : "New product appears in catalog after save."}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending || (isAtLimit && !editingProduct)}>
+                          {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {editingProduct ? "Update Product" : "Add Product"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </form>
               </ScrollArea>
             </DialogContent>
           </Dialog>
         </div>
       </div>
+
+      {(duplicateRows > 0 || priceConflictGroups > 0) && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Raw database rows</p>
+            <p className="mt-1 text-2xl font-bold">{products?.length || 0}</p>
+          </div>
+          <button type="button" onClick={() => setStatusFilter("duplicates")} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-left">
+            <p className="text-xs uppercase tracking-wide text-amber-700">Redundant rows</p>
+            <p className="mt-1 text-2xl font-bold">{duplicateRows}</p>
+          </button>
+          <button type="button" onClick={() => setStatusFilter("priceconflict")} className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-left">
+            <p className="text-xs uppercase tracking-wide text-destructive">Price conflicts</p>
+            <p className="mt-1 text-2xl font-bold">{priceConflictGroups}</p>
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -1117,6 +1408,8 @@ const ProductManager = () => {
                   <SelectItem value="featured">Featured Only</SelectItem>
                   <SelectItem value="instock">In Stock</SelectItem>
                   <SelectItem value="outofstock">Out of Stock</SelectItem>
+                  <SelectItem value="duplicates">Duplicate Models</SelectItem>
+                  <SelectItem value="priceconflict">Price Conflicts</SelectItem>
                 </SelectContent>
               </Select>
               {isPlatformAdmin && (
@@ -1246,6 +1539,7 @@ const ProductManager = () => {
               </TableRow>
             ) : (
               pagedProducts.map((product, idx) => {
+                const duplicateGroup = duplicateByPrimaryId.get(product.id);
                 const prev = idx > 0 ? pagedProducts[idx - 1] : null;
                 const showBrandHeader = !prev || (prev.brand || "") !== (product.brand || "");
                 return (
@@ -1297,11 +1591,23 @@ const ProductManager = () => {
                         {product.featured && (
                           <Badge variant="outline" className="text-[9px] h-4 px-1 uppercase text-yellow-600 border-yellow-200 bg-yellow-50">Featured</Badge>
                         )}
+                        {duplicateGroup && duplicateGroup.duplicates.length > 0 && (
+                          <Badge variant="outline" className="text-[9px] h-4 px-1 uppercase text-amber-700 border-amber-300 bg-amber-50">
+                            +{duplicateGroup.duplicates.length} duplicate{duplicateGroup.duplicates.length === 1 ? "" : "s"}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="text-xs">{product.category}</TableCell>
-                  <TableCell className="font-bold text-primary">{product.price}</TableCell>
+                  <TableCell>
+                    <div className="font-bold text-primary">{formatNprPrice(Number(product.price_value || 0))}</div>
+                    {duplicateGroup?.hasPriceConflict && (
+                      <div className="mt-1 text-[10px] font-medium text-destructive">
+                        Conflict: {formatNprPrice(duplicateGroup.prices[0])}–{formatNprPrice(duplicateGroup.prices.at(-1) || 0)}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs">{product.brand || "-"}</TableCell>
                   {isPlatformAdmin && (
                     <TableCell>
@@ -1320,7 +1626,7 @@ const ProductManager = () => {
                           </Tooltip>
                         </TooltipProvider>
                       ) : (
-                        <Badge variant="outline" className="text-muted-foreground italic bg-gray-50 border-gray-100">
+                        <Badge variant="outline" className="text-muted-foreground italic bg-muted border-border">
                           Platform
                         </Badge>
                       )}

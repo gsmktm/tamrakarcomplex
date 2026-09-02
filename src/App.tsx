@@ -9,13 +9,13 @@ import { ThemeProvider } from "@/hooks/useTheme";
 import { CartProvider } from "@/contexts/CartContext";
 import NotFound from "./pages/NotFound";
 import { publicRoutes } from "@/routes/publicRoutes";
-import { adminRoutes } from "@/routes/adminRoutes";
 import { staffAdminRoutes } from "@/routes/staffAdminRoutes";
 import { superAdminRoutes } from "@/routes/superAdminRoutes";
 import { RequireSuperAdmin } from "@/routes/RequireSuperAdmin";
 import SuperAdminLayout from "@/layouts/SuperAdminLayout";
 import { storeAdminRoutes } from "@/routes/storeAdminRoutes";
 import { staffRoutes } from "@/routes/staffRoutes";
+import { Navigate } from "react-router-dom";
 import ScrollToTop from "@/components/ScrollToTop";
 import { OfflineBanner } from "@/components/system/OfflineBanner";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -25,8 +25,8 @@ import { DynamicFavicon } from "@/components/system/DynamicFavicon";
 import { useVisitorTracking } from "@/hooks/useVisitorTracking";
 import { MaintenanceGate } from "@/components/system/MaintenanceGate";
 import { ErrorBoundary } from "@/components/system/ErrorBoundary";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
-import StoreRedirect from "@/components/routing/StoreRedirect";
 import "@/styles/dynamic-theme.css";
 
 const queryClient = new QueryClient({
@@ -64,19 +64,22 @@ const AppContent = () => {
   }, []);
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <VisitorTracker />
       <SiteSettingsHydrator />
       <DynamicFavicon />
       <OfflineBanner />
       {enableLiveEditor && <FrontendLiveEditor />}
       <ScrollToTop />
+      <ChatWidget />
       <ErrorBoundary>
         <MaintenanceGate>
           <Routes>
             {publicRoutes}
-            {adminRoutes}
             {staffAdminRoutes}
+            {/* Redirect from legacy /admin to /staffadmin */}
+            <Route path="/admin" element={<Navigate to="/staffadmin" replace />} />
+            <Route path="/admin/*" element={<Navigate to="/staffadmin" replace />} />
             <Route
               path="/suadmin"
               element={

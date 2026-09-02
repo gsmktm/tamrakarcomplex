@@ -76,8 +76,12 @@ In **cPanel → Setup Node.js App**:
 |---|---|
 | `NODE_ENV` | `production` |
 | `PORT` | Leave blank (cPanel sets this automatically) |
+| `SITE_URL` | `https://tamrakarcomplex.com` |
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Your public/anon Supabase key |
 
-Do NOT set `VITE_*` vars here — they have no effect at runtime.
+The `VITE_*` values are baked into the browser bundle. The runtime `SUPABASE_*`
+values above are used by Node routes such as the sitemap and contact proxy.
 
 ---
 
@@ -85,7 +89,8 @@ Do NOT set `VITE_*` vars here — they have no effect at runtime.
 
 In cPanel Node.js App panel, click **"Run NPM Install"**.
 
-This installs `express`, `compression`, and other runtime dependencies from `package.json`.
+This installs only the runtime dependencies (`express` and `compression`) from the
+deployment package.
 
 Only `dependencies` are needed at runtime — `devDependencies` are skipped automatically.
 
@@ -149,12 +154,15 @@ Expected response:
 ## Re-deploy Workflow (Subsequent Deploys)
 
 ```bash
-# 1. Make code changes locally
-# 2. npm run build
-# 3. Upload new dist/ folder (replace old one)
-# 4. In cPanel: Restart App
-# No npm install needed unless dependencies changed
+# Builds, validates production settings, and refreshes cpanel-deploy-ready/
+npm run deploy:cpanel
+
+# Optional final validation
+npm run deploy:check
 ```
+
+Upload the contents of `cpanel-deploy-ready/`, replace the old application files,
+then restart the app in cPanel. Run NPM Install only when its package files change.
 
 ---
 

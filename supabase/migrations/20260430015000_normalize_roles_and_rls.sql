@@ -12,8 +12,6 @@ AS $$
         SELECT 1 FROM public.user_roles 
         WHERE user_id = auth.uid() 
         AND role = 'suadmin'
-        -- Ensure email is confirmed for super admin access
-        AND (auth.jwt() ->> 'email_confirmed_at') IS NOT NULL
     );
 $$;
 
@@ -24,14 +22,10 @@ SECURITY DEFINER
 STABLE
 SET search_path = public
 AS $$
-    -- Staff admins must also have confirmed emails
-    SELECT (auth.jwt() ->> 'email_confirmed_at') IS NOT NULL 
-    AND (
-        public.is_super_admin() OR EXISTS (
-            SELECT 1 FROM public.user_roles 
-            WHERE user_id = auth.uid() 
-            AND role = 'staffadmin'
-        )
+    SELECT public.is_super_admin() OR EXISTS (
+        SELECT 1 FROM public.user_roles 
+        WHERE user_id = auth.uid() 
+        AND role = 'staffadmin'
     );
 $$;
 
@@ -42,9 +36,7 @@ SECURITY DEFINER
 STABLE
 SET search_path = public
 AS $$
-    -- Store admins must also have confirmed emails
-    SELECT (auth.jwt() ->> 'email_confirmed_at') IS NOT NULL
-    AND EXISTS (
+    SELECT public.is_super_admin() OR public.is_staff_admin() OR EXISTS (
         SELECT 1 FROM public.user_roles 
         WHERE user_id = auth.uid() 
         AND role = 'storeadmin'

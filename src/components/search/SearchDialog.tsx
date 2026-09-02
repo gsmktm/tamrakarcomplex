@@ -188,7 +188,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     }
 
     if (result.type === "article") {
-      navigate(`/article/${result.slug}`);
+      navigate(`/stores/article/${result.slug}`);
     } else if (result.type === "product") {
       navigate(`/product/${result.slug}`);
     } else if (result.type === "guide") {

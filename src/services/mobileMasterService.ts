@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { resolveMobileCatalogImage } from "@/data/mobileCatalogImages";
+import { getFallbackBrands, getFallbackProducts } from "@/services/publicFallbackData";
 
 export interface Brand {
   id: string;
@@ -219,6 +221,11 @@ export interface ModelListItem {
   // Variants summary (e.g. "8GB / 128GB / 256GB")
   ram_options?: string[];
   storage_options?: string[];
+  // Ecosystem signals from mobile_catalog_view
+  store_min_price?: number;
+  exchange_max_value?: number;
+  repair_available?: boolean;
+  unlocking_available?: boolean;
 }
 
 export interface BrandDetail extends Brand {
@@ -227,11 +234,67 @@ export interface BrandDetail extends Brand {
   total_models: number;
 }
 
+function getLocalBrands(): Brand[] {
+  return getFallbackBrands("All").map((name) => ({
+    id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    name,
+    slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    status: "active",
+  }));
+}
+
+function getLocalModelList(filters: CategoryFilter = {}): { items: ModelListItem[]; total: number } {
+  const seen = new Set<string>();
+  let items = getFallbackProducts()
+    .filter((product) => product.category.toLowerCase().includes("smartphone"))
+    .map((product) => {
+      const modelName = product.name
+        .replace(new RegExp(`^${product.brand ?? ""}\\s+`, "i"), "")
+        .replace(/\s*\([^)]*\)\s*$/, "");
+      const key = `${product.brand}:${modelName}`.toLowerCase();
+      if (seen.has(key)) return null;
+      seen.add(key);
+      const brandSlug = String(product.brand ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      return {
+        id: `fallback-model-${product.id}`,
+        name: modelName,
+        slug: product.slug,
+        image: product.image ?? undefined,
+        market_status: "available",
+        is_featured: Boolean(product.featured),
+        is_upcoming: false,
+        is_top_rated: Number(product.rating ?? 0) >= 4.5,
+        brand_name: product.brand ?? "",
+        brand_slug: brandSlug,
+        min_price: product.price_value ?? undefined,
+      } satisfies ModelListItem;
+    })
+    .filter((item): item is ModelListItem => item !== null);
+
+  if (filters.brand_id) items = items.filter((item) => item.brand_slug === filters.brand_id);
+  if (filters.search) items = items.filter((item) => item.name.toLowerCase().includes(filters.search!.toLowerCase()));
+  if (filters.is_featured) items = items.filter((item) => item.is_featured);
+  if (filters.is_upcoming) items = items.filter((item) => item.is_upcoming);
+  if (filters.is_top_rated) items = items.filter((item) => item.is_top_rated);
+  if (filters.minPrice !== undefined) items = items.filter((item) => (item.min_price ?? 0) >= filters.minPrice!);
+  if (filters.maxPrice !== undefined) items = items.filter((item) => (item.min_price ?? Infinity) <= filters.maxPrice!);
+  if (filters.sort === "price_asc") items.sort((a, b) => (a.min_price ?? Infinity) - (b.min_price ?? Infinity));
+  if (filters.sort === "price_desc") items.sort((a, b) => (b.min_price ?? -Infinity) - (a.min_price ?? -Infinity));
+
+  const total = items.length;
+  const from = filters.offset ?? 0;
+  if (filters.limit) items = items.slice(from, from + filters.limit);
+  return { items, total };
+}
+
 export const mobileMasterService = {
+  getLocalBrands,
+  getLocalModelList,
+
   // ── Brands ───────────────────────────────────────────────────
   async getBrands() {
     const { data, error } = await supabase.from("brands").select("*").eq("status", "active").order("name");
-    if (error) throw error;
+    if (error || !data?.length) return getLocalBrands();
     return data as Brand[];
   },
 
@@ -509,8 +572,13 @@ export const mobileMasterService = {
     if (images.error) throw images.error;
     if (expertScore.error) throw expertScore.error;
 
+    const resolvedModel = {
+      ...model,
+      image: resolveMobileCatalogImage(model.slug, model.brands?.slug, model.image),
+    };
+
     return {
-      model: model as ModelDetail['model'],
+      model: resolvedModel as ModelDetail['model'],
       variants: (variants.data ?? []) as PhoneVariant[],
       prices: (prices.data ?? []) as VariantPrice[],
       specs: (specs.data ?? null) as PhoneSpec | null,
@@ -542,12 +610,12 @@ export const mobileMasterService = {
     if (filters.limit) query = query.range(filters.offset ?? 0, (filters.offset ?? 0) + filters.limit - 1);
 
     const { data, error, count } = await query;
-    if (error) throw error;
+    if (error || !data?.length) return getLocalModelList(filters);
 
     const modelIds = (data ?? []).map((m: any) => m.id);
 
-    // Parallel: prices + specs + expert scores + variants
-    const [priceRows, specRows, expertRows, variantRows] = await Promise.all([
+    // Parallel: prices + specs + expert scores + variants + catalog view
+    const allRows = await Promise.all([
       modelIds.length > 0
         ? supabase.from('phone_variant_prices').select('model_id, regular_price').in('model_id', modelIds).eq('stock_status', 'in_stock')
         : { data: [], error: null },
@@ -560,7 +628,12 @@ export const mobileMasterService = {
       modelIds.length > 0
         ? supabase.from('phone_variants').select('model_id, ram, storage').in('model_id', modelIds).eq('status', 'active')
         : { data: [], error: null },
+      modelIds.length > 0
+        ? supabase.from('mobile_catalog_view').select('model_id, store_min_price, exchange_max_value, repair_available, unlocking_available').in('model_id', modelIds)
+        : { data: [], error: null },
     ]);
+
+    const [priceRows, specRows, expertRows, variantRows, catalogRows] = allRows;
 
     // Build lookup maps
     const minPriceMap: Record<string, number> = {};
@@ -582,11 +655,14 @@ export const mobileMasterService = {
       if (v.storage) { if (!storageMap[v.model_id]) storageMap[v.model_id] = new Set(); storageMap[v.model_id].add(v.storage); }
     }
 
+    const catalogMap: Record<string, any> = {};
+    for (const c of (catalogRows.data ?? [])) catalogMap[c.model_id] = c;
+
     let items: ModelListItem[] = (data ?? []).map((m: any) => ({
       id: m.id,
       name: m.name,
       slug: m.slug,
-      image: m.image,
+      image: resolveMobileCatalogImage(m.slug, m.brands?.slug, m.image),
       market_status: m.market_status ?? 'available',
       is_featured: m.is_featured ?? false,
       is_upcoming: m.is_upcoming ?? false,
@@ -594,7 +670,7 @@ export const mobileMasterService = {
       release_year: m.release_year,
       brand_name: m.brands?.name ?? '',
       brand_slug: m.brands?.slug ?? '',
-      min_price: minPriceMap[m.id],
+      min_price: minPriceMap[m.id] ?? catalogMap[m.id]?.store_min_price,
       expert_overall: expertMap[m.id],
       spec_display: specMap[m.id]?.display,
       spec_processor: specMap[m.id]?.processor,
@@ -602,6 +678,10 @@ export const mobileMasterService = {
       spec_battery: specMap[m.id]?.battery,
       ram_options: ramMap[m.id] ? Array.from(ramMap[m.id]) : undefined,
       storage_options: storageMap[m.id] ? Array.from(storageMap[m.id]) : undefined,
+      store_min_price: catalogMap[m.id]?.store_min_price,
+      exchange_max_value: catalogMap[m.id]?.exchange_max_value,
+      repair_available: catalogMap[m.id]?.repair_available ?? false,
+      unlocking_available: catalogMap[m.id]?.unlocking_available ?? false,
     }));
 
     // Price filter (post-fetch since price is in separate table)

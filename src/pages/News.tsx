@@ -72,14 +72,14 @@ export default function News() {
       <SEO 
         title="Tamrakar Newsroom - Tech News & Updates"
         description="Stay updated with the latest tech news, gadget launches, and industry updates from Nepal and around the world."
-        url="/news"
+        url="/stores/article"
         keywords={["tech news Nepal", "gadget launches", "price updates", "Tamrakar newsroom"]}
         structuredData={{
           "@context": "https://schema.org",
           "@type": "CollectionPage",
           name: "Tamrakar Newsroom",
           description: "Latest tech news, launches, reviews, and updates.",
-          url: "https://tamrakarcomplex.com/news",
+          url: "https://tamrakarcomplex.com/stores/article",
         }}
       />
       <Header />
@@ -100,7 +100,7 @@ export default function News() {
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {hashtags.map((h) => (
-                <Link key={h} to={`/news?tag=${encodeURIComponent(h.replace("#",""))}`} className="text-xs px-3 py-1 rounded-full border border-border/60 hover:bg-secondary">
+                <Link key={h} to={`/stores/article?tag=${encodeURIComponent(h.replace("#",""))}`} className="text-xs px-3 py-1 rounded-full border border-border/60 hover:bg-secondary">
                   {h}
                 </Link>
               ))}

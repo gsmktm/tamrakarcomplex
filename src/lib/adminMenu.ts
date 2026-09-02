@@ -9,8 +9,8 @@ type MenuItem = {
   enabled: boolean;
 };
 
-export function getAllowedMenuItems(userRole: AppRole, permissions?: StaffPermissions | null): MenuItem[] {
+export function getAllowedMenuItems(userRole: AppRole, permissions?: StaffPermissions | null, storeAdminPermissions?: string[]): MenuItem[] {
   const groups = PANEL_NAVIGATION[userRole] ?? [];
   const flattened = groups.flatMap((group) => group.items);
-  return flattened.filter((item) => canSeeMenuItem(userRole, item, permissions)) as MenuItem[];
+  return flattened.filter((item) => canSeeMenuItem(userRole, item, permissions, storeAdminPermissions)) as MenuItem[];
 }

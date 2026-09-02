@@ -24,29 +24,27 @@ import { cn } from "@/lib/utils";
 
 // ─── Brand metadata (keep in sync with MobilePrice.tsx) ──────────────────────
 const BRAND_META: Record<string, { bg: string; text: string; tagline: string; slug: string }> = {
-  Apple:    { bg: "#000000", text: "#ffffff", tagline: "iPhone, iPad & Mac — the Apple ecosystem", slug: "apple" },
-  Samsung:  { bg: "#1428A0", text: "#ffffff", tagline: "Galaxy series — innovation at every tier", slug: "samsung" },
-  Xiaomi:   { bg: "#FF6700", text: "#ffffff", tagline: "Redmi & POCO — flagship value for all", slug: "xiaomi" },
-  OnePlus:  { bg: "#F3122E", text: "#ffffff", tagline: "Fast & smooth — Never Settle", slug: "oneplus" },
-  Realme:   { bg: "#FFCD00", text: "#000000", tagline: "Dare to Leap — performance midrange", slug: "realme" },
-  Vivo:     { bg: "#415FFF", text: "#ffffff", tagline: "V & Y series — camera-first smartphones", slug: "vivo" },
-  OPPO:     { bg: "#05BA4B", text: "#ffffff", tagline: "Find & Reno series — stylish innovation", slug: "oppo" },
-  Nokia:    { bg: "#001135", text: "#ffffff", tagline: "Reliable builds with Android One", slug: "nokia" },
-  Motorola: { bg: "#000000", text: "#ffffff", tagline: "Moto series — clean Android experience", slug: "motorola" },
-  Huawei:   { bg: "#FF0000", text: "#ffffff", tagline: "Premium Kirin-powered devices", slug: "huawei" },
-  Honor:    { bg: "#000000", text: "#ffffff", tagline: "Honor series — tech for the bold", slug: "honor" },
-  Tecno:    { bg: "#00529B", text: "#ffffff", tagline: "Feature-packed at every budget", slug: "tecnomobile" },
-  Infinix:  { bg: "#000000", text: "#ffffff", tagline: "Bold designs and long battery life", slug: "infinix" },
-  Poco:     { bg: "#000000", text: "#FFCD00", tagline: "POCO — flagship killers redefined", slug: "poco" },
-  Itel:     { bg: "#FF6600", text: "#ffffff", tagline: "Affordable smartphones for everyone", slug: "itel" },
-  Sony:     { bg: "#000000", text: "#ffffff", tagline: "Sony — precision engineering", slug: "sony" },
-  Asus:     { bg: "#00539B", text: "#ffffff", tagline: "Asus — search for incredible", slug: "asus" },
-  Google:   { bg: "#4285F4", text: "#ffffff", tagline: "Google — the pure Android experience", slug: "google" },
-  Nothing:  { bg: "#000000", text: "#ffffff", tagline: "Nothing — technology made fun again", slug: "nothing" },
-  ZTE:      { bg: "#000000", text: "#ffffff", tagline: "ZTE — tomorrow never waits", slug: "zte" },
-  "Ai+":    { bg: "#000000", text: "#ffffff", tagline: "Ai+ — intelligence at your fingertips", slug: "aiplus" },
-  Coolpad:  { bg: "#000000", text: "#ffffff", tagline: "Coolpad — smart living for everyone", slug: "coolpad" },
-  Benco:    { bg: "#000000", text: "#ffffff", tagline: "Benco — quality meets value", slug: "benco" },
+  Apple:     { bg: "#000000", text: "#ffffff", tagline: "iPhone, iPad & Mac — the Apple ecosystem", slug: "apple" },
+  Asus:      { bg: "#00539B", text: "#ffffff", tagline: "Asus — search for incredible", slug: "asus" },
+  Dell:      { bg: "#007DB8", text: "#ffffff", tagline: "Dell — the power to do more", slug: "dell" },
+  Google:    { bg: "#4285F4", text: "#ffffff", tagline: "Google — the pure Android experience", slug: "google" },
+  Honor:     { bg: "#000000", text: "#ffffff", tagline: "Honor series — tech for the bold", slug: "honor" },
+  Huawei:    { bg: "#C7000B", text: "#ffffff", tagline: "Premium Kirin-powered devices", slug: "huawei" },
+  Infinix:   { bg: "#000000", text: "#ffffff", tagline: "Bold designs and long battery life", slug: "infinix" },
+  Lenovo:    { bg: "#E2231A", text: "#ffffff", tagline: "Lenovo — smarter technology for all", slug: "lenovo" },
+  Motorola:  { bg: "#000000", text: "#ffffff", tagline: "Moto series — clean Android experience", slug: "motorola" },
+  Nokia:     { bg: "#001135", text: "#ffffff", tagline: "Reliable builds with Android One", slug: "nokia" },
+  Nothing:   { bg: "#000000", text: "#ffffff", tagline: "Nothing — technology made fun again", slug: "nothing" },
+  OnePlus:   { bg: "#F3122E", text: "#ffffff", tagline: "Fast & smooth — Never Settle", slug: "oneplus" },
+  OPPO:      { bg: "#05BA4B", text: "#ffffff", tagline: "Find & Reno series — stylish innovation", slug: "oppo" },
+  Poco:      { bg: "#000000", text: "#FFCD00", tagline: "POCO — flagship killers redefined", slug: "poco" },
+  Realme:    { bg: "#FFCD00", text: "#000000", tagline: "Dare to Leap — performance midrange", slug: "realme" },
+  Samsung:   { bg: "#1428A0", text: "#ffffff", tagline: "Galaxy series — innovation at every tier", slug: "samsung" },
+  Sony:      { bg: "#000000", text: "#ffffff", tagline: "Sony — precision engineering", slug: "sony" },
+  Tecno:     { bg: "#00529B", text: "#ffffff", tagline: "Feature-packed at every budget", slug: "tecno" },
+  Vivo:      { bg: "#415FFF", text: "#ffffff", tagline: "V & Y series — camera-first smartphones", slug: "vivo" },
+  Xiaomi:    { bg: "#FF6700", text: "#ffffff", tagline: "Redmi & POCO — flagship value for all", slug: "xiaomi" },
+  ZTE:       { bg: "#000000", text: "#ffffff", tagline: "ZTE — tomorrow never waits", slug: "zte" },
 };
 
 // ─── Spec extractor ────────────────────────────────────────────────────────────
@@ -87,7 +85,7 @@ function BrandAvatar({ brand, size = 36 }: { brand: string; size?: number }) {
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';
               if (target.parentElement) {
-                target.parentElement.innerHTML = `<span>${brand.slice(0, 1)}</span>`;
+                target.parentElement.textContent = brand.slice(0, 1);
               }
             }}
           />
@@ -320,7 +318,7 @@ export default function MobilePriceBrand() {
 
       <main className="flex-1">
         {/* ── Brand Hero ───────────────────────────────────────────────── */}
-        <div className="relative bg-white dark:bg-slate-950 border-b overflow-hidden">
+        <div className="relative bg-card dark:bg-slate-950 border-b overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_-20%,hsl(var(--primary)/0.08),transparent_50%)] pointer-events-none" />
           <div className="container py-10 md:py-16 relative">
             {/* Breadcrumb */}
@@ -365,7 +363,7 @@ export default function MobilePriceBrand() {
             </div>
 
             {/* Quick Stats Banner */}
-            <div className="mt-10 flex flex-wrap items-center gap-x-12 gap-y-4 py-4 px-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border">
+            <div className="mt-10 flex flex-wrap items-center gap-x-12 gap-y-4 py-4 px-6 bg-muted dark:bg-slate-900/50 rounded-2xl border">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                   <TrendingUp className="h-4 w-4 text-primary" />

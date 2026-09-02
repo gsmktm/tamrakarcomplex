@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { useRepairGuide, RepairTool, RepairPart, RepairStep } from "@/hooks/useRepair";
 import { Badge } from "@/components/ui/badge";
+import { safeExternalUrl } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -43,7 +44,7 @@ export default function GuideDetail() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/50">
+    <div className="min-h-screen flex flex-col bg-background">
       <SEO
         title={`${guide.title} - Step-by-Step DIY Guide`}
         description={guide.summary || `Follow this expert guide to repair your device.`}
@@ -89,7 +90,7 @@ export default function GuideDetail() {
 
       <main className="flex-1 pb-20">
         {/* Guide Header */}
-        <div className="bg-white border-b border-slate-200 py-10">
+        <div className="bg-card border-b border-border py-10">
           <div className="container">
             <div className="space-y-6">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -107,31 +108,31 @@ export default function GuideDetail() {
                   {guide.repair_devices?.name}
                 </Link>
                 <ChevronRight className="h-3 w-3" />
-                <span className="text-slate-900 font-medium">{guide.title}</span>
+                <span className="text-foreground font-medium">{guide.title}</span>
               </div>
 
               <div className="flex flex-col lg:grid lg:grid-cols-12 gap-10 items-start">
                 <div className="lg:col-span-8 space-y-6">
                   <div className="space-y-4">
-                    <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">
+                    <h1 className="text-4xl md:text-5xl font-black tracking-tight text-foreground leading-tight">
                       {guide.title}
                     </h1>
-                    <p className="text-xl text-slate-600 leading-relaxed max-w-3xl">
+                    <p className="text-xl text-muted-foreground leading-relaxed max-w-3xl">
                       {guide.summary}
                     </p>
                   </div>
                   
-                  <div className="flex flex-wrap gap-4 items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <Badge variant="outline" className="px-4 py-1.5 bg-white border-slate-200 capitalize font-bold text-slate-700">
+                  <div className="flex flex-wrap gap-4 items-center p-4 bg-muted rounded-2xl border border-border">
+                    <Badge variant="outline" className="px-4 py-1.5 bg-card border-border capitalize font-bold text-foreground">
                       {guide.difficulty} Difficulty
                     </Badge>
                     <div className="h-4 w-px bg-slate-200 mx-2 hidden sm:block" />
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
                       <Clock className="h-4 w-4 text-primary" />
                       <span>{guide.time_estimate}</span>
                     </div>
                     <div className="h-4 w-px bg-slate-200 mx-2 hidden sm:block" />
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                       <Shield className="h-4 w-4 text-blue-500" />
                       <span>Author: {guide.author}</span>
                     </div>
@@ -147,7 +148,7 @@ export default function GuideDetail() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6 space-y-4">
-                      <p className="text-sm text-slate-600">
+                      <p className="text-sm text-muted-foreground">
                         Get all the tools and parts you need for this repair from our marketplace.
                       </p>
                       <Button className="w-full rounded-xl h-12 text-md font-bold gap-2" asChild>
@@ -156,7 +157,7 @@ export default function GuideDetail() {
                           <ArrowRight className="h-4 w-4" />
                         </Link>
                       </Button>
-                      <Button variant="outline" className="w-full rounded-xl h-12 text-md font-bold gap-2 border-slate-200" asChild>
+                      <Button variant="outline" className="w-full rounded-xl h-12 text-md font-bold gap-2 border-border" asChild>
                         <Link to={`/stores?search=${guide.repair_devices?.name}`}>
                           Find Parts in Stores
                           <ExternalLink className="h-4 w-4" />
@@ -166,10 +167,19 @@ export default function GuideDetail() {
                   </Card>
                   
                   <div className="grid grid-cols-2 gap-3">
-                    <Button variant="ghost" className="rounded-xl gap-2 text-sm h-11 hover:bg-white hover:shadow-sm" onClick={() => window.print()}>
+                    <Button variant="ghost" className="rounded-xl gap-2 text-sm h-11 hover:bg-card hover:shadow-sm" onClick={() => window.print()}>
                       <Printer className="h-4 w-4" /> Print Guide
                     </Button>
-                    <Button variant="ghost" className="rounded-xl gap-2 text-sm h-11 hover:bg-white hover:shadow-sm">
+                    <Button variant="ghost" className="rounded-xl gap-2 text-sm h-11 hover:bg-card hover:shadow-sm" onClick={async () => {
+                      const url = window.location.href;
+                      if (navigator.share) {
+                        try { await navigator.share({ title: guide.title, url }); } catch { /* dismissed */ }
+                      } else {
+                        await navigator.clipboard.writeText(url);
+                        // lightweight feedback via native alert fallback is handled by sonner in parent? keep simple
+                        alert("Link copied to clipboard");
+                      }
+                    }}>
                       <Share2 className="h-4 w-4" /> Share
                     </Button>
                   </div>
@@ -189,26 +199,26 @@ export default function GuideDetail() {
                     <Wrench className="h-6 w-6 text-primary" />
                     Tools
                   </h3>
-                  <Badge className="bg-slate-100 text-slate-600 border-none">{guide.tools?.length || 0}</Badge>
+                  <Badge className="bg-muted text-muted-foreground border-none">{guide.tools?.length || 0}</Badge>
                 </div>
                 <div className="grid gap-3">
                   {guide.tools && guide.tools.length > 0 ? (
                     guide.tools.map((tool: RepairTool) => (
-                      <div key={tool.id} className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="h-14 w-14 bg-slate-50 rounded-xl p-2 flex-shrink-0">
+                      <div key={tool.id} className="flex items-center gap-4 p-4 bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow">
+                        <div className="h-14 w-14 bg-muted rounded-xl p-2 flex-shrink-0">
                           <img src={tool.image || "/placeholder.svg"} alt={tool.name} className="w-full h-full object-contain" />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-bold text-slate-900">{tool.name}</p>
-                          {tool.url && (
-                            <a href={tool.url} target="_blank" className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider">Buy Tool</a>
+                          <p className="text-sm font-bold text-foreground">{tool.name}</p>
+                          {safeExternalUrl(tool.url) && (
+                            <a href={safeExternalUrl(tool.url)!} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider">Buy Tool</a>
                           )}
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="p-6 text-center bg-white rounded-2xl border border-dashed">
-                      <Info className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                    <div className="p-6 text-center bg-card rounded-2xl border border-dashed">
+                      <Info className="h-8 w-8 text-muted mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground italic">Standard toolkit required.</p>
                     </div>
                   )}
@@ -221,31 +231,31 @@ export default function GuideDetail() {
                     <Package className="h-6 w-6 text-primary" />
                     Parts
                   </h3>
-                  <Badge className="bg-slate-100 text-slate-600 border-none">{guide.parts?.length || 0}</Badge>
+                  <Badge className="bg-slate-100 text-muted-foreground border-none">{guide.parts?.length || 0}</Badge>
                 </div>
                 <div className="grid gap-3">
                   {guide.parts && guide.parts.length > 0 ? (
                     guide.parts.map((part: RepairPart) => (
-                      <div key={part.id} className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="h-14 w-14 bg-slate-50 rounded-xl p-2 flex-shrink-0">
+                      <div key={part.id} className="flex items-center gap-4 p-4 bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-shadow">
+                        <div className="h-14 w-14 bg-muted rounded-xl p-2 flex-shrink-0">
                           <img src={part.image || "/placeholder.svg"} alt={part.name} className="w-full h-full object-contain" />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-bold text-slate-900">{part.name}</p>
+                          <p className="text-sm font-bold text-foreground">{part.name}</p>
                           <div className="flex items-center justify-between mt-1">
                             {part.estimated_price && (
                               <span className="text-xs text-primary font-black">Rs. {part.estimated_price}</span>
                             )}
-                            {part.url && (
-                              <a href={part.url} target="_blank" className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider">View Part</a>
+                            {safeExternalUrl(part.url) && (
+                              <a href={safeExternalUrl(part.url)!} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider">View Part</a>
                             )}
                           </div>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="p-6 text-center bg-white rounded-2xl border border-dashed">
-                      <Info className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+                    <div className="p-6 text-center bg-card rounded-2xl border border-dashed">
+                      <Info className="h-8 w-8 text-muted mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground italic">No specific parts listed.</p>
                     </div>
                   )}
@@ -266,7 +276,7 @@ export default function GuideDetail() {
 
             {/* Main Content - Steps */}
             <div className="lg:col-span-8 space-y-12">
-              <h2 className="text-4xl font-black text-slate-900">Instructions</h2>
+              <h2 className="text-4xl font-black text-foreground">Instructions</h2>
               
               <div className="space-y-20">
                 {guide.steps && guide.steps.length > 0 ? (
@@ -276,19 +286,19 @@ export default function GuideDetail() {
                         <div className="flex items-center justify-center w-14 h-14 bg-primary text-white font-black rounded-2xl text-2xl shadow-xl shadow-primary/20 rotate-3 group-hover:rotate-0 transition-transform">
                           {index + 1}
                         </div>
-                        <h3 className="text-3xl font-black text-slate-900">{step.title || `Step ${index + 1}`}</h3>
+                        <h3 className="text-3xl font-black text-foreground">{step.title || `Step ${index + 1}`}</h3>
                       </div>
                       
                       <div className="grid md:grid-cols-2 gap-10 items-start">
                         <div className="space-y-6">
-                          <div className="text-lg text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
+                          <div className="text-lg text-muted-foreground leading-relaxed whitespace-pre-wrap font-medium">
                             {step.content}
                           </div>
                         </div>
                         <div className="space-y-4">
                           {step.images && step.images.length > 0 ? (
                             step.images.map((img: string, i: number) => (
-                              <div key={i} className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white group">
+                              <div key={i} className="rounded-3xl overflow-hidden shadow-2xl border-4 border-border group">
                                 <img 
                                   src={img} 
                                   alt={`Step ${index + 1} image ${i + 1}`} 
@@ -297,8 +307,8 @@ export default function GuideDetail() {
                               </div>
                             ))
                           ) : (
-                            <div className="aspect-video bg-slate-100 rounded-3xl flex items-center justify-center border-4 border-dashed border-slate-200">
-                              <Box className="h-12 w-12 text-slate-200" />
+                            <div className="aspect-video bg-muted rounded-3xl flex items-center justify-center border-4 border-dashed border-border">
+                              <Box className="h-12 w-12 text-muted-foreground/30" />
                             </div>
                           )}
                         </div>
@@ -306,8 +316,8 @@ export default function GuideDetail() {
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-20 bg-white rounded-3xl border-4 border-dashed">
-                    <PenTool className="h-16 w-16 text-slate-100 mx-auto mb-4" />
+                  <div className="text-center py-20 bg-card rounded-3xl border-4 border-dashed">
+                    <PenTool className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
                     <p className="text-xl text-muted-foreground font-bold">No steps recorded for this guide yet.</p>
                   </div>
                 )}
@@ -322,7 +332,7 @@ export default function GuideDetail() {
                   <CheckCircle2 className="h-10 w-10 text-primary" />
                 </div>
                 <h2 className="text-5xl font-black text-white">Repair Success?</h2>
-                <p className="text-slate-400 text-xl max-w-2xl mx-auto leading-relaxed">
+                <p className="text-muted-foreground text-xl max-w-2xl mx-auto leading-relaxed">
                   Congratulations on fixing your device! If you found this guide helpful, consider sharing it with others. 
                   Still having trouble? Visit us at Tamrakar Complex for expert assistance.
                 </p>

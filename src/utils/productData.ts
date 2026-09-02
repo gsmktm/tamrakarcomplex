@@ -1,3 +1,5 @@
+import { LATEST_MOBILE_BUYING_PRICES } from "@/data/latestMobileBuyingPrices";
+
 export interface ProductData {
   id: number;
   brand: string;
@@ -8,7 +10,7 @@ export interface ProductData {
 
 // Nepal market devices 2025-2026 — used as fallback when catalog_products DB is empty
 // Updated with comprehensive pricing from Nepal market
-export const PRODUCTS: ProductData[] = [
+const BASE_PRODUCTS: ProductData[] = [
   // ── APPLE ──
   { id: 300001, brand: "Apple", model: "iPhone 13 (128GB)",          retail_npr: 80399,  image: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" },
   { id: 300002, brand: "Apple", model: "iPhone 14 (128GB)",          retail_npr: 93499,  image: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg" },
@@ -100,66 +102,44 @@ export const PRODUCTS: ProductData[] = [
   { id: 300406, brand: "Honor", model: "Honor X6c (6+256GB)",         retail_npr: 21999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
   { id: 300407, brand: "Honor", model: "Honor X7d (8+256GB)",         retail_npr: 30999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
   { id: 300408, brand: "Honor", model: "Honor X7d (8+512GB)",         retail_npr: 32999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 300409, brand: "Honor", model: "Honor X8c (8+512GB)",         retail_npr: 34499,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
   { id: 300410, brand: "Honor", model: "Honor X8d (8+128GB)",         retail_npr: 39999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
   { id: 300411, brand: "Honor", model: "Honor X8d (8+256GB)",         retail_npr: 43999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
   { id: 300412, brand: "Honor", model: "Honor X9d (8+256GB)",         retail_npr: 54999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
   { id: 300413, brand: "Honor", model: "Honor X9d (12+256GB)",        retail_npr: 59999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
   { id: 300414, brand: "Honor", model: "Honor 600 Lite (8+256GB)",    retail_npr: 59999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 300415, brand: "Honor", model: "Honor 400 (12+512GB)",        retail_npr: 67999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 300416, brand: "Honor", model: "Honor 400 Pro (12+512GB)",    retail_npr: 88480,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
+  { id: 300415, brand: "Honor", model: "Honor 600 (12+256GB)",        retail_npr: 67999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
+  { id: 300416, brand: "Honor", model: "Honor 600 Pro (12+512GB)",    retail_npr: 88480,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
   { id: 300417, brand: "Honor", model: "Honor Magic 8 Pro (12+512GB)",retail_npr: 199999, image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
   { id: 300418, brand: "Honor", model: "Honor Magic V5 (16+512GB)",   retail_npr: 266999, image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
 
   // ── VIVO ──
-  { id: 300501, brand: "Vivo", model: "Vivo Y04 (4+64GB)",            retail_npr: 13999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300502, brand: "Vivo", model: "Vivo Y04 (4+128GB)",           retail_npr: 14999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300503, brand: "Vivo", model: "Vivo Y05 (4+64GB)",            retail_npr: 16999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300504, brand: "Vivo", model: "Vivo Y05 (4+128GB)",           retail_npr: 19499,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300505, brand: "Vivo", model: "Vivo Y19s (4+128GB)",          retail_npr: 16499,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300506, brand: "Vivo", model: "Vivo Y19s (6+128GB)",          retail_npr: 17499,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300507, brand: "Vivo", model: "Vivo Y19s Pro (8+128GB)",      retail_npr: 20999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300508, brand: "Vivo", model: "Vivo Y11d (4+128GB)",          retail_npr: 21499,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300509, brand: "Vivo", model: "Vivo Y11d (6+128GB)",          retail_npr: 26999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300510, brand: "Vivo", model: "Vivo Y21d (6+128GB)",          retail_npr: 21499,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300511, brand: "Vivo", model: "Vivo Y21d (8+128GB)",          retail_npr: 23499,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300512, brand: "Vivo", model: "Vivo Y29 (8+128GB)",           retail_npr: 24999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300513, brand: "Vivo", model: "Vivo Y29 (8+256GB)",           retail_npr: 26999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300514, brand: "Vivo", model: "Vivo Y31d (6+128GB)",          retail_npr: 29499,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300515, brand: "Vivo", model: "Vivo Y31d (8+128GB)",          retail_npr: 33999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300516, brand: "Vivo", model: "Vivo Y31d (8+256GB)",          retail_npr: 38999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300517, brand: "Vivo", model: "Vivo Y400 (8+256GB)",          retail_npr: 39999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300518, brand: "Vivo", model: "Vivo V50 Lite 4G (8+256GB)",   retail_npr: 37999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
+  { id: 300529, brand: "Vivo", model: "Vivo Y21 5G (6+128GB)",        retail_npr: 24999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300519, brand: "Vivo", model: "Vivo V60 Lite 4G (8+256GB)",   retail_npr: 43499,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300520, brand: "Vivo", model: "Vivo V50 Lite 5G (12+256GB)",  retail_npr: 45999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300521, brand: "Vivo", model: "Vivo V60 Lite 5G (12+256GB)",  retail_npr: 51999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300522, brand: "Vivo", model: "Vivo V50 5G (12+256GB)",       retail_npr: 67999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
+  { id: 300530, brand: "Vivo", model: "Vivo V70 FE (8+256GB)",        retail_npr: 59999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300523, brand: "Vivo", model: "Vivo V60 5G (12+256GB)",       retail_npr: 74999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300524, brand: "Vivo", model: "Vivo V60 5G (12+512GB)",       retail_npr: 79999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300525, brand: "Vivo", model: "Vivo V70 5G (12+256GB)",       retail_npr: 83999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300526, brand: "Vivo", model: "Vivo V70 5G (12+512GB)",       retail_npr: 94999,  image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
-  { id: 300527, brand: "Vivo", model: "Vivo X200 Pro (16+512GB)",     retail_npr: 184999, image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
   { id: 300528, brand: "Vivo", model: "Vivo X300 Pro (16+512GB)",     retail_npr: 179999, image: "https://upload.wikimedia.org/wikipedia/commons/e/e5/Vivo_mobile_logo.png" },
 
   // ── NOTHING ──
-  { id: 300601, brand: "Nothing", model: "CMF Phone 1 (8+128GB)",     retail_npr: 31699,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
-  { id: 300602, brand: "Nothing", model: "CMF Phone 1 (8+256GB)",     retail_npr: 36299,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300603, brand: "Nothing", model: "CMF Phone 2 Pro (8+128GB)", retail_npr: 38999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300604, brand: "Nothing", model: "CMF Phone 2 Pro (8+256GB)", retail_npr: 44999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300605, brand: "Nothing", model: "Nothing Phone (3a) Lite (8+128GB)", retail_npr: 38999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300606, brand: "Nothing", model: "Nothing Phone (3a) Lite (8+256GB)", retail_npr: 44499, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
-  { id: 300607, brand: "Nothing", model: "Nothing Phone (2a) (8+128GB)", retail_npr: 46999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
-  { id: 300608, brand: "Nothing", model: "Nothing Phone (2a) (8+256GB)", retail_npr: 48999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300609, brand: "Nothing", model: "Nothing Phone (2a) Plus (8+256GB)", retail_npr: 49999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300610, brand: "Nothing", model: "Nothing Phone (2a) Plus (12+256GB)", retail_npr: 53999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
-  { id: 300611, brand: "Nothing", model: "Nothing Phone (3a) (8+128GB)", retail_npr: 53999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
-  { id: 300612, brand: "Nothing", model: "Nothing Phone (3a) (8+256GB)", retail_npr: 54499, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
-  { id: 300613, brand: "Nothing", model: "Nothing Phone (3a) (12+256GB)", retail_npr: 61999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300614, brand: "Nothing", model: "Nothing Phone (4a) (8+128GB)", retail_npr: 58499, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300615, brand: "Nothing", model: "Nothing Phone (4a) (8+256GB)", retail_npr: 63999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300616, brand: "Nothing", model: "Nothing Phone (4a) (12+256GB)", retail_npr: 69999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
-  { id: 300617, brand: "Nothing", model: "Nothing Phone (3a) Pro (8+256GB)", retail_npr: 61999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
-  { id: 300618, brand: "Nothing", model: "Nothing Phone (3a) Pro (12+256GB)", retail_npr: 69999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300619, brand: "Nothing", model: "Nothing Phone (4a) Pro (12+256GB)", retail_npr: 86999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300620, brand: "Nothing", model: "Nothing Phone (3) (12+256GB)",    retail_npr: 99999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
   { id: 300621, brand: "Nothing", model: "Nothing Phone (3) (16+512GB)",    retail_npr: 114999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Nothing_Logo.svg/1200px-Nothing_Logo.svg.png" },
@@ -171,8 +151,6 @@ export const PRODUCTS: ProductData[] = [
   { id: 300704, brand: "OnePlus", model: "OnePlus 13R (12+256GB)",       retail_npr: 83999,  image: "https://upload.wikimedia.org/wikipedia/commons/c/c9/OnePlus_Logo.svg" },
   { id: 300705, brand: "OnePlus", model: "OnePlus 15R (12+256GB)",       retail_npr: 98499,  image: "https://upload.wikimedia.org/wikipedia/commons/c/c9/OnePlus_Logo.svg" },
   { id: 300706, brand: "OnePlus", model: "OnePlus 15R (12+512GB)",       retail_npr: 106999, image: "https://upload.wikimedia.org/wikipedia/commons/c/c9/OnePlus_Logo.svg" },
-  { id: 300707, brand: "OnePlus", model: "OnePlus 12 (16+512GB)",        retail_npr: 139999, image: "https://upload.wikimedia.org/wikipedia/commons/c/c9/OnePlus_Logo.svg" },
-  { id: 300708, brand: "OnePlus", model: "OnePlus 13 (16+512GB)",        retail_npr: 141999, image: "https://upload.wikimedia.org/wikipedia/commons/c/c9/OnePlus_Logo.svg" },
   { id: 300709, brand: "OnePlus", model: "OnePlus 15 (16+512GB)",        retail_npr: 169999, image: "https://upload.wikimedia.org/wikipedia/commons/c/c9/OnePlus_Logo.svg" },
 
   // ── REALME ──
@@ -183,6 +161,9 @@ export const PRODUCTS: ProductData[] = [
   { id: 300805, brand: "Realme", model: "Realme C71 (6/128GB)",          retail_npr: 25999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
   { id: 300806, brand: "Realme", model: "Realme C75 (8/128GB)",          retail_npr: 24999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
   { id: 300807, brand: "Realme", model: "Realme C75 (8/256GB)",          retail_npr: 26999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
+  { id: 300816, brand: "Realme", model: "Realme C85 (6/128GB)",           retail_npr: 22999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
+  { id: 300817, brand: "Realme", model: "Realme C85 (8/256GB)",           retail_npr: 27999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
+  { id: 300818, brand: "Realme", model: "Realme C85 Pro (8/256GB)",       retail_npr: 32999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
   { id: 300808, brand: "Realme", model: "Realme 14T (8/256GB)",          retail_npr: 36999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
   { id: 300809, brand: "Realme", model: "Realme 15T (8/256GB)",          retail_npr: 39999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
   { id: 300810, brand: "Realme", model: "Realme 15T (12/512GB)",         retail_npr: 49999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
@@ -190,12 +171,14 @@ export const PRODUCTS: ProductData[] = [
   { id: 300812, brand: "Realme", model: "Realme 15 Pro (12/256GB)",      retail_npr: 66999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
   { id: 300813, brand: "Realme", model: "Realme 15 Pro (12/512GB)",      retail_npr: 71999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
   { id: 300814, brand: "Realme", model: "Realme GT8 Pro (16/512GB)",     retail_npr: 149999, image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
-  { id: 300815, brand: "Realme", model: "Realme GT8 Pro Aston Martin Edition (16/512GB)", retail_npr: 159999, image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
+  { id: 300815, brand: "Realme", model: "Realme GT8 Pro Aston Martin (16/512GB)", retail_npr: 159999, image: "https://upload.wikimedia.org/wikipedia/commons/1/13/Realme_logo.svg" },
 
   // ── OPPO ──
   { id: 300901, brand: "OPPO", model: "OPPO A5x 4G (4/64GB)",            retail_npr: 16999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
   { id: 300902, brand: "OPPO", model: "OPPO A5x 4G (4/128GB)",           retail_npr: 19499,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
   { id: 300903, brand: "OPPO", model: "OPPO A5x 4G (6/128GB)",           retail_npr: 21999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
+  { id: 300914, brand: "OPPO", model: "OPPO A6c (4/64GB)",              retail_npr: 18999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
+  { id: 300915, brand: "OPPO", model: "OPPO A6c (4/128GB)",             retail_npr: 20999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
   { id: 300904, brand: "OPPO", model: "OPPO A5 4G (6/128GB)",            retail_npr: 22999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
   { id: 300905, brand: "OPPO", model: "OPPO A5 4G (8/128GB)",            retail_npr: 24999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
   { id: 300906, brand: "OPPO", model: "OPPO A5 Pro 4G (8/256GB)",        retail_npr: 32999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
@@ -207,37 +190,16 @@ export const PRODUCTS: ProductData[] = [
   { id: 300912, brand: "OPPO", model: "OPPO Reno 15 (12/512GB)",         retail_npr: 89999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
   { id: 300913, brand: "OPPO", model: "OPPO Find N5 (16/512GB)",         retail_npr: 249999, image: "https://upload.wikimedia.org/wikipedia/commons/a/ad/Oppo_logo_2019.svg" },
 
-  // ── HONOR (CONTINUED) ──
-  { id: 301001, brand: "Honor", model: "Honor Play10 (3+64GB)",       retail_npr: 12499,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301002, brand: "Honor", model: "Honor Play10 (4+128GB)",      retail_npr: 14999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301003, brand: "Honor", model: "Honor X5c (4+64GB)",           retail_npr: 15999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301004, brand: "Honor", model: "Honor X5c Plus (4+128GB)",    retail_npr: 17999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301005, brand: "Honor", model: "Honor X6c (6+128GB)",         retail_npr: 19999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301006, brand: "Honor", model: "Honor X6c (6+256GB)",         retail_npr: 21999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301007, brand: "Honor", model: "Honor X7d (8+256GB)",         retail_npr: 30999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301008, brand: "Honor", model: "Honor X7d (8+512GB)",         retail_npr: 32999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301009, brand: "Honor", model: "Honor X8c (8+512GB)",         retail_npr: 34999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301010, brand: "Honor", model: "Honor X8d (8+128GB)",         retail_npr: 39999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301011, brand: "Honor", model: "Honor X8d (8+256GB)",         retail_npr: 43999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301012, brand: "Honor", model: "Honor X9d (8+256GB)",         retail_npr: 54999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301013, brand: "Honor", model: "Honor X9d (12+256GB)",        retail_npr: 59999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301014, brand: "Honor", model: "Honor 600 Lite (8+256GB)",    retail_npr: 59999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301015, brand: "Honor", model: "Honor 400 (12+512GB)",        retail_npr: 67999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301016, brand: "Honor", model: "Honor 400 Pro (12+512GB)",    retail_npr: 88480,  image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301017, brand: "Honor", model: "Honor Magic 8 Pro (12+512GB)",retail_npr: 199999, image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-  { id: 301018, brand: "Honor", model: "Honor Magic V5 (16+512GB)",   retail_npr: 266999, image: "https://upload.wikimedia.org/wikipedia/commons/8/80/Honor_Logo.svg" },
-
   // ── INFINIX ──
   { id: 301101, brand: "Infinix", model: "Infinix Smart 10 (4+64GB)",      retail_npr: 14999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
   { id: 301102, brand: "Infinix", model: "Infinix Smart 10 Plus (4+128GB)", retail_npr: 15999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
   { id: 301103, brand: "Infinix", model: "Infinix Hot 60i (4+128GB)",      retail_npr: 16999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
   { id: 301104, brand: "Infinix", model: "Infinix Hot 60i (6+128GB)",      retail_npr: 18999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
-  { id: 301105, brand: "Infinix", model: "Infinix Hot 60 Pro (8+128GB)",   retail_npr: 24999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
-  { id: 301106, brand: "Infinix", model: "Infinix Hot 60 Pro+ (8+128GB)",  retail_npr: 29999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
-  { id: 301107, brand: "Infinix", model: "Infinix Note 50s (8+256GB)",     retail_npr: 35999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
-  { id: 301108, brand: "Infinix", model: "Infinix GT 30 (8+256GB)",        retail_npr: 36999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
+  { id: 301117, brand: "Infinix", model: "Infinix Smart 20 (4+64GB)",      retail_npr: 17999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
+  { id: 301118, brand: "Infinix", model: "Infinix Smart 20 (4+128GB)",     retail_npr: 19999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
+  { id: 301119, brand: "Infinix", model: "Infinix Hot 70 (6+128GB)",       retail_npr: 24999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
+  { id: 301120, brand: "Infinix", model: "Infinix Hot 70 (8+256GB)",       retail_npr: 29999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
   { id: 301109, brand: "Infinix", model: "Infinix GT 30 Pro (8+256GB)",    retail_npr: 47999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
-  { id: 301110, brand: "Infinix", model: "Infinix GT 30 Pro (12+256GB) + Gaming Kits", retail_npr: 55999, image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
   { id: 301111, brand: "Infinix", model: "Infinix Note Edge (8+128GB)",    retail_npr: 41999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
   { id: 301112, brand: "Infinix", model: "Infinix Note Edge (8+256GB)",    retail_npr: 47999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
   { id: 301113, brand: "Infinix", model: "Infinix Note 60 (8+128GB)",      retail_npr: 45999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Infinix_logo.svg/1200px-Infinix_logo.svg.png" },
@@ -247,11 +209,13 @@ export const PRODUCTS: ProductData[] = [
 
   // ── MOTOROLA ──
   { id: 301201, brand: "Motorola", model: "Moto G04s (4/64GB)",           retail_npr: 12599,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
-  { id: 301202, brand: "Motorola", model: "Moto G05 (4/64GB)",            retail_npr: 12499,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
+  { id: 301202, brand: "Motorola", model: "Moto G05 (4/64GB)",            retail_npr: 13499,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
+  { id: 301211, brand: "Motorola", model: "Moto G06 Power (4/128GB)",     retail_npr: 14999,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
   { id: 301203, brand: "Motorola", model: "Moto G35 (4/128GB)",           retail_npr: 19999,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
   { id: 301204, brand: "Motorola", model: "Moto G45 (8/128GB)",           retail_npr: 24999,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
   { id: 301205, brand: "Motorola", model: "Moto G64 (8/128GB)",           retail_npr: 27499,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
   { id: 301206, brand: "Motorola", model: "Moto G64 (12/256GB)",          retail_npr: 30999,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
+  { id: 301212, brand: "Motorola", model: "Moto G57 Power (8/128GB)",     retail_npr: 32999,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
   { id: 301207, brand: "Motorola", model: "Moto G85 (8/128GB)",           retail_npr: 34499,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
   { id: 301208, brand: "Motorola", model: "Moto G85 (12/256GB)",          retail_npr: 37499,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
   { id: 301209, brand: "Motorola", model: "Moto G96 (8/256GB)",           retail_npr: 44999,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Motorola_new_logo.svg" },
@@ -275,12 +239,6 @@ export const PRODUCTS: ProductData[] = [
   { id: 301315, brand: "ZTE", model: "Nubia Neo 3 GT (12/256GB)",         retail_npr: 36999,  image: "https://upload.wikimedia.org/wikipedia/commons/8/86/ZTE_logo_2015.svg" },
   { id: 301316, brand: "ZTE", model: "RedMagic 11 Pro (16/512GB)",       retail_npr: 164999, image: "https://upload.wikimedia.org/wikipedia/commons/8/86/ZTE_logo_2015.svg" },
 
-  // ── AI+ ──
-  { id: 301401, brand: "Ai+", model: "Ai+ Pulse (4+64GB)",                retail_npr: 14999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/A_logo.svg/1200px-A_logo.svg.png" },
-  { id: 301402, brand: "Ai+", model: "Ai+ Pulse (6+128GB)",               retail_npr: 16499,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/A_logo.svg/1200px-A_logo.svg.png" },
-  { id: 301403, brand: "Ai+", model: "Ai+ Nova 5G (6+128GB)",             retail_npr: 18499,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/A_logo.svg/1200px-A_logo.svg.png" },
-  { id: 301404, brand: "Ai+", model: "Ai+ Nova 5G (8+128GB)",             retail_npr: 21999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/A_logo.svg/1200px-A_logo.svg.png" },
-
   // ── TECNO ──
   { id: 301501, brand: "Tecno", model: "Spark Go 2 (3+64GB)",             retail_npr: 11499,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
   { id: 301502, brand: "Tecno", model: "Spark Go 2 (4+64GB)",             retail_npr: 13499,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
@@ -292,44 +250,103 @@ export const PRODUCTS: ProductData[] = [
   { id: 301508, brand: "Tecno", model: "Spark 30 (8+256GB)",              retail_npr: 22490,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
   { id: 301509, brand: "Tecno", model: "Spark 40 (6+128GB)",              retail_npr: 18999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
   { id: 301510, brand: "Tecno", model: "Spark 40 (8+256GB)",              retail_npr: 24999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
+  { id: 301514, brand: "Tecno", model: "Spark 50 (8+256GB)",              retail_npr: 28999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
+  { id: 301515, brand: "Tecno", model: "Spark 50 (12+256GB)",             retail_npr: 33999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
   { id: 301511, brand: "Tecno", model: "Spark 40 Pro (8+256GB)",          retail_npr: 31799,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
   { id: 301512, brand: "Tecno", model: "Pova 6 (12+256GB)",               retail_npr: 34990,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
   { id: 301513, brand: "Tecno", model: "Pova Curve 2 5G (8+256GB)",       retail_npr: 47999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Tecno_Mobile_logo.svg/1200px-Tecno_Mobile_logo.svg.png" },
 
-  // ── ITEL ──
-  { id: 301601, brand: "Itel", model: "Itel A05s (2+32GB)",               retail_npr: 9790,   image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Itel_logo.svg/1200px-Itel_logo.svg.png" },
-  { id: 301602, brand: "Itel", model: "Itel A50C (2+32GB)",               retail_npr: 9890,   image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Itel_logo.svg/1200px-Itel_logo.svg.png" },
-  { id: 301603, brand: "Itel", model: "Itel A50 (3+64GB)",                retail_npr: 10990,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Itel_logo.svg/1200px-Itel_logo.svg.png" },
-  { id: 301604, brand: "Itel", model: "Itel A50 (4+64GB)",                retail_npr: 11790,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Itel_logo.svg/1200px-Itel_logo.svg.png" },
-  { id: 301605, brand: "Itel", model: "Itel A70 (4+64GB)",                retail_npr: 11810,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Itel_logo.svg/1200px-Itel_logo.svg.png" },
-  { id: 301606, brand: "Itel", model: "Itel A80 (4+128GB)",               retail_npr: 12990,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Itel_logo.svg/1200px-Itel_logo.svg.png" },
-  { id: 301607, brand: "Itel", model: "Itel P55 (4+128GB)",               retail_npr: 12490,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Itel_logo.svg/1200px-Itel_logo.svg.png" },
-  { id: 301608, brand: "Itel", model: "Itel P55 (8+128GB)",               retail_npr: 14490,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Itel_logo.svg/1200px-Itel_logo.svg.png" },
+  // ── GOOGLE PIXEL ──
+  { id: 301901, brand: "Google", model: "Pixel 8a (8+128GB)",            retail_npr: 82999,  image: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
+  { id: 301902, brand: "Google", model: "Pixel 8a (8+256GB)",            retail_npr: 92999,  image: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
+  { id: 301903, brand: "Google", model: "Pixel 9 (12+128GB)",            retail_npr: 139999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
+  { id: 301904, brand: "Google", model: "Pixel 9 (12+256GB)",            retail_npr: 154999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
+  { id: 301905, brand: "Google", model: "Pixel 9 Pro (16+256GB)",        retail_npr: 209999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
+  { id: 301906, brand: "Google", model: "Pixel 9 Pro (16+512GB)",        retail_npr: 229999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
+  { id: 301907, brand: "Google", model: "Pixel 9 Pro XL (16+256GB)",     retail_npr: 239999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
+  { id: 301908, brand: "Google", model: "Pixel 9 Pro XL (16+512GB)",     retail_npr: 259999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
+  { id: 301909, brand: "Google", model: "Pixel 9 Pro Fold (16+512GB)",   retail_npr: 299999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" },
 
-  // ── COOLPAD ──
-  { id: 301701, brand: "Coolpad", model: "Coolpad 12 NEO Plus (3+64GB)",  retail_npr: 11199,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Coolpad_Logo.svg/1200px-Coolpad_Logo.svg.png" },
-  { id: 301702, brand: "Coolpad", model: "Coolpad 12 NEO Plus (3+128GB)", retail_npr: 11999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Coolpad_Logo.svg/1200px-Coolpad_Logo.svg.png" },
-  { id: 301703, brand: "Coolpad", model: "Coolpad 12 NEO (4+64GB)",       retail_npr: 10999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Coolpad_Logo.svg/1200px-Coolpad_Logo.svg.png" },
-  { id: 301704, brand: "Coolpad", model: "Coolpad 12 NEO (4+128GB)",      retail_npr: 11999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Coolpad_Logo.svg/1200px-Coolpad_Logo.svg.png" },
-  { id: 301705, brand: "Coolpad", model: "Coolpad C16 (4+128GB)",         retail_npr: 12999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Coolpad_Logo.svg/1200px-Coolpad_Logo.svg.png" },
-  { id: 301706, brand: "Coolpad", model: "Coolpad C15 (6+256GB)",         retail_npr: 15999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Coolpad_Logo.svg/1200px-Coolpad_Logo.svg.png" },
-  { id: 301707, brand: "Coolpad", model: "Coolpad X100 (8+256GB)",        retail_npr: 23999,  image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Coolpad_Logo.svg/1200px-Coolpad_Logo.svg.png" },
+  // ── NOKIA ──
+  { id: 302001, brand: "Nokia", model: "Nokia C12 (2+64GB)",             retail_npr: 11499,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
+  { id: 302002, brand: "Nokia", model: "Nokia C32 (4+64GB)",             retail_npr: 15499,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
+  { id: 302003, brand: "Nokia", model: "Nokia C32 (4+128GB)",            retail_npr: 17499,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
+  { id: 302004, brand: "Nokia", model: "Nokia G22 (4+64GB)",             retail_npr: 18999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
+  { id: 302005, brand: "Nokia", model: "Nokia G22 (4+128GB)",            retail_npr: 21499,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
+  { id: 302006, brand: "Nokia", model: "Nokia G42 5G (6+128GB)",         retail_npr: 29999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
+  { id: 302007, brand: "Nokia", model: "Nokia X30 5G (8+128GB)",         retail_npr: 49999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
+  { id: 302008, brand: "Nokia", model: "Nokia XR21 (6+128GB)",           retail_npr: 54999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
+  { id: 302009, brand: "Nokia", model: "Nokia G400 5G (4+64GB)",         retail_npr: 27999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
 
-  // ── BENCO ──
-  { id: 301801, brand: "Benco", model: "V90i SE (3/64GB)",                retail_npr: 10499,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301802, brand: "Benco", model: "V90 Plus (4/64GB)",               retail_npr: 11299,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301803, brand: "Benco", model: "V90 Plus (4/128GB)",              retail_npr: 11599,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301804, brand: "Benco", model: "V91c (4/128GB)",                  retail_npr: 12999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301805, brand: "Benco", model: "V91 (4/128GB)",                   retail_npr: 13599,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301806, brand: "Benco", model: "V91 (8/128GB)",                   retail_npr: 14399,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301807, brand: "Benco", model: "V91 Plus (6/128GB)",              retail_npr: 14999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301808, brand: "Benco", model: "V91 Plus (8/256GB)",              retail_npr: 17999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301809, brand: "Benco", model: "V92 (6/256GB)",                   retail_npr: 16999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301810, brand: "Benco", model: "S1 (6/128GB)",                    retail_npr: 13999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301811, brand: "Benco", model: "S1 (8/128GB)",                    retail_npr: 14999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301812, brand: "Benco", model: "S1 Pro (8/128GB)",                retail_npr: 18999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301813, brand: "Benco", model: "S1 Pro (8/256GB)",                retail_npr: 19999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
-  { id: 301814, brand: "Benco", model: "S1 Plus (8/256GB)",               retail_npr: 19999,  image: "https://upload.wikimedia.org/wikipedia/commons/0/02/Nokia_wordmark.svg" },
+  // ── HUAWEI ──
+  { id: 302101, brand: "Huawei", model: "Huawei Nova 12 (8+256GB)",      retail_npr: 74999,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4a/Huawei_logo_2018.svg" },
+  { id: 302102, brand: "Huawei", model: "Huawei Nova 12 Pro (12+512GB)",  retail_npr: 99999,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4a/Huawei_logo_2018.svg" },
+  { id: 302103, brand: "Huawei", model: "Huawei P60 Pro (12+512GB)",      retail_npr: 189999, image: "https://upload.wikimedia.org/wikipedia/commons/4/4a/Huawei_logo_2018.svg" },
+  { id: 302104, brand: "Huawei", model: "Huawei Pura 70 Ultra (16+512GB)", retail_npr: 249999, image: "https://upload.wikimedia.org/wikipedia/commons/4/4a/Huawei_logo_2018.svg" },
+  { id: 302105, brand: "Huawei", model: "Huawei Mate 60 Pro (12+512GB)",   retail_npr: 229999, image: "https://upload.wikimedia.org/wikipedia/commons/4/4a/Huawei_logo_2018.svg" },
+  { id: 302106, brand: "Huawei", model: "Huawei Mate X5 (16+512GB)",       retail_npr: 289999, image: "https://upload.wikimedia.org/wikipedia/commons/4/4a/Huawei_logo_2018.svg" },
+  { id: 302107, brand: "Huawei", model: "Huawei Pocket 2 (12+512GB)",      retail_npr: 179999, image: "https://upload.wikimedia.org/wikipedia/commons/4/4a/Huawei_logo_2018.svg" },
+
+  // ── SONY XPERIA ──
+  { id: 302201, brand: "Sony", model: "Xperia 10 VI (8+128GB)",           retail_npr: 52999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/1d/Sony_Logo_2022.svg" },
+  { id: 302202, brand: "Sony", model: "Xperia 10 VI (8+256GB)",           retail_npr: 62999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/1d/Sony_Logo_2022.svg" },
+  { id: 302203, brand: "Sony", model: "Xperia 5 V (8+256GB)",             retail_npr: 89999,  image: "https://upload.wikimedia.org/wikipedia/commons/1/1d/Sony_Logo_2022.svg" },
+  { id: 302204, brand: "Sony", model: "Xperia 1 VI (12+256GB)",           retail_npr: 179999, image: "https://upload.wikimedia.org/wikipedia/commons/1/1d/Sony_Logo_2022.svg" },
+  { id: 302205, brand: "Sony", model: "Xperia 1 VI (12+512GB)",           retail_npr: 199999, image: "https://upload.wikimedia.org/wikipedia/commons/1/1d/Sony_Logo_2022.svg" },
+  { id: 302206, brand: "Sony", model: "Xperia Pro-I (12+512GB)",          retail_npr: 249999, image: "https://upload.wikimedia.org/wikipedia/commons/1/1d/Sony_Logo_2022.svg" },
+
+  // ── ASUS ──
+  { id: 302301, brand: "Asus", model: "Zenfone 11 Ultra (16+512GB)",      retail_npr: 129999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2e/Asus_Logo.svg" },
+  { id: 302302, brand: "Asus", model: "ROG Phone 8 (12+256GB)",           retail_npr: 159999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2e/Asus_Logo.svg" },
+  { id: 302303, brand: "Asus", model: "ROG Phone 8 (16+512GB)",           retail_npr: 179999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2e/Asus_Logo.svg" },
+  { id: 302304, brand: "Asus", model: "ROG Phone 8 Pro (16+512GB)",       retail_npr: 209999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2e/Asus_Logo.svg" },
+  { id: 302305, brand: "Asus", model: "ROG Phone 8 Pro (24+1TB)",         retail_npr: 249999, image: "https://upload.wikimedia.org/wikipedia/commons/2/2e/Asus_Logo.svg" },
+
+  // ── LENOVO ──
+  { id: 302401, brand: "Lenovo", model: "ThinkPhone (8+256GB)",            retail_npr: 89999,  image: "https://upload.wikimedia.org/wikipedia/commons/4/4b/Lenovo_logo_2015.svg" },
+  { id: 302402, brand: "Lenovo", model: "Legion Y70 (12+256GB)",          retail_npr: 109999, image: "https://upload.wikimedia.org/wikipedia/commons/4/4b/Lenovo_logo_2015.svg" },
+  { id: 302403, brand: "Lenovo", model: "Legion Phone Duel 2 (16+512GB)",  retail_npr: 149999, image: "https://upload.wikimedia.org/wikipedia/commons/4/4b/Lenovo_logo_2015.svg" },
+
+  // ── XIAOMI (add missing models) ──
+  { id: 300218, brand: "Xiaomi", model: "Redmi A7 Pro (4+128GB)",         retail_npr: 18999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ae/Xiaomi_logo_2021.svg" },
+  { id: 300219, brand: "Xiaomi", model: "Xiaomi 17T (8+256GB)",            retail_npr: 79999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ae/Xiaomi_logo_2021.svg" },
+  { id: 300220, brand: "Xiaomi", model: "Xiaomi 17T (12+512GB)",           retail_npr: 89999,  image: "https://upload.wikimedia.org/wikipedia/commons/a/ae/Xiaomi_logo_2021.svg" },
+];
+
+const normalizeCatalogKey = (brand: string, model: string) => {
+  const normalizedBrand = brand.trim().toLowerCase();
+  const normalizedModel = model
+    .trim()
+    .toLowerCase()
+    .replace(new RegExp(`^${normalizedBrand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+`), "")
+    .replace(/\s*(?:\+|\/)\s*/g, "+")
+    .replace(/\s+/g, " ");
+
+  return `${normalizedBrand}:${normalizedModel}`;
+};
+
+const baseByBrand = new Map(
+  BASE_PRODUCTS.map((product) => [product.brand.toLowerCase(), product]),
+);
+const latestKeys = new Set(
+  LATEST_MOBILE_BUYING_PRICES.map((product) => normalizeCatalogKey(product.brand, product.model)),
+);
+
+const latestProducts: ProductData[] = LATEST_MOBILE_BUYING_PRICES.map((product, index) => ({
+  id: 400000 + index,
+  brand: product.brand,
+  model: product.model,
+  retail_npr: product.price,
+  image: baseByBrand.get(product.brand.toLowerCase())?.image ?? "",
+}));
+
+// Put the supplied list first so current variants and prices win in offline
+// valuation, while retaining older devices that are not part of this update.
+export const PRODUCTS: ProductData[] = [
+  ...latestProducts,
+  ...BASE_PRODUCTS.filter(
+    (product) => !latestKeys.has(normalizeCatalogKey(product.brand, product.model)),
+  ),
 ];
 
 export function estimateDevicePrice(device: ProductData, condition: string, defects: string[] = []): number {

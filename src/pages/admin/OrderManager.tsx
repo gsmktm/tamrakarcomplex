@@ -15,8 +15,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { getErrorMessage } from "@/lib/utils";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface OrderItem {
   id: string;
@@ -42,6 +51,7 @@ interface Order {
   created_at: string;
   order_items?: OrderItem[];
   store?: { name: string };
+  store_order_fulfillments?: Array<{ id: string; store_id: string; status: string }>;
 }
 
 export default function OrderManager() {
@@ -55,41 +65,32 @@ export default function OrderManager() {
     order_status: 'all',
     search: ''
   });
+  const [orderPage, setOrderPage] = useState(0);
 
   const queryClient = useQueryClient();
+  const { storeIds: myStoreIds } = useStoreMembership(user?.id);
 
   const { data: orders, isLoading, error: ordersError } = useQuery({
-    queryKey: ["orders", filters, user?.id, role],
+    queryKey: ["orders", filters, user?.id, role, orderPage],
     queryFn: async () => {
       try {
-        let query = supabase
+        const { PAGINATION } = await import("@/lib/supabaseColumnMaps");
+        const from = orderPage * PAGINATION.PAGE_SIZE_SMALL;
+        const to = from + PAGINATION.PAGE_SIZE_SMALL - 1;
+
+        let query = (supabase as any)
           .from("orders")
-          .select(`
-            *,
-            order_items(*),
-            store:stores(name)
-          `)
-          .order("created_at", { ascending: false });
+          .select(
+            `id, user_id, store_id, total_amount, payment_method, payment_status, order_status, shipping_address, contact_info, created_at,
+             order_items:order_items!inner(id, order_id, product_id, quantity, unit_price, total_price, product_name, variant_name),
+             store_order_fulfillments:store_order_fulfillments!left(id, store_id, status),
+             store:stores!left(name)`
+          )
+          .order("created_at", { ascending: false })
+          .range(from, to);
 
         // Store admins can only see orders from their stores
-        if (isStoreAdmin && !isPlatformAdmin && user?.id) {
-          // Get store IDs from store_admins or owner_id
-          const { data: memberships } = await supabase
-            .from("store_admins")
-            .select("store_id")
-            .eq("user_id", user.id)
-            .eq("status", "active");
-          
-          const { data: ownedStores } = await supabase
-            .from("stores")
-            .select("id")
-            .eq("owner_id", user.id);
-          
-          const myStoreIds = Array.from(new Set([
-            ...(memberships || []).map(m => m.store_id),
-            ...(ownedStores || []).map(s => s.id)
-          ]));
-
+        if (isStoreAdmin && !isPlatformAdmin) {
           if (myStoreIds.length === 0) {
             // Store admin has no stores - return empty
             return [];
@@ -136,6 +137,15 @@ export default function OrderManager() {
       order_status?: string;
       payment_status?: string;
     }) => {
+      if (isStoreAdmin && !isPlatformAdmin && order_status) {
+        const { error: fulfillmentError } = await (supabase as any)
+          .from("store_order_fulfillments")
+          .update({ status: order_status, updated_at: new Date().toISOString() })
+          .eq("order_id", id);
+        if (fulfillmentError) throw fulfillmentError;
+        return;
+      }
+
       const updates: { order_status?: string; payment_status?: string } = {};
       if (order_status) updates.order_status = order_status;
       if (payment_status) updates.payment_status = payment_status;
@@ -159,29 +169,32 @@ export default function OrderManager() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-      case 'pending_payment': return 'bg-yellow-100 text-yellow-800';
-      case 'paid': return 'bg-teal-100 text-teal-800';
-      case 'confirmed': return 'bg-blue-100 text-blue-800';
-      case 'processing': return 'bg-purple-100 text-purple-800';
-      case 'packed': return 'bg-amber-100 text-amber-800';
-      case 'shipped': return 'bg-indigo-100 text-indigo-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'completed': return 'bg-emerald-100 text-emerald-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'refunded': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pending_payment': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+      case 'paid': return 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300';
+      case 'confirmed': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'processing': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
+      case 'packed': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
+      case 'shipped': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300';
+      case 'delivered': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      case 'completed': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300';
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'refunded': return 'bg-muted text-muted-foreground';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'paid': return 'bg-green-100 text-green-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      case 'refunded': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+      case 'paid': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'refunded': return 'bg-muted text-muted-foreground';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
+
+  const getEffectiveOrderStatus = (order: Order) =>
+    isStoreAdmin ? order.store_order_fulfillments?.[0]?.status || order.order_status : order.order_status;
 
   if (isLoading) {
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -325,8 +338,8 @@ export default function OrderManager() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge className={getStatusColor(order.order_status)}>
-                      {order.order_status}
+                    <Badge className={getStatusColor(getEffectiveOrderStatus(order))}>
+                      {getEffectiveOrderStatus(order)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -344,7 +357,7 @@ export default function OrderManager() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {order.order_status === 'paid' && (
+                      {['paid', 'pending'].includes(getEffectiveOrderStatus(order)) && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -357,7 +370,7 @@ export default function OrderManager() {
                           <CheckCircle className="h-4 w-4" />
                         </Button>
                       )}
-                      {order.order_status === 'confirmed' && (
+                      {getEffectiveOrderStatus(order) === 'confirmed' && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -370,7 +383,7 @@ export default function OrderManager() {
                           <Truck className="h-4 w-4" />
                         </Button>
                       )}
-                      {order.order_status === 'processing' && (
+                      {getEffectiveOrderStatus(order) === 'processing' && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -383,7 +396,7 @@ export default function OrderManager() {
                           <Package className="h-4 w-4" />
                         </Button>
                       )}
-                      {order.order_status === 'packed' && (
+                      {getEffectiveOrderStatus(order) === 'packed' && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -400,12 +413,42 @@ export default function OrderManager() {
                   </TableCell>
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-      {/* Order Details Dialog */}
+        {orders && orders.length === 20 && (
+          <div className="flex justify-center mt-4">
+            <nav aria-label="Order pagination">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      isActive={orderPage === 0}
+                      onClick={() => orderPage > 0 && setOrderPage(orderPage - 1)}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink href="#" isActive>
+                      Page {orderPage + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      isActive
+                      onClick={() => setOrderPage(orderPage + 1)}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </nav>
+          </div>
+        )}
+
+        {/* Order Details Dialog */}
       <Dialog open={showOrderDialog} onOpenChange={setShowOrderDialog}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>

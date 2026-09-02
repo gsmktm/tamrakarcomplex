@@ -261,17 +261,17 @@ export default function ModelHub() {
                   <CardContent className="space-y-6 relative z-10">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium opacity-80">New Availability</span>
-                      <Badge className="bg-white/20 text-white border-none">{inventory.length > 0 ? "Available" : "Check Store"}</Badge>
+                      <Badge className="bg-card/20 text-white border-none">{inventory.length > 0 ? "Available" : "Check Store"}</Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium opacity-80">Used Market</span>
-                      <Badge className="bg-white/20 text-white border-none">{usedListings.length} Listings</Badge>
+                      <Badge className="bg-card/20 text-white border-none">{usedListings.length} Listings</Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium opacity-80">Repair Support</span>
-                      <Badge className="bg-white/20 text-white border-none">Verified</Badge>
+                      <Badge className="bg-card/20 text-white border-none">Verified</Badge>
                     </div>
-                    <Button className="w-full bg-white text-primary hover:bg-white/90 font-bold rounded-xl h-12 mt-4" asChild>
+                    <Button className="w-full bg-card text-primary hover:bg-card/90 font-bold rounded-xl h-12 mt-4" asChild>
                       <Link to="#buy">View Stores</Link>
                     </Button>
                   </CardContent>

@@ -1,11 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, LogIn, Smartphone, Search, Store, UserCheck, RefreshCw, MessageCircle, MapPin, Package, Shield, Wrench, Droplets, Battery, Camera, Eye, Fingerprint } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, LogIn, Smartphone, Search, Store, UserCheck, MessageCircle, MapPin, Package, Shield, Wrench, Droplets, Battery, Camera, Eye, Fingerprint, Tablet, Watch } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Slider } from "@/components/ui/slider";
 import { Header } from "@/components/layout/Header";
@@ -14,10 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { SEO } from "@/components/common/SEO";
-import { sellPhoneService } from "@/services/sellPhoneService";
+import { sellPhoneService, type SellDeviceCategory } from "@/services/sellPhoneService";
 import { storeDirectoryService, type StoreDirectoryItem } from "@/services/storeDirectoryService";
 import type { DeviceCatalogRow } from "@/types/app";
 import { breadcrumbSchema, faqSchema } from "@/lib/seo";
+import { sortByProductionDate } from "@/lib/productionDateSort";
+import { isValidNepalPhone, normalizePhone } from "@/lib/security";
 
 // Types
 interface Device {
@@ -41,6 +43,7 @@ interface CatalogDeviceWithJoins {
   brand?: { name: string };
   model?: { name: string };
   variant?: { storage?: string; ram?: string; color?: string };
+  category?: SellDeviceCategory;
 }
 
 interface ValuationResult {
@@ -80,17 +83,29 @@ const BRAND_LOGOS: Record<string, string> = {
 };
 
 const SELL_PHONE_DRAFT_KEY = "tamrakar_sell_phone_draft";
+const SELL_DEVICE_CATEGORIES: Array<{
+  value: SellDeviceCategory;
+  label: string;
+  description: string;
+  icon: typeof Smartphone;
+}> = [
+  { value: "phone", label: "Mobile", description: "iPhone & smartphones", icon: Smartphone },
+  { value: "tablet", label: "iPad / Tablet", description: "Apple iPad & Galaxy Tab", icon: Tablet },
+  { value: "watch", label: "Watch", description: "Apple Watch & Galaxy Watch", icon: Watch },
+];
 
 export default function SellYourPhone() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, signUp } = useAuth();
+  const isExchangeMode = searchParams.get("mode") === "exchange";
   const [step, setStep] = useState(1);
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [selectedBrandName, setSelectedBrandName] = useState<string>("");
+  const [selectedDeviceCategory, setSelectedDeviceCategory] = useState<SellDeviceCategory>("phone");
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [selectedCatalogProductId, setSelectedCatalogProductId] = useState<string>("");
   const [brandSearch, setBrandSearch] = useState("");
@@ -116,7 +131,6 @@ export default function SellYourPhone() {
   const [accessoriesAvailable, setAccessoriesAvailable] = useState<boolean>(false);
   const [customerLocation, setCustomerLocation] = useState<string>("");
 
-  const [mode, setMode] = useState<"sell" | "exchange">(searchParams.get("mode") === "exchange" ? "exchange" : "sell");
   const [sellDialogOpen, setSellDialogOpen] = useState(false);
   const [storePickerOpen, setStorePickerOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string>("");
@@ -127,15 +141,25 @@ export default function SellYourPhone() {
 
   const [sourceStore, setSourceStore] = useState<StoreDirectoryItem | null>(null);
 
+  // Keep submissionTargetStoreId in sync if URL ?store= changes
+  useEffect(() => {
+    const storeParam = searchParams.get("store") || undefined;
+    if (storeParam !== submissionTargetStoreId) {
+      setSubmissionTargetStoreId(storeParam);
+    }
+  }, [searchParams, submissionTargetStoreId]);
+
   // Fetch store if ID is provided in URL
   useEffect(() => {
     async function fetchSourceStore() {
       if (submissionTargetStoreId) {
-        const { data, error } = await storeDirectoryService.getStoreByIdentifier({ type: "id", value: submissionTargetStoreId });
+        const { data } = await storeDirectoryService.getStoreByIdentifier({ type: "id", value: submissionTargetStoreId });
         if (data) {
           setSourceStore(data as unknown as StoreDirectoryItem);
           setSelectedStoreId(data.id);
         }
+      } else {
+        setSourceStore(null);
       }
     }
     fetchSourceStore();
@@ -150,6 +174,7 @@ export default function SellYourPhone() {
         contactEmail,
         selectedBrand,
         selectedBrandName,
+        selectedDeviceCategory,
         selectedModel,
         selectedCatalogProductId,
         storage,
@@ -175,6 +200,7 @@ export default function SellYourPhone() {
         contactEmail?: string;
         selectedBrand?: string;
         selectedBrandName?: string;
+        selectedDeviceCategory?: SellDeviceCategory;
         selectedModel?: string;
         selectedCatalogProductId?: string;
         storage?: string;
@@ -190,6 +216,7 @@ export default function SellYourPhone() {
       setContactEmail(draft.contactEmail || "");
       setSelectedBrand(draft.selectedBrand || "");
       setSelectedBrandName(draft.selectedBrandName || "");
+      setSelectedDeviceCategory(draft.selectedDeviceCategory || "phone");
       setSelectedModel(draft.selectedModel || "");
       setSelectedCatalogProductId(draft.selectedCatalogProductId || "");
       setStorage(draft.storage || "");
@@ -213,17 +240,14 @@ export default function SellYourPhone() {
     }
   }, [user]);
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const { data: sellSettings } = useQuery({
     queryKey: ["sell-phone-settings"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("app_settings")
         .select("key, value")
-        .in("key", ["sell_phone_logos", "sell_phone_content"]);
+        .in("key", ["sell_phone_logos", "sell_phone_content"])
+        .abortSignal(AbortSignal.timeout(4000));
       if (error) throw error;
       
       const settings: Record<string, unknown> = {};
@@ -231,7 +255,8 @@ export default function SellYourPhone() {
         settings[item.key] = item.value;
       });
       return settings as { sell_phone_logos: Record<string, string>, sell_phone_content: typeof content };
-    }
+    },
+    retry: false,
   });
 
   const rawLogos = sellSettings?.sell_phone_logos || BRAND_LOGOS;
@@ -245,9 +270,9 @@ export default function SellYourPhone() {
     return match?.[1];
   };
   const content = sellSettings?.sell_phone_content || {
-    headline: "Sell Your Phone",
+    headline: "Sell Your Device",
     subheadline: "Get an instant quote in less than 60 seconds.",
-    step1_title: "Select your Phone's Brand",
+    step1_title: "Choose Device Type & Brand",
     step2_title: "Select Model",
     step3_title: "Device Details"
   };
@@ -257,16 +282,31 @@ export default function SellYourPhone() {
     queryKey: ["sell-brands"],
     queryFn: async (): Promise<Array<{ id: string; name: string; slug: string; logo_url?: string }>> => {
       return await sellPhoneService.getBrands();
-    }
+    },
+    initialData: () => sellPhoneService.getLocalBrands(),
+    retry: false,
   });
 
   const { data: models, isLoading: loadingModels } = useQuery({
-    queryKey: ["sell-models", selectedBrand],
+    queryKey: ["sell-models", selectedBrand, selectedDeviceCategory],
     enabled: !!selectedBrand,
     queryFn: async () => {
-      return await sellPhoneService.getDevicesByBrand(selectedBrand);
+      return await sellPhoneService.getDevicesByBrand(selectedBrand, selectedDeviceCategory, selectedBrandName);
     },
+    initialData: () => selectedBrandName
+      ? sellPhoneService.getLocalDevicesByBrand(selectedBrandName, selectedDeviceCategory)
+      : undefined,
+    retry: false,
   });
+
+  const productionOrderedModels = useMemo(
+    () => sortByProductionDate(
+      ((models || []) as CatalogDeviceWithJoins[]).filter((device) =>
+        (device.model?.name || device.name).toLowerCase().includes(modelSearch.toLowerCase()),
+      ),
+    ),
+    [modelSearch, models],
+  );
 
   const { data: sellStores, isLoading: sellStoresLoading } = useQuery({
     queryKey: ["sell-phone-store-picker", selectedBrandName],
@@ -354,6 +394,8 @@ export default function SellYourPhone() {
   // Estimate Mutation — uses database valuation rules
   const estimateMutation = useMutation({
     mutationFn: async () => {
+      if (!selectedCatalogProductId) throw new Error("Please select a device model first");
+      if (!storage) throw new Error("Please select a storage capacity");
       const estimatedPrice = await sellPhoneService.calculateValuation({
         catalog_product_id: selectedCatalogProductId,
         storage,
@@ -376,10 +418,9 @@ export default function SellYourPhone() {
     onSuccess: (data) => {
       setValuation(data);
       setStep(5);
-      scrollToTop();
     },
-    onError: () => {
-      toast.error("Could not generate estimate. Please try again.");
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : "Could not generate estimate. Please try again.");
     }
   });
 
@@ -401,7 +442,7 @@ export default function SellYourPhone() {
         customer_email: contactEmail,
         imei: deviceImei,
         assigned_store_id: storeId,
-        source: mode === "exchange" ? "exchange_your_phone" : "sell_your_phone"
+        source: "sell_your_phone"
       }, userId);
     },
     onSuccess: () => {
@@ -465,7 +506,7 @@ export default function SellYourPhone() {
 
   const viboGrade = viboScore >= 85 ? "Premium Used" : viboScore >= 70 ? "Good Condition" : viboScore >= 50 ? "Fair Condition" : "Poor Condition";
   const viboDemand = viboScore >= 80 ? "High" : viboScore >= 60 ? "Medium" : "Low";
-  const viboRecommendation = viboScore >= 80 ? "Exchange & Upgrade" : viboScore >= 60 ? "Sell for Best Price" : "Sell for Quick Cash";
+  const viboRecommendation = viboScore >= 80 ? "Best Cash Value" : viboScore >= 60 ? "Sell for Best Price" : "Sell for Quick Cash";
 
   const openPlatformSubmit = () => {
     setSubmissionTargetStoreId(undefined);
@@ -482,19 +523,19 @@ export default function SellYourPhone() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <SEO
-        title="Sell Your Phone in Nepal"
-        description="Get an instant phone valuation, submit device details, and start a fast quote-led resale flow."
-        url="/sell-your-phone"
-        keywords={["sell phone Nepal", "phone valuation Nepal", "sell old mobile", "used phone quote"]}
+        title={isExchangeMode ? "Exchange Your Phone in Nepal — Instant Trade-In Valuation" : "Sell Your Phone, iPad or Watch in Nepal"}
+        description={isExchangeMode ? "Exchange your mobile, tablet, or smartwatch in Nepal — get an instant trade-in valuation and upgrade for less." : "Get an instant mobile, tablet, or smartwatch valuation and start a fast quote-led resale flow."}
+        url={isExchangeMode ? "/sell-your-phone?mode=exchange" : "/sell-your-phone"}
+        keywords={isExchangeMode ? ["exchange phone Nepal", "phone trade-in Nepal", "exchange old mobile"] : ["sell phone Nepal", "phone valuation Nepal", "sell old mobile", "used phone quote"]}
         structuredData={[
           breadcrumbSchema([
             { name: "Home", url: "/" },
-            { name: "Sell Your Phone", url: "/sell-your-phone" },
+            { name: "Sell Your Device", url: "/sell-your-phone" },
           ]),
           faqSchema([
             {
-              question: "How do I sell my phone at Tamrakar Complex?",
-              answer: "Select your brand, model, storage, condition, and defects to get an instant valuation, then submit contact details for a quote-led resale flow.",
+              question: "How do I sell my phone, tablet, or watch at Tamrakar Complex?",
+              answer: "Choose the device type, brand, model, storage, condition, and defects to get an estimate, then submit contact details for a quote-led resale flow.",
             },
             {
               question: "Is the phone valuation final?",
@@ -516,17 +557,26 @@ export default function SellYourPhone() {
             <div className="flex justify-center mb-7">
               <span className="sell-badge animate-fade-in">
                 <Smartphone className="h-3 w-3" />
-                Sell &amp; Exchange at TamrakarComplex
+                {isExchangeMode ? "Exchange at TamrakarComplex" : "Sell at TamrakarComplex"}
               </span>
             </div>
 
             {/* Headline */}
             <h1 className="text-4xl md:text-6xl font-display font-extrabold mb-4 tracking-tight leading-tight text-white animate-fade-up">
-              Turn Your Phone<br />
-              <span className="sell-headline-accent">Into Cash or Upgrade</span>
+              {isExchangeMode ? (
+                <>
+                  Exchange Your Device<br />
+                  <span className="sell-headline-accent">And Upgrade Today</span>
+                </>
+              ) : (
+                <>
+                  Turn Your Device<br />
+                  <span className="sell-headline-accent">Into Cash Today</span>
+                </>
+              )}
             </h1>
             <p className="text-base md:text-lg text-white/55 mb-10 max-w-xl mx-auto animate-fade-up delay-100">
-              {content.subheadline || "Check live market value, compare store offers, and get paid — in minutes at TamrakarComplex."}
+              {isExchangeMode ? "Get a trade-in valuation, offset your next purchase, and upgrade in minutes at TamrakarComplex." : (content.subheadline || "Check live market value, compare store offers, and get paid — in minutes at TamrakarComplex.")}
             </p>
 
             {/* CTA row */}
@@ -536,20 +586,12 @@ export default function SellYourPhone() {
                 className="hero-gradient shadow-gold font-bold h-12 px-7 pressable"
                 onClick={() => { setStep(1); document.getElementById("sell-wizard")?.scrollIntoView({ behavior: "smooth" }); }}
               >
-                <Smartphone className="h-4 w-4 mr-2" /> Sell My Phone
+                <Smartphone className="h-4 w-4 mr-2" /> Sell My Device
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                className="bg-transparent border-[oklch(72%_0.20_280/0.55)] text-[oklch(78%_0.16_285)] hover:bg-[oklch(25%_0.20_280/0.18)] font-bold h-12 px-7 pressable"
-                onClick={() => { setMode("exchange"); setStep(1); document.getElementById("sell-wizard")?.scrollIntoView({ behavior: "smooth" }); }}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" /> Exchange &amp; Upgrade
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="bg-transparent border-white/20 text-white/65 hover:bg-white/8 font-bold h-12 px-7 pressable"
+                className="bg-transparent border-white/20 text-white/65 hover:bg-card/8 font-bold h-12 px-7 pressable"
                 onClick={() => navigate("/cat/mobiles")}
               >
                 <Search className="h-4 w-4 mr-2" /> Check Market Price
@@ -571,7 +613,7 @@ export default function SellYourPhone() {
           </div>
         </div>
 
-        <div id="sell-wizard" className="bg-[oklch(10%_0.028_258)] py-12">
+        <div id="sell-wizard" className="bg-background py-12">
         <div className="container mx-auto px-4 max-w-3xl sell-wizard-wrap">
         {/* Progress Steps */}
         <div className="flex items-center mb-10 max-w-xl mx-auto gap-0">
@@ -604,10 +646,36 @@ export default function SellYourPhone() {
           ))}
         </div>
 
-        <Card className="p-6 sm:p-8 sell-wizard-card [&_input]:bg-[oklch(18%_0.028_258)] [&_input]:border-[oklch(30%_0.030_258)] [&_input]:text-white [&_input::placeholder]:text-white/40 [&_label]:text-white/80 [&_h2]:text-white">
+        <Card className="p-6 sm:p-8 sell-wizard-card">
           {step === 1 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 className="text-2xl font-bold text-center text-primary">{content.step1_title}</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl mx-auto">
+                {SELL_DEVICE_CATEGORIES.map(({ value, label, description, icon: Icon }) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant="outline"
+                    className={`h-auto min-h-24 flex-col gap-2 py-4 ${
+                      selectedDeviceCategory === value ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-card"
+                    }`}
+                    onClick={() => {
+                      setSelectedDeviceCategory(value);
+                      setSelectedBrand("");
+                      setSelectedBrandName("");
+                      setSelectedModel("");
+                      setSelectedCatalogProductId("");
+                      setModelSearch("");
+                      setStorage("");
+                      setValuation(null);
+                    }}
+                  >
+                    <Icon className="h-6 w-6" />
+                    <span className="font-semibold">{label}</span>
+                    <span className="text-[11px] font-normal text-muted-foreground">{description}</span>
+                  </Button>
+                ))}
+              </div>
               <div className="relative max-w-sm mx-auto mb-8">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -626,6 +694,7 @@ export default function SellYourPhone() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {brands
                     .filter(brand => brand.name.toLowerCase().includes(brandSearch.toLowerCase()))
+                    .filter(brand => selectedDeviceCategory === "phone" || ["apple", "samsung"].includes(brand.name.toLowerCase()))
                     .map((brand) => (
                     <Button
                       key={brand.id}
@@ -638,8 +707,9 @@ export default function SellYourPhone() {
                         setSelectedBrandName(brand.name);
                         setSelectedModel("");
                         setSelectedCatalogProductId("");
+                        setStorage("");
+                        setValuation(null);
                         setStep(2);
-                        scrollToTop();
                       }}
                     >
                       {getLogoUrl(brand.name, brand.logo_url) ? (
@@ -654,7 +724,10 @@ export default function SellYourPhone() {
                               target.style.display = "none";
                               const parent = target.parentElement;
                               if (parent) {
-                                parent.innerHTML = `<div class="h-10 w-10 rounded-full bg-secondary flex items-center justify-center"><span class="font-bold text-lg">${brand.name.slice(0, 1)}</span></div>`;
+                                const fallback = document.createElement("span");
+                                fallback.className = "h-10 w-10 rounded-full bg-secondary flex items-center justify-center font-bold text-lg";
+                                fallback.textContent = brand.name.slice(0, 1);
+                                parent.replaceChildren(fallback);
                               }
                             }}
                           />
@@ -700,6 +773,9 @@ export default function SellYourPhone() {
                   value={modelSearch}
                   onChange={(e) => setModelSearch(e.target.value)}
                 />
+                <span className="mt-1 block text-right text-[11px] text-muted-foreground">
+                  Newest production year first
+                </span>
               </div>
             </div>
             
@@ -707,38 +783,55 @@ export default function SellYourPhone() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
+            ) : productionOrderedModels.length === 0 ? (
+              <div className="py-12 text-center rounded-xl border border-dashed bg-secondary/10">
+                <p className="text-sm text-muted-foreground">No models found for "{modelSearch}"</p>
+                <Button variant="ghost" size="sm" className="mt-2" onClick={() => setModelSearch("")}>Clear search</Button>
+              </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[500px] overflow-y-auto p-1">
-                {(models as CatalogDeviceWithJoins[])
-                  ?.filter(device => device.model?.name?.toLowerCase().includes(modelSearch.toLowerCase()))
-                  .map((device) => (
+                {productionOrderedModels.map((device) => (
                   <Button
                     key={device.id}
                     variant="outline"
                     className={`h-40 flex flex-col gap-3 items-center justify-between p-4 hover:border-primary hover:shadow-md transition-all ${
-                      selectedModel === device.model?.name ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-card"
+                      selectedModel === (device.model?.name || device.name) ? "border-primary bg-primary/5 ring-1 ring-primary" : "bg-card"
                     }`}
                       onClick={() => {
-                        setSelectedModel(device.model?.name || "");
+                        setSelectedModel(device.model?.name || device.name);
                         setSelectedCatalogProductId(device.id);
+                        setStorage("");
+                        setValuation(null);
                         setStep(3);
-                        scrollToTop();
                       }}
                     >
                     <div className="flex-1 flex items-center justify-center w-full">
                       {device.image_url ? (
                         <img 
                           src={device.image_url} 
-                          alt={device.model?.name} 
+                            alt={device.model?.name || device.name}
                           className="h-full max-h-24 w-auto object-contain hover:scale-105 transition-transform duration-300"
                           loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(event) => {
+                            const image = event.currentTarget;
+                            if (!image.src.endsWith("/default-product.svg")) {
+                              image.src = "/default-product.svg";
+                            }
+                          }}
                         />
                       ) : (
-                        <Smartphone className="h-12 w-12 text-muted-foreground/30" />
+                        selectedDeviceCategory === "tablet" ? (
+                          <Tablet className="h-12 w-12 text-muted-foreground/30" />
+                        ) : selectedDeviceCategory === "watch" ? (
+                          <Watch className="h-12 w-12 text-muted-foreground/30" />
+                        ) : (
+                          <Smartphone className="h-12 w-12 text-muted-foreground/30" />
+                        )
                       )}
                     </div>
                     <div className="text-center w-full">
-                      <span className="font-semibold text-sm line-clamp-2 leading-tight">{device.model?.name}</span>
+                      <span className="font-semibold text-sm line-clamp-2 leading-tight">{device.model?.name || device.name}</span>
                       {device.release_year && (
                         <span className="text-xs text-muted-foreground block mt-1">{device.release_year}</span>
                       )}
@@ -763,7 +856,10 @@ export default function SellYourPhone() {
             <div className="space-y-4">
               <Label className="text-lg font-semibold">Storage Capacity</Label>
               <div className="grid grid-cols-3 gap-3">
-                {["64GB", "128GB", "256GB", "512GB", "1TB"].map((cap) => (
+                {(selectedDeviceCategory === "watch"
+                  ? ["8GB", "16GB", "32GB", "64GB"]
+                  : ["64GB", "128GB", "256GB", "512GB", "1TB", "2TB"]
+                ).map((cap) => (
                   <div
                     key={cap}
                     className={`cursor-pointer rounded-xl border-2 p-4 flex items-center justify-center text-center transition-all ${
@@ -979,7 +1075,6 @@ export default function SellYourPhone() {
               disabled={!storage}
               onClick={() => {
                 setStep(4);
-                scrollToTop();
               }}
             >
               Continue <ArrowRight className="ml-2 h-5 w-5" />
@@ -1098,7 +1193,7 @@ export default function SellYourPhone() {
                   </div>
                 </div>
                 {/* Score bar */}
-                <div className="mt-4 h-2 rounded-full bg-white/10 overflow-hidden">
+                <div className="mt-4 h-2 rounded-full bg-card/10 overflow-hidden">
                   <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-primary transition-all duration-1000" style={{ width: `${viboScore}%` }} />
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs text-white/40">
@@ -1110,18 +1205,14 @@ export default function SellYourPhone() {
             </div>
 
             {/* 4 Price Cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-slate-900 p-4 text-center">
-                <p className="text-xs text-white/40 uppercase tracking-widest mb-1">Market Price</p>
-                <p className="text-2xl font-black text-white">{valuation.currency} {valuation.estimated_price.toLocaleString()}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-border bg-muted p-4 text-center">
+                <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Market Price</p>
+                <p className="text-2xl font-black text-foreground">{valuation.currency} {valuation.estimated_price.toLocaleString()}</p>
               </div>
               <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-center">
                 <p className="text-xs text-emerald-400/80 uppercase tracking-widest mb-1">Instant Sell</p>
                 <p className="text-2xl font-black text-emerald-300">{valuation.currency} {Math.floor(valuation.estimated_price * 0.93).toLocaleString()}</p>
-              </div>
-              <div className="rounded-2xl border border-violet-500/30 bg-violet-950/30 p-4 text-center">
-                <p className="text-xs text-violet-300/80 uppercase tracking-widest mb-1">Exchange Value</p>
-                <p className="text-2xl font-black text-violet-200">{valuation.currency} {Math.floor(valuation.estimated_price * 0.97).toLocaleString()}</p>
               </div>
               <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-4 text-center">
                 <p className="text-xs text-amber-300/80 uppercase tracking-widest mb-1">Best Store Offer</p>
@@ -1134,15 +1225,11 @@ export default function SellYourPhone() {
               Quote valid until {new Date(valuation.valid_until).toLocaleDateString()} · Subject to physical inspection
             </p>
 
-            {/* 3 Main Action Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Main Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Button size="lg" className="h-14 hero-gradient shadow-glow font-bold flex-col gap-0.5 py-2" onClick={openPlatformSubmit}>
-                <span className="text-sm font-bold">{sourceStore ? `Sell at ${sourceStore.name}` : "Sell Now for Cash"}</span>
+                <span className="text-sm font-bold">{sourceStore ? `${isExchangeMode ? "Exchange at" : "Sell at"} ${sourceStore.name}` : isExchangeMode ? "Exchange Now" : "Sell Now for Cash"}</span>
                 <span className="text-[11px] opacity-80">{valuation.currency} {Math.floor(valuation.estimated_price * 0.93).toLocaleString()}</span>
-              </Button>
-              <Button size="lg" variant="outline" className="h-14 border-violet-400/60 text-violet-300 hover:bg-violet-950/30 font-bold flex-col gap-0.5 py-2" onClick={() => { setMode("exchange"); openPlatformSubmit(); }}>
-                <span className="text-sm font-bold">Exchange & Upgrade</span>
-                <span className="text-[11px] opacity-80">{valuation.currency} {Math.floor(valuation.estimated_price * 0.97).toLocaleString()} credit</span>
               </Button>
               {!sourceStore ? (
                 <Button size="lg" variant="outline" className="h-14 border-amber-400/60 text-amber-300 hover:bg-amber-950/20 font-bold flex-col gap-0.5 py-2" onClick={() => setStorePickerOpen(true)}>
@@ -1168,9 +1255,9 @@ export default function SellYourPhone() {
               </Button>
               <Button variant="outline" size="sm" className="h-11 flex-col gap-0.5 border-dashed text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-700"
                 onClick={() => {
-                  const phone = contactPhone.replace(/\D/g, "");
-                  const target = phone.length >= 10 ? `977${phone}` : "9779851091542";
-                  window.open(`https://wa.me/${target}?text=${encodeURIComponent(`Hi, I want to sell my ${selectedBrandName} ${selectedModel}. Viboscope Score: ${viboScore}/100. Quote: Rs. ${valuation.estimated_price.toLocaleString()}`)}`, "_blank");
+                  const normalized = normalizePhone(contactPhone);
+                  const target = isValidNepalPhone(normalized) ? normalized.replace("+", "") : "9779851091542";
+                  window.open(`https://wa.me/${target}?text=${encodeURIComponent(`Hi, I want to ${isExchangeMode ? "exchange" : "sell"} my ${selectedBrandName} ${selectedModel}. Viboscope Score: ${viboScore}/100. Quote: Rs. ${valuation.estimated_price.toLocaleString()}`)}`, "_blank");
                 }}>
                 <MessageCircle className="h-4 w-4" />
                 <span className="text-[10px]">WhatsApp</span>
@@ -1358,7 +1445,7 @@ export default function SellYourPhone() {
             <Dialog open={sellDialogOpen} onOpenChange={setSellDialogOpen}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{mode === "exchange" ? "Exchange & Upgrade" : submissionTargetStoreId ? "Submit to Selected Store" : "Sell It Now"}</DialogTitle>
+                  <DialogTitle>{submissionTargetStoreId ? "Submit to Selected Store" : "Sell It Now"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   {/* Device + quote summary */}
@@ -1446,9 +1533,9 @@ export default function SellYourPhone() {
                         toast.error("Please enter your name");
                         return;
                       }
-                      const phoneDigits = contactPhone.replace(/\D/g, "");
-                      if (phoneDigits.length < 10) {
-                        toast.error("Invalid mobile number");
+                      const normalizedPhoneCheck = normalizePhone(contactPhone);
+                      if (!isValidNepalPhone(normalizedPhoneCheck)) {
+                        toast.error("Enter a valid Nepal mobile number (e.g. 98XXXXXXXX)");
                         return;
                       }
                       // IMEI is optional — only validate format if provided

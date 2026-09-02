@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,19 +6,17 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { usePaymentMethods, type CheckoutPaymentMethod } from "@/hooks/usePaymentMethods";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { getErrorMessage, parseProductPrice } from "@/lib/utils";
 import { isValidEmail, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeText } from "@/lib/security";
-
-type PaymentMethod = "cod" | "esewa";
-
-const ESEWA_ENABLED = import.meta.env.VITE_ESEWA_ENABLED === "true";
 
 type CreateOrderSecureResponse = {
   success?: boolean;
@@ -28,12 +26,24 @@ type CreateOrderSecureResponse = {
   };
 };
 
+type CreateSessionResponse = {
+  success?: boolean;
+  error?: string;
+  message?: string;
+  mode?: "demo" | "sandbox" | "production";
+  redirect_url?: string;
+  payment_url?: string;
+  payment_data?: Record<string, string>;
+};
+
 export default function Checkout() {
   const { cart, cartTotal, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const checkoutIdempotencyKey = useRef(crypto.randomUUID());
+  const [paymentMethod, setPaymentMethod] = useState<string>("cod");
+  const { data: methods = [], isLoading: methodsLoading } = usePaymentMethods();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -41,6 +51,21 @@ export default function Checkout() {
     address: "",
     city: "",
   });
+
+  // Default to the first ready method (COD stays first via display_order).
+  useEffect(() => {
+    const firstReady = methods.find((m) => m.is_ready);
+    if (firstReady && !methods.some((m) => m.slug === paymentMethod)) {
+      setPaymentMethod(firstReady.slug);
+    }
+  }, [methods, paymentMethod]);
+
+  const selectableMethods = useMemo(() => methods.filter((m) => m.is_ready), [methods]);
+  const comingSoonMethods = useMemo(() => methods.filter((m) => !m.is_ready), [methods]);
+  const selectedMethod = useMemo(
+    () => selectableMethods.find((m) => m.slug === paymentMethod) ?? null,
+    [selectableMethods, paymentMethod]
+  );
 
   if (cart.length === 0) {
     return (
@@ -66,9 +91,7 @@ export default function Checkout() {
     setLoading(true);
 
     try {
-      if (paymentMethod === "esewa" && !ESEWA_ENABLED) {
-        throw new Error("eSewa is not enabled in this deployment yet. Please use Cash on Delivery for now.");
-      }
+      if (!selectedMethod) throw new Error("Please select a payment method.");
       if (!user) throw new Error("Please sign in before checkout.");
       const checkoutPhone = normalizePhone(formData.phone);
       const checkoutEmail = normalizeEmail(formData.email || user.email || "");
@@ -89,8 +112,11 @@ export default function Checkout() {
             phone: checkoutPhone,
             email: checkoutEmail,
           },
+          idempotency_key: checkoutIdempotencyKey.current,
           items: cart.map((item) => ({
             product_id: item.product.id,
+            source_type: item.product.source_type ?? "product",
+            store_product_id: item.product.store_product_id ?? (item.product.source_type === "store_product" ? item.product.id : null),
             quantity: item.quantity,
             store_id: item.product.store_id ?? null,
           })),
@@ -105,15 +131,39 @@ export default function Checkout() {
       const orderId = data.order.id;
 
       // 2. Handle Payment
-      if (paymentMethod === "esewa") {
-        const { data: sessionData, error: sessionError } = await supabase.functions.invoke("create-payment-session", {
-          body: { order_id: orderId, payment_method: "esewa" },
-        });
-        if (sessionError) throw sessionError;
-        if (!sessionData?.payment_url || !sessionData?.payment_data) {
-          throw new Error("Payment session could not be created.");
-        }
-        
+      const { data: sessionData, error: sessionError } = await supabase.functions.invoke<CreateSessionResponse>(
+        "create-payment-session",
+        { body: { order_id: orderId, payment_method: paymentMethod } }
+      );
+      if (sessionError) throw sessionError;
+      if (sessionData?.success === false || !sessionData?.success) {
+        throw new Error(sessionData?.error || "Payment session could not be created.");
+      }
+
+      if (selectedMethod.slug === "cod") {
+        toast.success("Order placed successfully!");
+        clearCart();
+        navigate(`/order-success?oid=${orderId}`);
+        return;
+      }
+
+      if (sessionData.mode === "demo") {
+        // Demo mode: the gateway is bypassed; the success page settles the order
+        // through verify-payment (which only auto-passes while the provider is
+        // in demo mode). The cart is cleared on the success page only after
+        // settlement is confirmed — same invariant as the real-gateway flow.
+        navigate(sessionData.redirect_url ?? `/order-success?oid=${orderId}&demo=1`, { replace: true });
+        return;
+      }
+
+      // Khalti-style hosted checkout: the gateway returns a payment_url to
+      // redirect the customer to (GET navigation, no form POST).
+      if (sessionData.redirect_url && !sessionData.payment_data) {
+        window.location.href = sessionData.redirect_url;
+        return;
+      }
+
+      if (sessionData.payment_url && sessionData.payment_data) {
         const form = document.createElement("form");
         form.setAttribute("method", "POST");
         form.setAttribute("action", sessionData.payment_url);
@@ -128,22 +178,12 @@ export default function Checkout() {
 
         document.body.appendChild(form);
         form.submit();
-        
-        // Don't clear cart yet, wait for success
-      } else {
-        // COD
-        const { data: sessionData, error: sessionError } = await supabase.functions.invoke("create-payment-session", {
-          body: { order_id: orderId, payment_method: "cod" },
-        });
-        if (sessionError) throw sessionError;
-        if (sessionData?.success === false) {
-          throw new Error(sessionData.error || "Order payment setup could not be completed.");
-        }
 
-        toast.success("Order placed successfully!");
-        clearCart();
-        navigate(`/order-success?oid=${orderId}`);
+        // Don't clear cart yet, wait for success
+        return;
       }
+
+      throw new Error("Payment session did not return a payable flow.");
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to place order"));
     } finally {
@@ -238,28 +278,45 @@ export default function Checkout() {
               <CardTitle>Payment Method</CardTitle>
             </CardHeader>
             <CardContent>
-              <RadioGroup value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)} className="space-y-3">
-                {ESEWA_ENABLED ? (
-                  <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-secondary/50">
-                    <RadioGroupItem value="esewa" id="esewa" />
-                    <Label htmlFor="esewa" className="flex-1 cursor-pointer font-medium flex items-center gap-2">
-                      <img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" className="h-6" />
-                      eSewa Mobile Wallet
-                    </Label>
-                  </div>
-                ) : null}
-                <div className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-secondary/50">
-                  <RadioGroupItem value="cod" id="cod" />
-                  <Label htmlFor="cod" className="flex-1 cursor-pointer font-medium">
-                    Cash on Delivery (COD)
-                  </Label>
-                </div>
-              </RadioGroup>
-              {!ESEWA_ENABLED ? (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Online payment is hidden until a signed eSewa gateway is configured for this deployment.
+              {methodsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading payment options…</p>
+              ) : (
+                <RadioGroup value={paymentMethod} onValueChange={(value) => setPaymentMethod(value)} className="space-y-3">
+                  {selectableMethods.map((method) => (
+                    <PaymentOption
+                      key={method.slug}
+                      method={method}
+                      checked={paymentMethod === method.slug}
+                    />
+                  ))}
+                  {comingSoonMethods.length > 0 && (
+                    <div className="pt-2 space-y-2">
+                      {comingSoonMethods.map((method) => (
+                        <div
+                          key={method.slug}
+                          className="flex items-center space-x-2 border border-dashed p-3 rounded-md opacity-70"
+                          aria-disabled="true"
+                        >
+                          <span className="h-4 w-4" aria-hidden />
+                          <span className="flex-1 flex items-center gap-2 font-medium">
+                            {method.icon_url ? (
+                              <img src={method.icon_url} alt="" className="h-6" />
+                            ) : null}
+                            {method.name}
+                          </span>
+                          <Badge variant="outline">Coming soon</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </RadioGroup>
+              )}
+              {selectedMethod?.mode === "demo" && (
+                <p className="mt-3 text-xs font-medium text-amber-600">
+                  Test mode: this payment method is in demo mode and will complete instantly
+                  without charging a real gateway.
                 </p>
-              ) : null}
+              )}
             </CardContent>
           </Card>
         </div>
@@ -288,12 +345,12 @@ export default function Checkout() {
                 <span>Total</span>
                 <span>NPR {cartTotal.toLocaleString()}</span>
               </div>
-              <Button 
-                type="submit" 
-                form="checkout-form" 
-                className="w-full mt-4" 
+              <Button
+                type="submit"
+                form="checkout-form"
+                className="w-full mt-4"
                 size="lg"
-                disabled={loading}
+                disabled={loading || methodsLoading || !selectedMethod}
               >
                 {loading ? "Processing..." : `Place Order (NPR ${cartTotal.toLocaleString()})`}
               </Button>
@@ -306,6 +363,29 @@ export default function Checkout() {
       </div>
       </main>
       <Footer />
+    </div>
+  );
+}
+
+function PaymentOption({
+  method,
+  checked,
+}: {
+  method: CheckoutPaymentMethod;
+  checked: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-secondary/50 ${
+        checked ? "border-primary" : ""
+      }`}
+    >
+      <RadioGroupItem value={method.slug} id={method.slug} />
+      <Label htmlFor={method.slug} className="flex-1 cursor-pointer font-medium flex items-center gap-2">
+        {method.icon_url ? <img src={method.icon_url} alt="" className="h-6" /> : null}
+        {method.name}
+      </Label>
+      {method.mode === "demo" && <Badge variant="outline">Test</Badge>}
     </div>
   );
 }

@@ -117,8 +117,13 @@ npm run supabase:functions # Run edge functions locally
 | `storeadmin` | Store Admin | `/storeadmin/*` | Store-owned data |
 | `user` | User Dashboard | `/account/*` | Personal data only |
 
-**Default Super Admin:** `suadmin@tamrakarcomplex.com`  
-To create/reset: Run `supabase/migrations/fix_suadmin.sql` in Supabase SQL Editor
+**Default Super Admin:** `suadmin@tamrakarcomplex.com`
+
+To grant super-admin access, first create/sign up the user, then run this in the Supabase SQL editor:
+
+```sql
+SELECT public.bootstrap_suadmin_by_email('suadmin@tamrakarcomplex.com');
+```
 
 ## 📦 Project Structure
 

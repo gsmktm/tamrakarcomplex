@@ -193,7 +193,7 @@ export default function MobileInventoryManager({ storeId }: { storeId: string })
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                   <div className="flex items-center justify-between bg-muted/30 p-3 rounded-lg border">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-white rounded border flex items-center justify-center overflow-hidden">
+                      <div className="h-10 w-10 bg-background rounded border border-border flex items-center justify-center overflow-hidden">
                         {selectedModel.image ? <img src={selectedModel.image} className="h-full w-full object-contain" /> : <Smartphone className="h-5 w-5 text-primary" />}
                       </div>
                       <div>
@@ -282,9 +282,9 @@ export default function MobileInventoryManager({ storeId }: { storeId: string })
         </Dialog>
       </div>
 
-      <Card className="rounded-2xl border-slate-100 shadow-sm overflow-hidden">
+      <Card className="rounded-2xl border-border shadow-sm overflow-hidden">
         <Table>
-          <TableHeader className="bg-slate-50">
+          <TableHeader className="bg-muted">
             <TableRow>
               <TableHead className="font-bold">Product</TableHead>
               <TableHead className="font-bold">Variant</TableHead>
@@ -300,15 +300,15 @@ export default function MobileInventoryManager({ storeId }: { storeId: string })
             ) : inventory?.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground italic">No products in inventory. Click "Add Product" to start.</TableCell></TableRow>
             ) : inventory?.map((item: any) => (
-              <TableRow key={item.id} className="hover:bg-slate-50/50 transition-colors">
+              <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-white rounded border flex items-center justify-center overflow-hidden">
+                    <div className="h-10 w-10 bg-background rounded border border-border flex items-center justify-center overflow-hidden">
                       {Array.isArray(item.images) && item.images[0] ? <img src={item.images[0]} className="h-full w-full object-contain" /> : <Smartphone className="h-5 w-5 text-slate-300" />}
                     </div>
                     <div>
                       <p className="font-bold text-sm leading-tight">{item.title || item.model || item.model_id}</p>
-                      <Badge variant="secondary" className="text-[10px] h-4 mt-1 bg-slate-100 text-slate-600 uppercase">
+                      <Badge variant="secondary" className="text-[10px] h-4 mt-1 bg-slate-100 text-muted-foreground uppercase">
                         {item.condition}
                       </Badge>
                     </div>
@@ -363,7 +363,7 @@ export default function MobileInventoryManager({ storeId }: { storeId: string })
           {editingItem && (
             <div className="space-y-4 py-4">
               <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                <div className="h-10 w-10 bg-white rounded border flex items-center justify-center overflow-hidden">
+                <div className="h-10 w-10 bg-background rounded border border-border flex items-center justify-center overflow-hidden">
                   {Array.isArray(editingItem.images) && editingItem.images[0] ? <img src={editingItem.images[0]} className="h-full w-full object-contain" /> : <Smartphone className="h-5 w-5" />}
                 </div>
                 <div>

@@ -23,12 +23,14 @@ const MobilePriceBrand = lazy(() => import("@/pages/MobilePriceBrand"));
 const Brands = lazy(() => import("@/pages/Brands"));
 const MobileGuides = lazy(() => import("@/pages/MobileGuides"));
 const LaptopGuides = lazy(() => import("@/pages/LaptopGuides"));
+const LaptopTrend = lazy(() => import("@/pages/LaptopTrend"));
 const Compare = lazy(() => import("@/pages/Compare"));
 const MarketplaceBrowse = lazy(() => import("@/pages/marketplace/MarketplaceBrowse"));
 const SellWizard = lazy(() => import("@/pages/marketplace/SellWizard"));
 const ListingDetail = lazy(() => import("@/pages/marketplace/ListingDetail"));
 const Stores = lazy(() => import("@/pages/Stores"));
 const StoreApply = lazy(() => import("@/pages/StoreApply"));
+const StorePricing = lazy(() => import("@/pages/StorePricing"));
 const StoreDetail = lazy(() => import("@/pages/StoreDetail"));
 const ComplexMap = lazy(() => import("@/pages/ComplexMap"));
 const StoreManage = lazy(() => import("@/pages/StoreManage"));
@@ -38,8 +40,11 @@ const AutoSearchLandingPage = lazy(() => import("@/pages/AutoSearchLandingPage")
 const DeviceDetail = lazy(() => import("@/pages/repair/DeviceDetail"));
 const GuideDetailRepair = lazy(() => import("@/pages/repair/GuideDetail"));
 const RepairTracking = lazy(() => import("@/pages/repair/RepairTracking"));
+const RepairWizard = lazy(() => import("@/components/repair/RepairWizard"));
+const BookingSuccess = lazy(() => import("@/pages/BookingSuccess"));
 const CustomRepairRequest = lazy(() => import("@/pages/CustomRepairRequest"));
 const ContentPage = lazy(() => import("@/pages/ContentPage"));
+const AboutUs = lazy(() => import("@/pages/AboutUs"));
 const ContactUs = lazy(() => import("@/pages/ContactUs"));
 const SellYourPhone = lazy(() => import("@/pages/sell/SellYourPhone"));
 const ValuationEstimator = lazy(() => import("@/pages/ValuationEstimator"));
@@ -79,6 +84,11 @@ function RedirectModelToNew() {
   return <Navigate to={`/mobile/${slug ?? ''}`} replace />;
 }
 
+function RedirectArticleToStores() {
+  const { slug } = useParams<{ slug?: string }>();
+  return <Navigate to={slug ? `/stores/article/${slug}` : "/stores/article"} replace />;
+}
+
 export const publicRoutes = (
   <>
     <Route path="/" element={<Index />} />
@@ -98,6 +108,9 @@ export const publicRoutes = (
     <Route path="/marketplace/listing/:id" element={withSuspense(ListingDetail)} />
     <Route path="/stores" element={withSuspense(Stores)} />
     <Route path="/stores/apply" element={withSuspense(StoreApply)} />
+    <Route path="/stores/pricing" element={withSuspense(StorePricing)} />
+    <Route path="/stores/article" element={withSuspense(News)} />
+    <Route path="/stores/article/:slug" element={withSuspense(ArticleDetail)} />
     <Route path="/map" element={withSuspense(ComplexMap)} />
     <Route path="/stores/:id/manage" element={<RequireAuth>{withSuspense(StoreManage)}</RequireAuth>} />
     <Route path="/stores/inside/:shop_no" element={withSuspense(StoreDetail)} />
@@ -126,6 +139,8 @@ export const publicRoutes = (
     <Route path="/staff/*" element={<WildcardRedirect from="/staff" to="/staffadmin" />} />
     
     <Route path="/repair" element={withSuspense(RepairHub)} />
+    <Route path="/repair/book" element={withSuspense(RepairWizard)} />
+    <Route path="/repair/success" element={withSuspense(BookingSuccess)} />
     <Route path="/unlocking" element={withSuspense(UnlockingHub)} />
     <Route path="/search/:slug" element={withSuspense(AutoSearchLandingPage)} />
     <Route path="/repair/device/:slug" element={withSuspense(DeviceDetail)} />
@@ -133,7 +148,7 @@ export const publicRoutes = (
     <Route path="/repair/track" element={withSuspense(RepairTracking)} />
     <Route path="/repair-tracking" element={withSuspense(RepairTracking)} />
     <Route path="/repair/custom" element={withSuspense(CustomRepairRequest)} />
-    <Route path="/news" element={withSuspense(News)} />
+    <Route path="/news" element={<Navigate to="/stores/article" replace />} />
     <Route path="/reviews" element={withSuspense(Reviews)} />
     <Route path="/buy" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
     <Route path="/products" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
@@ -144,13 +159,16 @@ export const publicRoutes = (
     <Route path="/mobile-price/brand/:brand" element={<RedirectBrandToNew />} />
     <Route path="/mobile-price/:slug" element={<RedirectModelToNew />} />
     <Route path="/laptop-price" element={withSuspense(LaptopPrice)} />
-    <Route path="/article/:slug" element={withSuspense(ArticleDetail)} />
+    <Route path="/article" element={<RedirectArticleToStores />} />
+    <Route path="/article/:slug" element={<RedirectArticleToStores />} />
     <Route path="/guide/:slug" element={withSuspense(GuideDetail)} />
     <Route path="/product/:slug" element={withSuspense(ProductDetail)} />
     <Route path="/mobile/:slug" element={withSuspense(ModelDetailPage)} />
     <Route path="/brand/:brand" element={withSuspense(BrandProducts)} />
     <Route path="/mobile-guides" element={withSuspense(MobileGuides)} />
     <Route path="/laptop-guides" element={withSuspense(LaptopGuides)} />
+    <Route path="/laptop-trends" element={withSuspense(LaptopTrend)} />
+    <Route path="/laptops/trend" element={withSuspense(LaptopTrend)} />
     <Route path="/compare" element={withSuspense(Compare)} />
     
     {/* Content Pages */}
@@ -164,9 +182,20 @@ export const publicRoutes = (
         <ContentPage slug="terms-of-service" />
       </Suspense>
     } />
-    <Route path="/about-us" element={
+    <Route path="/about-us" element={withSuspense(AboutUs)} />
+    <Route path="/shipping-delivery" element={
       <Suspense fallback={<RouteFallback />}>
-        <ContentPage slug="about-us" />
+        <ContentPage slug="shipping-delivery" />
+      </Suspense>
+    } />
+    <Route path="/returns-refunds" element={
+      <Suspense fallback={<RouteFallback />}>
+        <ContentPage slug="returns-refunds" />
+      </Suspense>
+    } />
+    <Route path="/marketplace-disclosure" element={
+      <Suspense fallback={<RouteFallback />}>
+        <ContentPage slug="marketplace-disclosure" />
       </Suspense>
     } />
     <Route path="/contact-us" element={withSuspense(ContactUs)} />
@@ -180,7 +209,7 @@ export const publicRoutes = (
     <Route path="/shop" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
     <Route path="/explore" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
     <Route path="/prices" element={<Navigate to="/mobile-price" replace />} />
-    <Route path="/newsroom" element={<Navigate to="/news" replace />} />
+    <Route path="/newsroom" element={<Navigate to="/stores/article" replace />} />
     <Route path="/guides" element={<Navigate to="/mobile-guides" replace />} />
     <Route path="/apply-store" element={<Navigate to="/stores/apply" replace />} />
     <Route path="/store/:id" element={<ParamRouteRedirect to="/stores/:id" />} />

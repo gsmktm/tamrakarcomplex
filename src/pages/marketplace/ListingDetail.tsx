@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveListingImage } from "@/lib/phoneImages";
-import { Loader2, ArrowLeft, MapPin, Calendar, User, Edit, Store } from "lucide-react";
+import { Loader2, ArrowLeft, MapPin, Calendar, User, Edit, Store, ShoppingCart, Zap, MessageCircle, Heart, Share2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -24,6 +24,11 @@ import { decodeListingDescription, formatCondition, toCoarseLocation } from "@/l
 import { absoluteUrl, breadcrumbSchema } from "@/lib/seo";
 import { getPublicStorePath } from "@/lib/storeRoutes";
 import { getFallbackMarketplaceListings } from "@/services/publicFallbackData";
+import { useCart } from "@/contexts/CartContext";
+import { canShowPhoneNumber } from "@/lib/storePackages";
+import { buildWhatsAppPurchaseUrl } from "@/lib/marketplaceContact";
+import { useWishlist } from "@/hooks/useWishlist";
+import { toast } from "sonner";
 
 interface StoreInfo {
   id: string;
@@ -34,6 +39,11 @@ interface StoreInfo {
   shop_no: string | null;
   location: string | null;
   is_verified: boolean;
+  phone?: string | null;
+  whatsapp?: string | null;
+  package_slug?: string | null;
+  is_featured?: boolean | null;
+  subscription_status?: string | null;
 }
 
 type ListingDetailRecord = {
@@ -61,7 +71,10 @@ type ListingDetailRecord = {
 
 export default function ListingDetail() {
   const { id } = useParams();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
+  const navigate = useNavigate();
+  const { addToCart } = useCart();
+  const { hasItem, toggleItem } = useWishlist();
   const [activeImage, setActiveImage] = useState<string | null>(null);
   const [store, setStore] = useState<StoreInfo | null>(null);
 
@@ -80,7 +93,12 @@ export default function ListingDetail() {
           : unifiedData.images
             ? Object.values(unifiedData.images as Record<string, string>).filter(Boolean)
             : [];
-        const resolvedFirst = resolveListingImage(unifiedData.title ?? null, unifiedData.brand ?? null, rawImages);
+        const resolvedFirst = resolveListingImage(
+          unifiedData.title ?? null,
+          unifiedData.brand ?? null,
+          rawImages,
+          unifiedData.model ?? null,
+        );
         const images: string[] = resolvedFirst
           ? [resolvedFirst, ...rawImages.filter((u: string) => u !== resolvedFirst)]
           : rawImages;
@@ -102,7 +120,12 @@ export default function ListingDetail() {
 
       if (data) {
         const rawImgs = Array.isArray(data.images) ? data.images as string[] : [];
-        const resolvedFirst = resolveListingImage(data.title ?? null, (data as any).brand ?? null, rawImgs);
+        const resolvedFirst = resolveListingImage(
+          data.title ?? null,
+          (data as any).brand ?? null,
+          rawImgs,
+          (data as any).model ?? null,
+        );
         const resolvedImgs: string[] = resolvedFirst
           ? [resolvedFirst, ...rawImgs.filter((u) => u !== resolvedFirst)]
           : rawImgs;
@@ -139,7 +162,7 @@ export default function ListingDetail() {
       if (listing?.store_id) {
         const { data } = await supabase
           .from("stores")
-          .select("id, name, slug, seo_slug, logo_url, shop_no, location, is_verified")
+          .select("id, name, slug, seo_slug, logo_url, shop_no, location, is_verified, phone, whatsapp, package_slug, is_featured, subscription_status")
           .eq("id", listing.store_id)
           .single();
         if (data) setStore(data as StoreInfo);
@@ -185,6 +208,72 @@ export default function ListingDetail() {
   const availableDate =
     meta?.available_date ? new Date(meta.available_date).toLocaleDateString() : null;
   const contactInfo = listing.contact_info || "";
+  const isCatalogProduct = listing.source_type === "store_product";
+  const canCheckout = isCatalogProduct && Boolean(listing.store_id) && Number(listing.stock ?? 0) > 0;
+  const checkoutProduct = {
+    id: listing.id,
+    store_product_id: listing.id,
+    source_type: "store_product" as const,
+    name: listing.title,
+    slug: `marketplace-${listing.id}`,
+    brand: listing.brand,
+    price: `NPR ${listing.price.toLocaleString()}`,
+    price_value: listing.price,
+    store_id: listing.store_id,
+    image: currentImage,
+    images,
+    rating: null,
+    category: listing.category || "marketplace",
+    description: publicDescription,
+    in_stock: canCheckout,
+    stock_quantity: listing.stock,
+  };
+  const storeContact = store ? canShowPhoneNumber(store.package_slug, {
+    isActive: store.subscription_status === "active" || store.subscription_status === "trialing",
+    isFeatured: Boolean(store.is_featured),
+    featuredContactVisible: Boolean(store.is_featured),
+    isLoggedIn: Boolean(user),
+  }) : null;
+  const contactNumber = store
+    ? (storeContact?.showWhatsApp ? store.whatsapp || store.phone : null)
+    : contactInfo;
+  const whatsappUrl = buildWhatsAppPurchaseUrl(contactNumber, {
+    id: listing.id,
+    title: listing.title,
+    price: listing.price,
+    condition: conditionLabel,
+    storeName: store?.name,
+  }, absoluteUrl(`/marketplace/listing/${listing.id}`));
+  const openWhatsApp = () => {
+    if (!whatsappUrl) return;
+    if (user && listing.store_id) {
+      void (supabase as any).rpc("record_marketplace_whatsapp_intent", {
+        p_store_id: listing.store_id,
+        p_item_id: listing.id,
+        p_item_title: listing.title,
+        p_item_price: listing.price,
+        p_source_page: `/marketplace/listing/${listing.id}`,
+      });
+    }
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+  };
+  const saved = hasItem(listing.id);
+  const saveProduct = () => {
+    const added = toggleItem(checkoutProduct);
+    toast.success(added ? "Saved to your wishlist" : "Removed from your wishlist");
+  };
+  const shareProduct = async () => {
+    const url = absoluteUrl(`/marketplace/listing/${listing.id}`);
+    try {
+      if (navigator.share) await navigator.share({ title: listing.title, text: `${listing.title} — NPR ${listing.price.toLocaleString()}`, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        toast.success("Listing link copied");
+      }
+    } catch (error) {
+      if ((error as DOMException)?.name !== "AbortError") toast.error("Could not share this listing");
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -232,6 +321,9 @@ export default function ListingDetail() {
               Back to Listings
             </Link>
           </Button>
+          <div className="flex items-center gap-2">
+          {canCheckout ? <Button variant="outline" size="sm" onClick={saveProduct}><Heart className={`mr-2 h-4 w-4 ${saved ? "fill-rose-500 text-rose-500" : ""}`} />{saved ? "Saved" : "Save"}</Button> : null}
+          <Button variant="outline" size="sm" onClick={shareProduct}><Share2 className="mr-2 h-4 w-4" />Share</Button>
           {isOwner && (
             <Button asChild variant="outline" size="sm" className="gap-2">
               <Link to={listing.source_type === "store_product" ? "/storeadmin/products" : `/marketplace/edit/${listing.id}`}>
@@ -240,16 +332,20 @@ export default function ListingDetail() {
               </Link>
             </Button>
           )}
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
+        <div className="grid md:grid-cols-2 gap-8 lg:gap-12 rounded-[2rem] border bg-card/60 p-4 md:p-7 shadow-[0_30px_80px_-45px_rgba(15,23,42,.45)]">
           {/* Image Gallery */}
           <div className="space-y-4">
-            <div className="aspect-square bg-muted rounded-xl overflow-hidden flex items-center justify-center text-muted-foreground text-lg relative border">
+            <div className="aspect-square bg-[radial-gradient(circle_at_center,hsl(var(--background)),hsl(var(--muted)))] rounded-[1.75rem] overflow-hidden flex items-center justify-center text-muted-foreground text-lg relative border">
               <SafeImage 
                 src={currentImage} 
                 alt={listing.title} 
-                className="w-full h-full object-contain bg-white"
+                aspect="square"
+                width={720}
+                height={720}
+                className={`w-full h-full ${isCatalogProduct ? "object-contain p-6 md:p-10" : "object-contain"}`}
               />
             </div>
             
@@ -259,13 +355,16 @@ export default function ListingDetail() {
                   {images.map((img: string, index: number) => (
                     <CarouselItem key={`${index}-${img}`} className="pl-2 basis-1/4">
                       <div 
-                        className={`aspect-square rounded-md overflow-hidden cursor-pointer border-2 transition-all ${activeImage === img || (!activeImage && index === 0) ? 'border-primary' : 'border-transparent hover:border-primary/50'}`}
+                        className={`aspect-square rounded-xl overflow-hidden cursor-pointer border-2 bg-muted transition-all ${activeImage === img || (!activeImage && index === 0) ? 'border-primary' : 'border-transparent hover:border-primary/50'}`}
                         onClick={() => setActiveImage(img)}
                       >
                         <SafeImage 
                           src={img} 
                           alt={`${listing.title} ${index + 1}`} 
-                          className="w-full h-full object-cover"
+                          aspect="square"
+                          width={144}
+                          height={144}
+                          className={`w-full h-full ${isCatalogProduct ? "object-contain p-2" : "object-cover"}`}
                         />
                       </div>
                     </CarouselItem>
@@ -288,9 +387,26 @@ export default function ListingDetail() {
               <div className="text-3xl font-bold text-primary">
                 Rs. {listing.price.toLocaleString()}
               </div>
+              {canCheckout ? (
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <Button size="lg" variant="outline" className="h-12 rounded-xl font-bold" onClick={() => addToCart(checkoutProduct)}><ShoppingCart className="mr-2 h-5 w-5" />Add to cart</Button>
+                  <Button size="lg" className="h-12 rounded-xl font-bold" onClick={() => { addToCart(checkoutProduct); navigate("/checkout"); }}><Zap className="mr-2 h-5 w-5" />Buy now</Button>
+                  {whatsappUrl ? <Button size="lg" className="col-span-2 h-12 rounded-xl bg-emerald-600 font-bold text-white hover:bg-emerald-700" onClick={openWhatsApp}><MessageCircle className="mr-2 h-5 w-5" />Ask to buy on WhatsApp</Button> : null}
+                </div>
+              ) : isCatalogProduct ? (
+                <Badge variant="secondary" className="mt-5">Currently out of stock</Badge>
+              ) : (
+                <p className="mt-5 rounded-xl border bg-muted/30 p-3 text-sm text-muted-foreground">Private-seller listings use direct seller contact. Platform checkout is available for store inventory.</p>
+              )}
             </div>
 
             <Separator />
+
+            <div className="grid grid-cols-3 gap-2 rounded-2xl border bg-emerald-500/5 p-3 text-center text-xs font-medium">
+              <span><ShieldCheck className="mx-auto mb-1 h-4 w-4 text-emerald-600" />Verify IMEI</span>
+              <span><ShieldCheck className="mx-auto mb-1 h-4 w-4 text-emerald-600" />Confirm warranty</span>
+              <span><ShieldCheck className="mx-auto mb-1 h-4 w-4 text-emerald-600" />Pay securely</span>
+            </div>
 
             <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
                <div className="flex items-center gap-3">
@@ -425,7 +541,7 @@ export default function ListingDetail() {
                   </div>
                   <div className="p-6 space-y-4">
                     <div className="flex items-center gap-4">
-                      <div className="h-16 w-16 rounded-xl border bg-white overflow-hidden shrink-0">
+                      <div className="h-16 w-16 rounded-xl border bg-card overflow-hidden shrink-0">
                         {store.logo_url ? (
                           <img src={store.logo_url} alt={store.name} className="h-full w-full object-cover" />
                         ) : (
@@ -448,12 +564,9 @@ export default function ListingDetail() {
                       <Button variant="outline" className="rounded-xl h-11 font-bold border-primary/20" asChild>
                         <Link to={`/marketplace?store=${store.id}`}>All Listings</Link>
                       </Button>
-                      {contactInfo && (
-                        <Button variant="outline" className="h-11 font-bold" onClick={() => window.open(`tel:${contactInfo}`)}>
-                          Call Store
-                        </Button>
-                      )}
+                      {storeContact?.showPhone && store.phone ? <Button variant="outline" className="h-11 font-bold" onClick={() => window.open(`tel:${store.phone}`)}>Call Store</Button> : null}
                     </div>
+                    {whatsappUrl ? <Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700" onClick={openWhatsApp}><MessageCircle className="mr-2 h-4 w-4" />WhatsApp product details</Button> : null}
                   </div>
                 </CardContent>
               </Card>

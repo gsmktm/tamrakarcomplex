@@ -26,7 +26,7 @@ const categoryColorMap: Record<string, string> = {
 export function ArticleCard({ article, featured = false }: ArticleCardProps) {
   if (featured) {
     return (
-      <Link to={`/article/${article.slug}`} className="group">
+      <Link to={`/stores/article/${article.slug}`} className="group">
         <div className="article-card h-full">
           <div className="relative aspect-[16/10] overflow-hidden">
             <SafeImage
@@ -64,7 +64,7 @@ export function ArticleCard({ article, featured = false }: ArticleCardProps) {
   }
 
   return (
-    <Link to={`/article/${article.slug}`} className="group">
+    <Link to={`/stores/article/${article.slug}`} className="group">
       <div className="article-card h-full flex flex-col">
         <div className="relative aspect-video overflow-hidden bg-secondary/25">
           <SafeImage

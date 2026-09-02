@@ -21,8 +21,10 @@ import {
   Search, MapPin, Phone, Mail, Globe, ExternalLink,
   CheckCircle2, Gem, Star, Award, Lock, Store as StoreIcon,
   ArrowRight, Crown, Sparkles, Building2, ChevronRight, ShieldCheck,
+  Navigation, Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { buildEntitlements, getRawPackageEntitlements } from "@/lib/storeEntitlements";
 
 // ─── Tier filter tabs ─────────────────────────────────────────────────────────
 type TierFilter = "all" | "diamond" | "gold" | "silver" | "free";
@@ -113,7 +115,7 @@ function ServiceTag({ svc }: { svc: string }) {
       isRepair ? "bg-red-500/10 text-red-500 border-red-500/20" :
       isExchange ? "bg-green-500/10 text-green-500 border-green-500/20" :
       isSales ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
-      "bg-slate-500/10 text-slate-500 border-slate-500/20"
+      "bg-muted0/10 text-muted-foreground border-slate-500/20"
     )}>
       {svc}
     </span>
@@ -121,12 +123,15 @@ function ServiceTag({ svc }: { svc: string }) {
 }
 
 // ─── Modern Store Card ────────────────────────────────────────────────────────
-function ModernStoreCard({ store, isAdmin }: { store: StoreDirectoryItem; isAdmin: boolean }) {
+function ModernStoreCard({ store, isAdmin, index = 0 }: { store: StoreDirectoryItem; isAdmin: boolean; index?: number }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const tier = store.subscription_tier || "free";
   const isDiamond = tier === "diamond";
   const isGold = tier === "gold";
+  const entitlements = buildEntitlements(tier);
+  const rawEntitlements = getRawPackageEntitlements(tier);
+  const canShowPhone = entitlements.canShowPhonePublic || (!!user && entitlements.canShowPhoneLoginRequired);
 
   // Prefetch store detail on hover so the page feels instant on click
   const handleMouseEnter = useCallback(() => {
@@ -142,12 +147,14 @@ function ModernStoreCard({ store, isAdmin }: { store: StoreDirectoryItem; isAdmi
   return (
     <div
       onMouseEnter={handleMouseEnter}
+      style={{ animationDelay: `${Math.min(index, 8) * 70}ms` }}
       className={cn(
-      "group relative flex flex-col p-6 rounded-[2.5rem] transition-all duration-500 border h-full",
-      "hover:shadow-[0_20px_50px_-20px_rgba(0,0,0,0.1)] hover:-translate-y-1",
-      isDiamond ? "bg-white/40 backdrop-blur-xl border-cyan-100 shadow-[0_10px_30px_-15px_rgba(34,211,238,0.1)]" : 
-      isGold ? "bg-white/60 border-amber-50" : "bg-white/80 border-slate-100"
+      "group relative flex flex-col overflow-hidden p-6 rounded-[2.5rem] transition-all duration-500 border h-full animate-fade-up will-change-transform",
+      "hover:shadow-[0_28px_70px_-24px_rgba(15,23,42,0.24)] hover:-translate-y-2 hover:[transform:translateY(-8px)_rotateX(1.5deg)]",
+      isDiamond ? "bg-card/40 backdrop-blur-xl border-cyan-100 shadow-[0_10px_30px_-15px_rgba(34,211,238,0.1)]" :
+      isGold ? "bg-card/60 border-amber-50" : "bg-card/80 border-border"
     )}>
+      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent" />
       {/* Decorative floating shapes for Premium tiers */}
       {isDiamond && (
         <>
@@ -160,10 +167,10 @@ function ModernStoreCard({ store, isAdmin }: { store: StoreDirectoryItem; isAdmi
 
       {/* Header with Avatar & Title */}
       <div className="flex items-start gap-5 mb-6">
-        <StoreAvatar name={store.name} logoUrl={store.logo_url} tier={tier} size="md" />
+        <StoreAvatar name={store.name} logoUrl={rawEntitlements.logo ? store.logo_url : null} tier={tier} size="md" />
         <div className="flex-1 min-w-0 pt-1">
           <div className="flex items-center gap-2 mb-1.5">
-            {store.is_verified && (
+            {store.is_verified && entitlements.canHaveVerifiedBadge && (
               <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-bold text-[9px] uppercase tracking-tighter">
                 <CheckCircle2 className="h-2.5 w-2.5" /> Verified
               </div>
@@ -171,11 +178,11 @@ function ModernStoreCard({ store, isAdmin }: { store: StoreDirectoryItem; isAdmi
             <TierBadge tier={tier} />
           </div>
           <Link to={getStorePath(store)} className="block group/title">
-            <h3 className="font-display text-xl font-black text-slate-900 leading-tight group-hover/title:text-primary transition-colors">
+            <h3 className="font-display text-xl font-black text-foreground leading-tight group-hover/title:text-primary transition-colors">
               {store.name}
             </h3>
           </Link>
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-1">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mt-1">
             <MapPin className="h-3 w-3 text-slate-400" />
             {store.location}
           </div>
@@ -184,7 +191,7 @@ function ModernStoreCard({ store, isAdmin }: { store: StoreDirectoryItem; isAdmi
 
       {/* Description & Services */}
       <div className="flex-1 flex flex-col">
-        <p className="text-sm text-slate-600 leading-relaxed font-medium line-clamp-2 mb-5">
+        <p className="text-sm text-muted-foreground leading-relaxed font-medium line-clamp-2 mb-5">
           {store.description || "Leading tech provider offering genuine products and certified repair services at Tamrakar Complex."}
         </p>
 
@@ -200,50 +207,51 @@ function ModernStoreCard({ store, isAdmin }: { store: StoreDirectoryItem; isAdmi
       {/* Footer Actions & Gated Info */}
       <div className="pt-5 border-t border-slate-50 mt-auto space-y-4">
         <div className="flex flex-wrap items-center gap-y-2 gap-x-4">
-          {user ? (
-            <>
-              {store.phone && (
-                <a href={`tel:${store.phone}`} className="flex items-center gap-2 text-xs font-black text-slate-900 hover:text-primary transition-colors">
-                  <div className="w-8 h-8 rounded-2xl bg-slate-50 flex items-center justify-center">
+          <>
+              {store.phone && canShowPhone && (
+                <a href={`tel:${store.phone}`} className="flex items-center gap-2 text-xs font-black text-foreground hover:text-primary transition-colors">
+                  <div className="w-8 h-8 rounded-2xl bg-muted flex items-center justify-center">
                     <Phone className="h-3.5 w-3.5 text-slate-400" />
                   </div>
                   {store.phone}
                 </a>
               )}
-              {store.shop_no && (
-                <div className="flex items-center gap-2 text-xs font-black text-slate-900">
-                  <div className="w-8 h-8 rounded-2xl bg-slate-50 flex items-center justify-center">
+              {store.shop_no && rawEntitlements.shopNo && (
+                <div className="flex items-center gap-2 text-xs font-black text-foreground">
+                  <div className="w-8 h-8 rounded-2xl bg-muted flex items-center justify-center">
                     <Building2 className="h-3.5 w-3.5 text-slate-400" />
                   </div>
                   Shop #{store.shop_no}
                 </div>
               )}
             </>
-          ) : (
-            <Link to="/auth?redirect=/stores" className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-50 border border-slate-100 text-[11px] font-black text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all group/lock">
+          {!canShowPhone && !user && entitlements.canShowPhoneLoginRequired && store.phone && (
+            <Link to="/auth?redirect=/stores" className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-muted border border-border text-[11px] font-black text-slate-400 hover:bg-slate-100 hover:text-muted-foreground transition-all group/lock">
               <Lock className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" />
-              LOGIN TO VIEW CONTACT & SHOP NO.
+              LOGIN TO VIEW CONTACT
             </Link>
           )}
         </div>
 
         <div className="flex gap-2">
-                  <Button 
-                    variant="ghost" 
-                    className="flex-1 rounded-2xl h-12 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50" 
+                  <Button
+                    variant="ghost"
+                    className="flex-1 rounded-2xl h-12 font-black text-[11px] uppercase tracking-widest hover:bg-muted"
                     asChild
                   >
                     <Link to={getStorePath(store)}>Store Profile</Link>
                   </Button>
-                  <Button 
-                    className={cn(
-                      "flex-1 rounded-2xl h-12 font-black text-[11px] uppercase tracking-widest shadow-lg shadow-primary/20",
-                      isDiamond ? "bg-cyan-500 hover:bg-cyan-600" : "bg-primary"
-                    )}
-                    asChild
-                  >
-                    <Link to={`/marketplace?store=${store.slug || store.id}`}>Visit Marketplace</Link>
-                  </Button>
+                  {entitlements.canEnableMarketplace && (
+                    <Button
+                      className={cn(
+                        "flex-1 rounded-2xl h-12 font-black text-[11px] uppercase tracking-widest shadow-lg shadow-primary/20",
+                        isDiamond ? "bg-cyan-500 hover:bg-cyan-600" : "bg-primary"
+                      )}
+                      asChild
+                    >
+                      <Link to={`/marketplace?store=${store.slug || store.id}`}>Visit Marketplace</Link>
+                    </Button>
+                  )}
                 </div>
       </div>
     </div>
@@ -639,43 +647,6 @@ function SectionHeader({
   );
 }
 
-// ─── Stats bar ────────────────────────────────────────────────────────────────
-function StatsBar({ stores }: { stores: StoreDirectoryItem[] }) {
-  const diamond = stores.filter((s) => s.subscription_tier === "diamond").length;
-  const gold    = stores.filter((s) => s.subscription_tier === "gold").length;
-  const silver  = stores.filter((s) => s.subscription_tier === "silver").length;
-  const total   = stores.length;
-
-  return (
-    <div className="flex flex-wrap items-center gap-6 mt-6 py-4 px-6 rounded-2xl bg-card/50 border backdrop-blur-sm">
-      <div className="flex items-center gap-2">
-        <span className="text-2xl font-black text-cyan-400">{diamond}</span>
-        <span className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Diamond</span>
-      </div>
-      <div className="w-px h-8 bg-border hidden sm:block" />
-      <div className="flex items-center gap-2">
-        <span className="text-2xl font-black text-amber-400">{gold}</span>
-        <span className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Gold</span>
-      </div>
-      <div className="w-px h-8 bg-border hidden sm:block" />
-      <div className="flex items-center gap-2">
-        <span className="text-2xl font-black text-slate-400">{silver}</span>
-        <span className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Silver</span>
-      </div>
-      <div className="w-px h-8 bg-border hidden sm:block" />
-      <div className="flex items-center gap-2">
-        <span className="text-2xl font-black text-primary">{total}</span>
-        <span className="text-xs uppercase tracking-widest font-bold text-muted-foreground">Total</span>
-      </div>
-      
-      <div className="ml-auto flex items-center gap-2 text-[10px] font-medium text-muted-foreground bg-muted/50 px-3 py-1 rounded-full border">
-        <ShieldCheck className="h-3 w-3 text-blue-500" />
-        Admin view — all store details visible
-      </div>
-    </div>
-  );
-}
-
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
 function LoadingSkeleton() {
   return (
@@ -714,8 +685,8 @@ export default function Stores() {
   const [floorFilter, setFloorFilter] = useState("all");
   const [blockFilter, setBlockFilter] = useState("all");
 
-  const { data: storesResponse, isLoading } = useStoreDirectory();
-  const stores = storesResponse?.data || [];
+  const { data: storesResponse, isLoading } = useStoreDirectory({ search: search.trim() || undefined, package_slug: tierFilter !== 'all' ? tierFilter : undefined, limit: 100 });
+  const stores = useMemo(() => storesResponse?.data ?? [], [storesResponse?.data]);
   const { user, role } = useAuth();
   const isAdmin = isAdminRole(role);
   const floorOptions = useMemo(() => Array.from(new Set(stores.map((s) => s.floor).filter(Boolean))).sort(), [stores]);
@@ -803,55 +774,55 @@ export default function Stores() {
 
       <main className="flex-1">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-primary/8 via-background to-secondary/15 border-b">
-          {/* Decorative orbs */}
-          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-cyan-400/6 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-8 -left-8 w-48 h-48 rounded-full bg-amber-400/6 blur-3xl pointer-events-none" />
+        <div className="relative isolate overflow-hidden border-b bg-slate-950 text-white">
+          <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.06)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+          <div className="absolute -top-32 right-[5%] h-96 w-96 rounded-full bg-cyan-400/20 blur-[100px] pointer-events-none" />
+          <div className="absolute -bottom-40 left-[15%] h-80 w-80 rounded-full bg-amber-400/15 blur-[90px] pointer-events-none" />
+          <div className="absolute left-1/2 top-20 h-40 w-40 rounded-full border border-white/10 bg-white/[0.03] [transform:rotateX(65deg)_rotateZ(35deg)] shadow-[0_30px_80px_rgba(34,211,238,.15)]" />
 
-          <div className="container py-10 relative">
-            <nav className="flex items-center gap-1.5 text-xs text-muted-foreground mb-5">
-              <Link to="/" className="hover:text-primary transition-colors">Home</Link>
+          <div className="container py-12 md:py-20 relative">
+            <nav className="flex items-center gap-1.5 text-xs text-white/50 mb-8">
+              <Link to="/" className="hover:text-white transition-colors">Home</Link>
               <ChevronRight className="h-3 w-3" />
-              <span className="text-foreground font-medium">Store Directory</span>
+              <span className="text-white font-medium">Store Directory</span>
             </nav>
 
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary mb-3">
-                  <Sparkles className="h-3 w-3" /> Tamrakar Complex, Kathmandu
+            <div className="grid items-end gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,.65fr)]">
+              <div className="animate-fade-up">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs font-semibold text-cyan-200 mb-5 backdrop-blur-xl">
+                  <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" /><span className="relative h-2 w-2 rounded-full bg-emerald-400" /></span>
+                  Nepal's gadget district, now online
                 </div>
-                <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight mb-2">
-                  Store Directory
+                <h1 className="font-display max-w-3xl text-4xl font-black leading-[.98] tracking-[-0.045em] md:text-6xl lg:text-7xl">
+                  Find your next <span className="bg-gradient-to-r from-cyan-300 via-white to-amber-200 bg-clip-text text-transparent">trusted gadget store.</span>
                 </h1>
-                <p className="text-muted-foreground text-base max-w-xl">
-                  Discover verified stores, repair centers, and official distributors — from Diamond flagship showrooms to neighbourhood specialists.
+                <p className="mt-5 max-w-2xl text-base leading-7 text-white/60 md:text-lg">
+                  Explore Tamrakar Complex floor by floor. Compare verified sellers, specialist repair labs, accessories, and exchange services before you visit.
                 </p>
 
-                {!isLoading && <StatsBar stores={stores} />}
+                <div className="mt-7 flex flex-wrap gap-3 text-xs font-semibold text-white/60">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.06] px-3 py-2"><ShieldCheck className="h-3.5 w-3.5 text-emerald-300" /> Verified membership tiers</span>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[.06] px-3 py-2"><MapPin className="h-3.5 w-3.5 text-cyan-300" /> Floor and block discovery</span>
+                </div>
               </div>
 
-              {/* Search */}
-              <div className="w-full md:w-72 shrink-0">
+              <div className="relative animate-fade-up rounded-[2rem] border border-white/15 bg-white/[0.08] p-5 shadow-[0_30px_80px_-30px_rgba(34,211,238,.5)] backdrop-blur-2xl [animation-delay:120ms]">
+                <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-200">Discovery console</p><p className="mt-1 text-sm text-white/55">Search the complete store directory</p></div><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-300 text-slate-950"><Navigation className="h-5 w-5" /></div></div>
                 <div className="relative">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Search stores, services…"
+                    placeholder="Store, shop no. or service…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-10 h-11 rounded-xl"
+                    className="pl-11 h-14 rounded-2xl border-white/10 bg-white text-slate-950 shadow-xl placeholder:text-slate-400"
                   />
                 </div>
-                {isAdmin && (
-                  <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Crown className="h-3 w-3 text-cyan-400" />
-                    <span>Admin view — all store details visible</span>
-                  </div>
-                )}
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-semibold text-white/55"><span className="rounded-xl bg-white/[.06] px-2 py-2"><ShieldCheck className="mx-auto mb-1 h-3.5 w-3.5 text-emerald-300" />Verified</span><span className="rounded-xl bg-white/[.06] px-2 py-2"><Zap className="mx-auto mb-1 h-3.5 w-3.5 text-amber-300" />Fast compare</span><span className="rounded-xl bg-white/[.06] px-2 py-2"><MapPin className="mx-auto mb-1 h-3.5 w-3.5 text-cyan-300" />Floor guide</span></div>
               </div>
             </div>
 
             {/* Tier filter tabs */}
-            <div className="flex flex-wrap gap-2 mt-6">
+            <div className="flex flex-wrap gap-2 mt-10 border-t border-white/10 pt-6">
               {TIER_TABS.map((tab) => {
                 const count = tab.key === "all" ? stores.length
                   : tab.key === "diamond" ? stores.filter((s) => s.subscription_tier === "diamond").length
@@ -863,8 +834,8 @@ export default function Stores() {
                 const tierColors: Record<TierFilter, string> = {
                   all:     "bg-primary text-primary-foreground border-primary",
                   diamond: "bg-gradient-to-r from-cyan-500 to-blue-600 text-white border-cyan-400",
-                  gold:    "bg-gradient-to-r from-amber-400 to-yellow-500 text-black border-amber-400",
-                  silver:  "bg-gradient-to-r from-slate-300 to-slate-400 text-black border-slate-400",
+                  gold:    "bg-gradient-to-r from-amber-400 to-yellow-500 text-foreground border-amber-400",
+                  silver:  "bg-gradient-to-r from-slate-300 to-slate-400 text-foreground border-slate-400",
                   free:    "bg-muted text-foreground border-muted-foreground/30",
                 };
 
@@ -876,11 +847,11 @@ export default function Stores() {
                       "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium transition-all",
                       isActive
                         ? tierColors[tab.key]
-                        : "bg-background border-border hover:border-primary/40 hover:bg-muted"
+                        : "bg-white/[.06] border-white/10 text-white/70 hover:border-white/30 hover:bg-white/10"
                     )}
                   >
                     {tab.icon} {tab.label}
-                    <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-bold", isActive ? "bg-white/20" : "bg-muted text-muted-foreground")}>
+                    <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-bold", isActive ? "bg-card/20" : "bg-white/10 text-white/60")}>
                       {count}
                     </span>
                   </button>
@@ -895,7 +866,7 @@ export default function Stores() {
                   onClick={() => setServiceFilter(tab.key)}
                   className={cn(
                     "inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                    serviceFilter === tab.key ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted",
+                    serviceFilter === tab.key ? "border-cyan-300 bg-cyan-300 text-slate-950" : "border-white/10 bg-white/[.05] text-white/60 hover:bg-white/10",
                   )}
                 >
                   {tab.label}
@@ -907,7 +878,7 @@ export default function Stores() {
                   onClick={() => setFloorFilter(floorFilter === floor ? "all" : String(floor))}
                   className={cn(
                     "inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                    floorFilter === floor ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted",
+                    floorFilter === floor ? "border-cyan-300 bg-cyan-300 text-slate-950" : "border-white/10 bg-white/[.05] text-white/60 hover:bg-white/10",
                   )}
                 >
                   Floor {floor}
@@ -919,7 +890,7 @@ export default function Stores() {
                   onClick={() => setBlockFilter(blockFilter === block ? "all" : String(block))}
                   className={cn(
                     "inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                    blockFilter === block ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted",
+                    blockFilter === block ? "border-cyan-300 bg-cyan-300 text-slate-950" : "border-white/10 bg-white/[.05] text-white/60 hover:bg-white/10",
                   )}
                 >
                   Block {block}
@@ -954,8 +925,8 @@ export default function Stores() {
                     description="Premium flagship stores with full service visibility and priority placement"
                   />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {diamondStores.map((s) => (
-                      <ModernStoreCard key={s.id} store={s} isAdmin={isAdmin} />
+                    {diamondStores.map((s, index) => (
+                      <ModernStoreCard key={s.id} store={s} isAdmin={isAdmin} index={index} />
                     ))}
                   </div>
                 </section>
@@ -971,8 +942,8 @@ export default function Stores() {
                     description="Verified stores with full contact details, services, and dedicated profiles"
                   />
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {goldStores.map((s) => (
-                      <ModernStoreCard key={s.id} store={s} isAdmin={isAdmin} />
+                    {goldStores.map((s, index) => (
+                      <ModernStoreCard key={s.id} store={s} isAdmin={isAdmin} index={index} />
                     ))}
                   </div>
                 </section>
@@ -988,8 +959,8 @@ export default function Stores() {
                     description="Listed stores with basic contact details and service information"
                   />
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {silverStores.map((s) => (
-                      <ModernStoreCard key={s.id} store={s} isAdmin={isAdmin} />
+                    {silverStores.map((s, index) => (
+                      <ModernStoreCard key={s.id} store={s} isAdmin={isAdmin} index={index} />
                     ))}
                   </div>
                 </section>
@@ -1052,26 +1023,26 @@ export default function Stores() {
                   </div>
                   <h2 className="font-display text-2xl md:text-3xl font-bold mb-2">List your store at Tamrakar Complex</h2>
                   <p className="text-background/70 text-sm max-w-lg">
-                    Get discovered by thousands of buyers. Silver, Gold, and Diamond plans include full profile listing, phone, email, website, services, priority placement, and a dedicated store page.
+                    Get discovered by thousands of buyers. Compare listing limits, contact visibility, analytics, team access, verification, and featured placement before choosing a plan.
                   </p>
                   <div className="flex flex-wrap gap-3 mt-4">
                     {[
-                      { tier: "Silver", price: "Rs. 1,000/mo" },
-                      { tier: "Gold",   price: "Rs. 2,500/mo" },
-                      { tier: "Diamond", price: "Rs. 5,000/mo" },
-                    ].map(({ tier, price }) => (
+                      { tier: "Silver", feature: "Premium profile" },
+                      { tier: "Gold", feature: "Public contact + boost" },
+                      { tier: "Diamond", feature: "Maximum visibility" },
+                    ].map(({ tier, feature }) => (
                       <div key={tier} className="px-3 py-1.5 rounded-lg bg-background/10 border border-background/20 text-sm">
-                        <span className="font-bold">{tier}</span> — {price}
+                        <span className="font-bold">{tier}</span> — {feature}
                       </div>
                     ))}
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 shrink-0">
-                  <Button size="lg" className="bg-white text-black hover:bg-white/90 gap-2" asChild>
-                    <Link to="/contact-us">Get Listed <ArrowRight className="h-4 w-4" /></Link>
+                  <Button size="lg" className="bg-card text-foreground hover:bg-card/90 gap-2" asChild>
+                    <Link to="/stores/pricing">Compare Plans <ArrowRight className="h-4 w-4" /></Link>
                   </Button>
                   <Button size="sm" variant="ghost" className="text-background/70 hover:text-background hover:bg-background/10" asChild>
-                    <Link to="/services">Learn more</Link>
+                    <Link to="/stores/apply">Apply for a store</Link>
                   </Button>
                 </div>
               </div>

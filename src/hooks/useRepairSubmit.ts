@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { createRepairRequest } from "@/services/repairService";
 
 export type RepairRequestInput = {
   device_brand: string;
@@ -9,6 +9,13 @@ export type RepairRequestInput = {
   phone: string;
   location: string;
   name?: string;
+  email?: string | null;
+  description?: string | null;
+  estimated_cost?: number | null;
+  preferred_date?: string | null;
+  device_id?: string | null;
+  repair_pricing_id?: string | null;
+  part_quality?: string | null;
 };
 
 export const useRepairSubmit = () => {
@@ -16,24 +23,23 @@ export const useRepairSubmit = () => {
 
   return useMutation({
     mutationFn: async (input: RepairRequestInput) => {
-      if (!user) {
-        throw new Error("Authentication required");
-      }
-
-      const { data, error } = await supabase
-        .from("repair_requests")
-        .insert([
-          {
-            ...input,
-            user_id: user.id,
-            name: input.name || user.email || "Guest",
-          },
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      return createRepairRequest({
+        user_id: user?.id ?? null,
+        name: input.name || user?.user_metadata?.full_name || user?.email || "Guest",
+        phone: input.phone,
+        email: input.email ?? user?.email ?? null,
+        device_brand: input.device_brand,
+        device_model: input.device_model,
+        issue_type: input.issue_type,
+        description: [input.location ? `Customer location: ${input.location}` : "", input.description ?? ""]
+          .filter(Boolean)
+          .join("\n") || null,
+        estimated_cost: input.estimated_cost ?? null,
+        preferred_date: input.preferred_date ?? null,
+        device_id: input.device_id ?? null,
+        repair_pricing_id: input.repair_pricing_id ?? null,
+        part_quality: input.part_quality ?? null,
+      });
     },
   });
 };

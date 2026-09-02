@@ -15,11 +15,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getStorePackageMeta } from "@/lib/storePackages";
 import { STORE_SUBSCRIPTION_PACKAGES } from "@/lib/storePackages";
 import { supabase } from "@/integrations/supabase/client";
-import { getErrorMessage } from "@/lib/utils";
+import { STORE_PACKAGES_COLUMNS } from "@/lib/supabaseColumnMaps";
+import { getErrorMessage, slugify } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 
 type StorageMode = "db" | "settings" | "builtin";
@@ -27,6 +29,7 @@ type StorageMode = "db" | "settings" | "builtin";
 type PackageLike = {
   id: string;
   name: string;
+  slug: string;
   price: number;
   billing_cycle: string;
   product_limit: number;
@@ -91,6 +94,7 @@ function toPackageLike(p: Record<string, unknown>): PackageLike {
   return {
     id: String(p?.id ?? newId()),
     name: String(p?.name ?? ""),
+    slug: String(p?.slug ?? slugify(String(p?.name ?? ""))),
     price: Number(p?.price ?? 0),
     billing_cycle: String(p?.billing_cycle ?? "monthly"),
     product_limit: Number(p?.product_limit ?? 0),
@@ -110,7 +114,7 @@ async function loadPackages(): Promise<PackagesResult> {
   try {
     const { data: pkgData, error: pkgError } = await supabase
       .from("store_packages")
-      .select("*")
+      .select(STORE_PACKAGES_COLUMNS.join(","))
       .order("price", { ascending: true });
 
     if (!pkgError) {
@@ -130,6 +134,7 @@ async function loadPackages(): Promise<PackagesResult> {
   const builtinPackages = STORE_SUBSCRIPTION_PACKAGES.map((pkg) => ({
     id: pkg.id,
     name: pkg.name,
+    slug: pkg.slug,
     price: pkg.monthly_price,
     billing_cycle: "monthly",
     product_limit: pkg.product_limit,
@@ -166,12 +171,36 @@ export default function SubscriptionManager() {
     staleTime: 60_000,
   });
 
-  const packages = data?.packages ?? [];
+  const packages = useMemo(() => data?.packages ?? [], [data?.packages]);
   const storage = data?.storage ?? "builtin";
   const writable = !!data?.writable;
   const note = data?.note;
 
-  const activeValue = watch("is_active");
+  const billingCycleValue = watch("billing_cycle") || "monthly";
+  const analyticsLevelValue = watch("analytics_level") || "none";
+
+  const { data: pendingPayments = [] } = useQuery({
+    queryKey: ["admin-pending-subscription-payments"],
+    queryFn: async () => {
+      const { data: rows, error: paymentError } = await (supabase.from as any)("subscription_payments")
+        .select("id, invoice_no, amount, status, payment_method, provider_transaction_id, billing_cycle, created_at, store:stores(name), package:store_packages(name,slug)")
+        .eq("status", "pending").order("created_at", { ascending: true });
+      if (paymentError) throw paymentError;
+      return rows ?? [];
+    },
+  });
+
+  const verifyPaymentMutation = useMutation({
+    mutationFn: async (paymentId: string) => {
+      const { error: verifyError } = await (supabase.rpc as any)("verify_store_subscription_payment", { p_payment_id: paymentId });
+      if (verifyError) throw verifyError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-pending-subscription-payments"] });
+      toast({ title: "Payment verified", description: "The package is active and its expiry date was set." });
+    },
+    onError: (e) => toast({ title: "Verification failed", description: getErrorMessage(e), variant: "destructive" }),
+  });
 
   const upsertMutation = useMutation({
     mutationFn: async (values: PackageFormValues) => {
@@ -179,6 +208,7 @@ export default function SubscriptionManager() {
 
       const payload = {
         name: values.name.trim(),
+        slug: editing?.slug || slugify(values.name),
         price: values.price,
         billing_cycle: values.billing_cycle,
         product_limit: values.product_limit,
@@ -391,6 +421,24 @@ export default function SubscriptionManager() {
         ))}
       </div>
 
+      <section className="space-y-4">
+        <div><h2 className="text-2xl font-bold">Payments awaiting verification</h2><p className="text-sm text-muted-foreground">Confirm the provider or bank reference before activation. Verification is audited and idempotent.</p></div>
+        {pendingPayments.length === 0 ? (
+          <div className="rounded-xl border bg-muted/20 p-6 text-sm text-muted-foreground">No pending subscription payments.</div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border">
+            {pendingPayments.map((payment: any) => (
+              <div key={payment.id} className="flex flex-col gap-3 border-b p-4 last:border-b-0 md:flex-row md:items-center md:justify-between">
+                <div><div className="font-semibold">{payment.store?.name || "Store"} · {payment.package?.name || "Package"}</div><div className="text-sm text-muted-foreground">{payment.invoice_no} · NPR {Number(payment.amount).toLocaleString()} · {payment.payment_method} · {payment.provider_transaction_id || "no reference"}</div></div>
+                <Button size="sm" disabled={verifyPaymentMutation.isPending || (!payment.provider_transaction_id && payment.payment_method !== "cash")} onClick={() => verifyPaymentMutation.mutate(payment.id)}>
+                  {verifyPaymentMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}Verify and activate
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -412,7 +460,7 @@ export default function SubscriptionManager() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Billing Cycle</Label>
-                <Select defaultValue="monthly" onValueChange={(v) => setValue("billing_cycle", v)}>
+                <Select value={billingCycleValue} onValueChange={(v) => setValue("billing_cycle", v)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -425,7 +473,7 @@ export default function SubscriptionManager() {
               </div>
               <div className="space-y-2">
                 <Label>Analytics Level</Label>
-                <Select defaultValue="none" onValueChange={(v) => setValue("analytics_level", v)}>
+                <Select value={analyticsLevelValue} onValueChange={(v) => setValue("analytics_level", v)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -492,4 +540,3 @@ export default function SubscriptionManager() {
     </div>
   );
 }
-

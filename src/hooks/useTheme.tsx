@@ -1,5 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { hexToHSL } from "@/lib/utils";
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { readThemeSettings } from "@/lib/siteSettings";
 
 type Theme = "light" | "dark";
@@ -12,36 +11,47 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const isTheme = (value: unknown): value is Theme => value === "light" || value === "dark";
+
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+
+  const stored = window.localStorage.getItem("theme");
+  if (isTheme(stored)) return stored;
+
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("theme") as Theme;
-      if (stored) return stored;
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    }
-    return "light";
-  });
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
 
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(theme);
-    localStorage.setItem("theme", theme);
+    root.style.colorScheme = theme;
+    window.localStorage.setItem("theme", theme);
+  }, [theme]);
 
-    const applyThemeSettings = () => {
+  useEffect(() => {
+    const root = window.document.documentElement;
+
+    const applyThemeSettings = (syncMode = false) => {
       try {
         const parsed = readThemeSettings();
-        if (parsed.primaryColor) {
-          const color = parsed.primaryColor.startsWith("#") ? hexToHSL(parsed.primaryColor) : parsed.primaryColor;
-          root.style.setProperty("--primary", color);
-        }
-        if (parsed.secondaryColor) {
-          const color = parsed.secondaryColor.startsWith("#") ? hexToHSL(parsed.secondaryColor) : parsed.secondaryColor;
-          root.style.setProperty("--secondary", color);
-        }
+
+        // Tailwind colors in this project consume complete CSS color values.
+        // HSL channel fragments (e.g. "240 100% 50%") are invalid here.
+        if (parsed.primaryColor) root.style.setProperty("--primary", parsed.primaryColor);
+        else root.style.removeProperty("--primary");
+        if (parsed.secondaryColor) root.style.setProperty("--secondary", parsed.secondaryColor);
+        else root.style.removeProperty("--secondary");
         if (parsed.radius) root.style.setProperty("--radius", `${parsed.radius}px`);
         if (parsed.containerMaxWidth) root.style.setProperty("--container-max-width", `${parsed.containerMaxWidth}px`);
         if (parsed.fontFamily) document.body.style.fontFamily = parsed.fontFamily;
+        else document.body.style.removeProperty("font-family");
+
+        if (syncMode && isTheme(parsed.theme)) setThemeState(parsed.theme);
       } catch (e) {
         console.error("Failed to apply custom theme settings", e);
       }
@@ -49,17 +59,30 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     applyThemeSettings();
 
-    window.addEventListener("theme-update", applyThemeSettings);
-    return () => window.removeEventListener("theme-update", applyThemeSettings);
-  }, [theme]);
+    const handleThemeUpdate = () => applyThemeSettings(true);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "theme" && isTheme(event.newValue)) {
+        setThemeState(event.newValue);
+      } else if (event.key === "theme-settings") {
+        applyThemeSettings(true);
+      }
+    };
 
-  const toggleTheme = () => {
+    window.addEventListener("theme-update", handleThemeUpdate);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("theme-update", handleThemeUpdate);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const toggleTheme = useCallback(() => {
     setThemeState((prev) => (prev === "light" ? "dark" : "light"));
-  };
+  }, []);
 
-  const setTheme = (newTheme: Theme) => {
+  const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
-  };
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>

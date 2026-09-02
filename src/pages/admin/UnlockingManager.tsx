@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
-import { AlertCircle, Loader2, Trash2, Search, CheckCircle, Clock, Smartphone, Key, Cpu, RefreshCw, Zap } from "lucide-react";
+import { UNLOCK_REQUESTS_COLUMNS } from "@/lib/supabaseColumnMaps";
+import { AlertCircle, Loader2, Trash2, Search, CheckCircle, Clock, Smartphone, Key, Cpu, RefreshCw, Zap, Pencil, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -19,6 +21,9 @@ import {
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 function isSchemaMissingError(error: unknown) {
   const code = (error?.code as string | undefined) ?? "";
@@ -39,7 +44,10 @@ const UnlockingManager = () => {
   const { user, role } = useAuth();
   const isSuperAdmin = role === "suadmin";
   const isStoreAdmin = role === "storeadmin";
+  const { storeIds: myStoreIds } = useStoreMembership(user?.id);
   const [search, setSearch] = useState("");
+  const [editingRequest, setEditingRequest] = useState<any | null>(null);
+  const [editDraft, setEditDraft] = useState<Record<string, string>>( {} );
   const queryClient = useQueryClient();
 
   const { data: requests, isLoading, error: requestsError } = useQuery({
@@ -48,26 +56,12 @@ const UnlockingManager = () => {
       try {
         let query = supabase.from("unlock_requests").select("*, stores(name)");
         
-        if (isStoreAdmin && !isSuperAdmin && user?.id) {
-          // Get store IDs from store_admins or owner_id
-          const { data: memberships } = await supabase
-            .from("store_admins")
-            .select("store_id")
-            .eq("user_id", user.id)
-            .eq("status", "active");
-          
-          const { data: ownedStores } = await supabase
-            .from("stores")
-            .select("id")
-            .eq("owner_id", user.id);
-          
-          const myStoreIds = Array.from(new Set([
-            ...(memberships || []).map(m => m.store_id),
-            ...(ownedStores || []).map(s => s.id)
-          ]));
-          
-          query = query.in("assigned_store_id", myStoreIds);
-        }
+         if (isStoreAdmin && !isSuperAdmin) {
+           if (myStoreIds.length === 0) {
+             return [];
+           }
+           query = query.in("assigned_store_id", myStoreIds);
+         }
 
         const { data, error } = await query.order("created_at", { ascending: false });
         if (error) {
@@ -75,7 +69,7 @@ const UnlockingManager = () => {
             // Fallback to base table if relationship fails
             const { data: baseData, error: baseError } = await supabase
               .from("unlock_requests")
-              .select("*")
+              .select(UNLOCK_REQUESTS_COLUMNS.join(","))
               .order("created_at", { ascending: false });
             if (baseError) return [];
             return baseData ?? [];
@@ -105,13 +99,18 @@ const UnlockingManager = () => {
   });
 
   const updateRequestMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; status?: string; assigned_store_id?: string }) => {
-      const { error } = await supabase.from("unlock_requests").update(updates).eq("id", id);
+    mutationFn: async ({ id, ...updates }: { id: string; status?: string; assigned_store_id?: string | null; notes?: string | null; quoted_price_npr?: number | null; payment_status?: string; urgency?: string }) => {
+      const { error } = await supabase.rpc("update_unlock_request_status", {
+        p_request_id: id,
+        p_status: updates.status ?? null,
+        p_notes: updates.notes ?? null,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin_unlock_requests"] });
       toast.success("Request updated successfully");
+      setEditingRequest(null);
     },
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : "Failed to update request";
@@ -121,21 +120,25 @@ const UnlockingManager = () => {
 
   const deleteRequestMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("unlock_requests").delete().eq("id", id);
+      const { error } = await supabase.rpc("update_unlock_request_status", {
+        p_request_id: id,
+        p_status: "cancelled",
+        p_notes: "Cancelled from unlock administration",
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin_unlock_requests"] });
-      toast.success("Request deleted");
+      toast.success("Request cancelled and retained for audit");
     }
   });
 
-  const filteredRequests = (requests || []).filter(r => 
-    r.customer_name.toLowerCase().includes(search.toLowerCase()) ||
-    r.model.toLowerCase().includes(search.toLowerCase()) ||
-    r.brand.toLowerCase().includes(search.toLowerCase()) ||
-    r.service_type.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredRequests = (requests || []).filter((request) => {
+    const query = search.trim().toLowerCase();
+    return !query || [request.customer_name, request.customer_phone, request.customer_email, request.model, request.brand, request.service_type, request.imei, request.serial_number]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(query));
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -148,7 +151,7 @@ const UnlockingManager = () => {
   };
 
   const getServiceIcon = (service: string) => {
-    const s = service.toLowerCase();
+    const s = String(service || "").toLowerCase();
     if (s.includes("frp")) return <Key className="h-4 w-4 text-red-500" />;
     if (s.includes("imei")) return <Cpu className="h-4 w-4 text-blue-500" />;
     if (s.includes("network") || s.includes("unlock")) return <RefreshCw className="h-4 w-4 text-emerald-500" />;
@@ -215,9 +218,11 @@ const UnlockingManager = () => {
         </Card>
       </div>
 
-      <div className="border rounded-xl bg-white overflow-hidden shadow-sm">
+      {requestsError && <div className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"><AlertCircle className="h-5 w-5 shrink-0" /><span>Unlocking requests could not be loaded. Check database connectivity and permissions, then retry.</span></div>}
+
+      <div className="border rounded-xl bg-card overflow-hidden shadow-sm">
         <Table>
-          <TableHeader className="bg-slate-50">
+          <TableHeader className="bg-muted">
             <TableRow>
               <TableHead className="font-bold">Customer</TableHead>
               <TableHead className="font-bold">Device</TableHead>
@@ -237,22 +242,22 @@ const UnlockingManager = () => {
               </TableRow>
             ) : filteredRequests.length > 0 ? (
               filteredRequests.map((request) => (
-                <TableRow key={request.id} className="hover:bg-slate-50/50 transition-colors">
+                <TableRow key={request.id} className="hover:bg-muted/30 transition-colors">
                   <TableCell>
-                    <div className="font-bold">{request.customer_name}</div>
-                    <div className="text-xs text-muted-foreground">{request.customer_phone}</div>
+                    <div className="font-bold">{request.customer_name || "Unnamed customer"}</div>
+                    <div className="text-xs text-muted-foreground">{request.customer_phone || "No phone"}</div>
                     {request.customer_email && <div className="text-[10px] text-muted-foreground">{request.customer_email}</div>}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-[10px] font-bold uppercase">{request.brand}</Badge>
-                      <span className="font-medium">{request.model}</span>
+                      <Badge variant="secondary" className="text-[10px] font-bold uppercase">{request.brand || request.device_brand || "Device"}</Badge>
+                      <span className="font-medium">{request.model || request.device_model || "Not specified"}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {getServiceIcon(request.service_type)}
-                      <span className="text-sm font-medium">{request.service_type}</span>
+                      <span className="text-sm font-medium">{request.service_type || "Unlock assessment"}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -288,7 +293,7 @@ const UnlockingManager = () => {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <span className="text-sm font-medium text-slate-600">
+                      <span className="text-sm font-medium text-muted-foreground">
                         {request.stores?.name || "Unassigned"}
                       </span>
                     )}
@@ -297,12 +302,30 @@ const UnlockingManager = () => {
                     {format(new Date(request.created_at), "MMM d, yyyy HH:mm")}
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Edit ${request.brand} ${request.model} unlock request`}
+                      onClick={() => {
+                        setEditingRequest(request);
+                        setEditDraft({
+                          status: request.status || "pending",
+                          assigned_store_id: request.assigned_store_id || "unassigned",
+                          quoted_price_npr: request.quoted_price_npr == null ? "" : String(request.quoted_price_npr),
+                          payment_status: request.payment_status || "pending",
+                          urgency: request.urgency || "standard",
+                          notes: request.notes || "",
+                        });
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       className="text-red-500 hover:text-red-600 hover:bg-red-50"
                       onClick={() => {
-                        if (confirm("Are you sure you want to delete this request?")) {
+                        if (confirm("Cancel this unlocking request? The record will be retained for audit.")) {
                           deleteRequestMutation.mutate(request.id);
                         }
                       }}
@@ -322,6 +345,31 @@ const UnlockingManager = () => {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={!!editingRequest} onOpenChange={(open) => !open && setEditingRequest(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Edit unlocking case</DialogTitle>
+            <DialogDescription>{editingRequest?.customer_name} · {editingRequest?.brand} {editingRequest?.model}. Confirm ownership and lawful eligibility before processing.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2"><Label>Status</Label><Select value={editDraft.status} onValueChange={(value) => setEditDraft((draft) => ({ ...draft, status: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pending">Pending</SelectItem><SelectItem value="processing">Processing</SelectItem><SelectItem value="completed">Completed</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label>Assigned store</Label><Select value={editDraft.assigned_store_id} onValueChange={(value) => setEditDraft((draft) => ({ ...draft, assigned_store_id: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{stores?.map((store) => <SelectItem key={store.id} value={store.id}>{store.name}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label>Quoted fee (NPR)</Label><Input type="number" min={0} max={1000000} value={editDraft.quoted_price_npr} onChange={(event) => setEditDraft((draft) => ({ ...draft, quoted_price_npr: event.target.value }))} /></div>
+            <div className="space-y-2"><Label>Payment status</Label><Select value={editDraft.payment_status} onValueChange={(value) => setEditDraft((draft) => ({ ...draft, payment_status: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pending">Pending</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="failed">Failed</SelectItem><SelectItem value="refunded">Refunded</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2 sm:col-span-2"><Label>Urgency</Label><Select value={editDraft.urgency} onValueChange={(value) => setEditDraft((draft) => ({ ...draft, urgency: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="standard">Standard</SelectItem><SelectItem value="urgent">Urgent</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2 sm:col-span-2"><Label>Internal case notes</Label><Textarea rows={5} maxLength={2000} value={editDraft.notes} onChange={(event) => setEditDraft((draft) => ({ ...draft, notes: event.target.value }))} placeholder="Eligibility evidence, carrier response, customer follow-up and completion details…" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingRequest(null)}>Cancel</Button>
+            <Button disabled={updateRequestMutation.isPending} onClick={() => {
+              const fee = editDraft.quoted_price_npr === "" ? null : Number(editDraft.quoted_price_npr);
+              if (fee !== null && (!Number.isFinite(fee) || fee < 0 || fee > 1000000)) { toast.error("Enter a valid fee between Rs. 0 and Rs. 1,000,000"); return; }
+              updateRequestMutation.mutate({ id: editingRequest.id, status: editDraft.status, assigned_store_id: editDraft.assigned_store_id === "unassigned" ? null : editDraft.assigned_store_id, quoted_price_npr: fee, payment_status: editDraft.payment_status, urgency: editDraft.urgency, notes: editDraft.notes.trim() || null });
+            }}>{updateRequestMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save case</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

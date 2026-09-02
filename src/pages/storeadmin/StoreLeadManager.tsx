@@ -12,10 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Loader2, Search, Eye, Phone, Mail, MessageSquare, User, Store } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Label } from "@/components/ui/label";
+import { useMyStores } from "@/hooks/useMyStores";
 
 export default function StoreLeadManager() {
-  const { user, role } = useAuth();
-  const isSuperAdmin = role === "suadmin";
+  const { role } = useAuth();
+  const isPlatformAdmin = role === "suadmin" || role === "staffadmin";
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedLead, setSelectedLead] = useState<any>(null);
@@ -23,20 +25,9 @@ export default function StoreLeadManager() {
   const queryClient = useQueryClient();
 
   // For store admins, find their store
-  const { data: userStore } = useQuery({
-    queryKey: ["my-store-for-general-leads", user?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("stores")
-        .select("id")
-        .or(`owner_user_id.eq.${user?.id},owner_id.eq.${user?.id}`)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!user?.id && !isSuperAdmin
-  });
+  const { data: myStores } = useMyStores();
 
-  const activeStoreId = isSuperAdmin ? storeId : userStore?.id;
+  const activeStoreId = isPlatformAdmin ? storeId : myStores?.[0]?.id;
 
   const { data: leads, isLoading } = useQuery({
     queryKey: ["store_leads", searchTerm, statusFilter, activeStoreId],
@@ -60,7 +51,7 @@ export default function StoreLeadManager() {
       if (error) throw error;
       return data;
     },
-    enabled: isSuperAdmin || !!activeStoreId
+    enabled: isPlatformAdmin || !!activeStoreId
   });
 
   const updateStatusMutation = useMutation({
@@ -80,7 +71,7 @@ export default function StoreLeadManager() {
       const { data } = await supabase.from("stores").select("id, name").eq("status", "active");
       return data || [];
     },
-    enabled: isSuperAdmin
+    enabled: isPlatformAdmin
   });
 
   if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -117,7 +108,7 @@ export default function StoreLeadManager() {
             <SelectItem value="lost">Lost</SelectItem>
           </SelectContent>
         </Select>
-        {isSuperAdmin && (
+        {isPlatformAdmin && (
           <div className="flex items-center gap-2">
             <Label className="whitespace-nowrap">Filter by Store:</Label>
             <select 

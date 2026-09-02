@@ -21,6 +21,7 @@ import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { getErrorMessage } from "@/lib/utils";
 import { submitContactMessage } from "@/services/submissionService";
+import { useSearchParams } from "react-router-dom";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -32,14 +33,20 @@ const formSchema = z.object({
 export default function ContactUs() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchParams] = useSearchParams();
+  const requestedModel = searchParams.get("model")?.trim() ?? "";
+  const requestedVariant = searchParams.get("variant")?.trim() ?? "";
+  const isBuyingInquiry = searchParams.get("intent") === "buy" && Boolean(requestedModel);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       email: "",
-      subject: "",
-      message: "",
+      subject: isBuyingInquiry ? `Buying request: ${requestedModel}` : "",
+      message: isBuyingInquiry
+        ? `I want to buy ${requestedModel}${requestedVariant ? ` (${requestedVariant})` : ""}. Please confirm stock, store, warranty, and final price.`
+        : "",
     },
   });
 
@@ -156,9 +163,13 @@ export default function ContactUs() {
 
           <Card className="shadow-lg border-primary/10">
             <CardHeader className="bg-primary/5">
-              <CardTitle className="text-2xl">Send a Digital Inquiry</CardTitle>
+              <CardTitle className="text-2xl">
+                {isBuyingInquiry ? `Buy ${requestedModel}` : "Send a Digital Inquiry"}
+              </CardTitle>
               <CardDescription className="text-base">
-                Use the form below for marketplace assistance, store verification, or repair tracking inquiries.
+                {isBuyingInquiry
+                  ? "Send this request and our team will confirm availability and connect you with a suitable store."
+                  : "Use the form below for marketplace assistance, store verification, or repair tracking inquiries."}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6">

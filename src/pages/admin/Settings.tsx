@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { APP_SETTINGS_COLUMNS, PROFILES_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { toast } from "sonner";
 import { Shield, Users, Store, User, Settings as SettingsIcon, Save, Database, Globe, Key, Loader2, Upload } from "lucide-react";
@@ -32,7 +33,7 @@ const GeneralSettings = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("app_settings")
-        .select("*")
+        .select(APP_SETTINGS_COLUMNS.join(","))
         .in("key", ["site_info", "contact_info", "features"]);
       
       if (error) {
@@ -117,7 +118,7 @@ const GeneralSettings = () => {
                   onChange={(e) => setSettings({...settings, site_info: {...settings.site_info, favicon_url: e.target.value}})} 
                 />
                 {settings.site_info.favicon_url && (
-                  <div className="h-10 w-10 border rounded flex items-center justify-center bg-white p-1 shrink-0">
+                  <div className="h-10 w-10 border rounded flex items-center justify-center bg-background p-1 shrink-0">
                     <img src={settings.site_info.favicon_url} alt="Favicon" className="max-h-full max-w-full" />
                   </div>
                 )}
@@ -399,7 +400,7 @@ const ProfileSettings = () => {
       
       const { data } = await supabase
         .from("profiles")
-        .select("*")
+        .select(PROFILES_COLUMNS.join(","))
         .eq("id", user.id)
         .single();
       return data;

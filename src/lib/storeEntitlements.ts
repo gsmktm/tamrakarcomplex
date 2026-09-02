@@ -7,6 +7,7 @@ import {
   type PackageLimitKey,
   type StorePackageSlug,
 } from "./storePackages";
+import { allowedStoreThemes } from "./storeThemeBuilder";
 
 export type FeatureAccessResult = {
   allowed: boolean;
@@ -177,12 +178,7 @@ export function buildEntitlements(packageSlug: string | null | undefined): Store
     featurePlacementPriority: slug === "diamond" ? 1 : slug === "gold" ? 2 : slug === "silver" ? 3 : 4,
     canEnableMarketplace: e.marketplaceEnabled,
     defaultMarketplaceCommission: e.marketplaceCommission,
-    availableThemes: [
-      "basic",
-      ...(e.premiumTheme ? ["minimal", "classic", "premium"] : []),
-      ...(e.layoutEditing ? ["modern", "editorial"] : []),
-      ...(e.diamondTheme ? ["diamond", "custom"] : []),
-    ],
+    availableThemes: allowedStoreThemes(slug).map((theme) => theme.slug),
     canUseBasicTheme: e.basicTheme,
     canUsePremiumTheme: e.premiumTheme,
     canUseDiamondTheme: e.diamondTheme,

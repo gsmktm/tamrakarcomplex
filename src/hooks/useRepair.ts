@@ -44,12 +44,39 @@ export interface StoreInventory {
   stores?: any; // To be typed if needed
 }
 
-export function useMasterModels(brandId?: string) {
+export interface MasterModelWithBrand {
+  id: string;
+  brand_id: string;
+  series_id: string | null;
+  name: string;
+  slug: string;
+  model_number: string | null;
+  release_year: number | null;
+  image: string | null;
+  brands?: {
+    id: string;
+    name: string;
+    slug: string;
+    logo: string | null;
+  };
+}
+
+export function useMasterModels(brandIdOrSlug?: string) {
   return useQuery({
-    queryKey: ['master-models', brandId],
+    queryKey: ['master-models', brandIdOrSlug],
     queryFn: async () => {
-      let query = supabase.from('phone_models').select('*, brands(*)');
-      if (brandId) query = query.eq('brand_id', brandId);
+      let query = supabase.from('phone_models').select(`
+        *,
+        brands!inner(id, name, slug, logo)
+      `);
+      if (brandIdOrSlug) {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(brandIdOrSlug);
+        if (isUUID) {
+          query = query.eq('brand_id', brandIdOrSlug);
+        } else {
+          query = query.eq('brands.slug', brandIdOrSlug);
+        }
+      }
       const { data, error } = await query.order('name');
       if (error) throw error;
       return data as MasterModel[];
@@ -366,7 +393,7 @@ export function useRepairCategory(slug: string) {
   return useQuery({
     queryKey: ['repair-category', slug],
     queryFn: async () => {
-      const { data, error } = await sb
+      const { data, error } = await supabase
         .from('repair_categories')
         .select(`
           *,
@@ -435,7 +462,7 @@ export function useRepairDevices() {
   return useQuery({
     queryKey: ['repair-devices'],
     queryFn: async () => {
-      const { data, error } = await sb
+      const { data, error } = await supabase
         .from('repair_devices')
         .select('*')
         .order('name');
@@ -452,7 +479,7 @@ export function useRepairDevice(slug: string) {
   return useQuery({
     queryKey: ['repair-device', slug],
     queryFn: async () => {
-      const { data, error } = await sb
+      const { data, error } = await supabase
         .from('repair_devices')
         .select(`
           *,
@@ -493,7 +520,7 @@ export function useRepairGuide(slug: string) {
   return useQuery<RepairGuideFull | null>({
     queryKey: ['repair-guide', slug],
     queryFn: async () => {
-      const { data: guide, error: guideError } = await sb
+      const { data: guide, error: guideError } = await supabase
         .from('repair_guides')
         .select(`
           *,

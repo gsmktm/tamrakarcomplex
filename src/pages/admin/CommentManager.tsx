@@ -106,7 +106,7 @@ export default function CommentManager() {
                 <TableRow key={comment.id}>
                   <TableCell className="max-w-[260px] truncate" title={comment.article?.title || ""}>
                     {comment.article?.slug ? (
-                      <Link to={`/article/${comment.article.slug}`} target="_blank" rel="noreferrer" className="hover:underline">
+                      <Link to={`/stores/article/${comment.article.slug}`} target="_blank" rel="noreferrer" className="hover:underline">
                         {comment.article.title}
                       </Link>
                     ) : (
@@ -120,7 +120,7 @@ export default function CommentManager() {
                   <TableCell>{new Date(comment.created_at).toLocaleString()}</TableCell>
                   <TableCell className="text-right space-x-2">
                     {comment.article?.slug ? (
-                      <Link to={`/article/${comment.article.slug}`} target="_blank" rel="noreferrer">
+                      <Link to={`/stores/article/${comment.article.slug}`} target="_blank" rel="noreferrer">
                         <Button variant="ghost" size="icon">
                           <ExternalLink className="h-4 w-4" />
                         </Button>
@@ -148,4 +148,3 @@ export default function CommentManager() {
     </div>
   );
 }
-

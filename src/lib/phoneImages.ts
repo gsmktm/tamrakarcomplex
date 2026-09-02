@@ -4,6 +4,8 @@
  * Pattern: https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-{slug}.jpg
  */
 
+import { resolveMobileCatalogImage } from "@/data/mobileCatalogImages";
+
 const GSMARENA_BASE = "https://fdn2.gsmarena.com/vv/bigpic";
 
 // iPhone model slug map — ordered longest-match first so "pro max" beats "pro"
@@ -101,7 +103,8 @@ function isPlaceholder(url: string): boolean {
 export function resolveListingImage(
   title: string | null,
   brand: string | null,
-  images: string[] | null
+  images: string[] | null,
+  model?: string | null,
 ): string | null {
   const imgs = Array.isArray(images) ? images.filter(Boolean) : [];
 
@@ -119,6 +122,26 @@ export function resolveListingImage(
     if (gsm) return gsm;
   }
 
+  const brandSlug = slugifyImageKey(brand ?? "");
+  const modelSlug = slugifyImageKey(model || title || "");
+  if (brandSlug && modelSlug) {
+    const catalogImage = resolveMobileCatalogImage(
+      `${brandSlug}-${modelSlug}`,
+      brandSlug,
+    );
+    if (catalogImage) return catalogImage;
+  }
+
   // Fall back to existing image (Unsplash placeholder) if any
   return imgs[0] ?? null;
+}
+
+function slugifyImageKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\+/g, " plus ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

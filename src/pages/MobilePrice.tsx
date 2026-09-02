@@ -46,30 +46,30 @@ import { cn } from "@/lib/utils";
 
 // ─── Brand visual metadata ────────────────────────────────────────────────────
 const BRAND_META: Record<string, { bg: string; text: string; slug: string }> = {
-  Apple:    { bg: "#000000", text: "#ffffff", slug: "apple" },
-  Samsung:  { bg: "#1428A0", text: "#ffffff", slug: "samsung" },
-  Xiaomi:   { bg: "#FF6700", text: "#ffffff", slug: "xiaomi" },
-  OnePlus:  { bg: "#F3122E", text: "#ffffff", slug: "oneplus" },
-  Realme:   { bg: "#FFCD00", text: "#000000", slug: "realme" },
-  Vivo:     { bg: "#415FFF", text: "#ffffff", slug: "vivo" },
-  OPPO:     { bg: "#05BA4B", text: "#ffffff", slug: "oppo" },
-  Nokia:    { bg: "#001135", text: "#ffffff", slug: "nokia" },
-  Motorola: { bg: "#000000", text: "#ffffff", slug: "motorola" },
-  Huawei:   { bg: "#FF0000", text: "#ffffff", slug: "huawei" },
-  Honor:    { bg: "#000000", text: "#ffffff", slug: "honor" },
-  Tecno:    { bg: "#00529B", text: "#ffffff", slug: "tecnomobile" },
-  Infinix:  { bg: "#000000", text: "#ffffff", slug: "infinix" },
-  Poco:     { bg: "#000000", text: "#FFCD00", slug: "poco" },
-  Redmi:    { bg: "#FF6700", text: "#ffffff", slug: "xiaomi" },
-  Itel:     { bg: "#FF6600", text: "#ffffff", slug: "itel" },
-  Sony:     { bg: "#000000", text: "#ffffff", slug: "sony" },
-  Asus:     { bg: "#00539B", text: "#ffffff", slug: "asus" },
-  Google:   { bg: "#4285F4", text: "#ffffff", slug: "google" },
-  Nothing:  { bg: "#000000", text: "#ffffff", slug: "nothing" },
-  ZTE:      { bg: "#000000", text: "#ffffff", slug: "zte" },
-  "Ai+":    { bg: "#000000", text: "#ffffff", slug: "aiplus" },
-  Coolpad:  { bg: "#000000", text: "#ffffff", slug: "coolpad" },
-  Benco:    { bg: "#000000", text: "#ffffff", slug: "benco" },
+  "Ai+":      { bg: "#10B981", text: "#ffffff", slug: "ai-plus" },
+  Apple:     { bg: "#000000", text: "#ffffff", slug: "apple" },
+  Asus:      { bg: "#00539B", text: "#ffffff", slug: "asus" },
+  Dell:      { bg: "#007DB8", text: "#ffffff", slug: "dell" },
+  Google:    { bg: "#4285F4", text: "#ffffff", slug: "google" },
+  Honor:     { bg: "#000000", text: "#ffffff", slug: "honor" },
+  Huawei:    { bg: "#C7000B", text: "#ffffff", slug: "huawei" },
+  Infinix:   { bg: "#000000", text: "#ffffff", slug: "infinix" },
+  Lenovo:    { bg: "#E2231A", text: "#ffffff", slug: "lenovo" },
+  Motorola:  { bg: "#000000", text: "#ffffff", slug: "motorola" },
+  Nokia:     { bg: "#001135", text: "#ffffff", slug: "nokia" },
+  Nothing:   { bg: "#000000", text: "#ffffff", slug: "nothing" },
+  OnePlus:   { bg: "#F3122E", text: "#ffffff", slug: "oneplus" },
+  OPPO:      { bg: "#05BA4B", text: "#ffffff", slug: "oppo" },
+  POCO:      { bg: "#000000", text: "#FFCD00", slug: "poco" },
+  Poco:      { bg: "#000000", text: "#FFCD00", slug: "poco" },
+  Redmi:     { bg: "#FF6700", text: "#ffffff", slug: "xiaomi" },
+  Realme:    { bg: "#FFCD00", text: "#000000", slug: "realme" },
+  Samsung:   { bg: "#1428A0", text: "#ffffff", slug: "samsung" },
+  Sony:      { bg: "#000000", text: "#ffffff", slug: "sony" },
+  Tecno:     { bg: "#00529B", text: "#ffffff", slug: "tecno" },
+  Vivo:      { bg: "#415FFF", text: "#ffffff", slug: "vivo" },
+  Xiaomi:    { bg: "#FF6700", text: "#ffffff", slug: "xiaomi" },
+  ZTE:       { bg: "#000000", text: "#ffffff", slug: "zte" },
 };
 
 // ─── Budget brackets ──────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ function BrandAvatar({ brand, size = 36 }: { brand: string; size?: number }) {
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';
               if (target.parentElement) {
-                target.parentElement.innerHTML = `<span>${brand.slice(0, 1)}</span>`;
+                target.parentElement.textContent = brand.slice(0, 1);
               }
             }}
           />
@@ -533,7 +533,7 @@ export default function MobilePrice() {
 
       <main className="flex-1">
         {/* ── Hero ─────────────────────────────────────────────────────── */}
-        <div className="relative bg-white dark:bg-slate-950 border-b overflow-hidden">
+        <div className="relative bg-card dark:bg-slate-950 border-b overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_-20%,hsl(var(--primary)/0.08),transparent_50%),radial-gradient(circle_at_70%_120%,hsl(var(--primary)/0.05),transparent_50%)] pointer-events-none" />
           <div className="container py-10 md:py-16 relative">
             {/* Breadcrumb */}
@@ -875,7 +875,7 @@ export default function MobilePrice() {
 
           {/* ── FAQ / Editorial ───────────────────────────────────────── */}
           <section className="mt-20 max-w-4xl mx-auto">
-            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-3xl p-8 md:p-12 border">
+            <div className="bg-muted dark:bg-slate-900/50 rounded-3xl p-8 md:p-12 border">
               <h2 className="font-display text-3xl font-bold mb-8 text-center">Mobile Price in Nepal — Buying Guide</h2>
               <div className="grid md:grid-cols-2 gap-8 text-sm text-muted-foreground leading-relaxed">
                 <div className="space-y-4">

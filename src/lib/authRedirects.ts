@@ -31,6 +31,10 @@ export function locationToPath(location: Pick<Location, "pathname" | "search" | 
   return `${location.pathname}${location.search}${location.hash}`;
 }
 
+export function getAuthPathForLocation(location: Pick<Location, "pathname" | "search" | "hash">) {
+  return `/auth?redirect=${encodeURIComponent(locationToPath(location))}`;
+}
+
 export function getSafeLocalRedirectPath(value?: string | null) {
   if (!value) return null;
 

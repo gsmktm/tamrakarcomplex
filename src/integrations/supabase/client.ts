@@ -3,15 +3,64 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 const PUBLIC_SUPABASE_URL = "https://tvgmnjuexdgtgtqhrjok.supabase.co";
-const PUBLIC_SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2Z21uanVleGRndGd0cWhyam9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NTcxNDQsImV4cCI6MjA4ODEzMzE0NH0.VMJCM_-Qf5g-l88aQZDd5NP65S9JRlZrNjLpnt6uO7o";
+const PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_4-Yq_PD4j8sVEsn1ZM1-Mw_ZDPUAd5v";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || PUBLIC_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+const REST_TIMEOUT_MS = 4000;
+const REST_CIRCUIT_OPEN_MS = 60_000;
+let restCircuitOpenUntil = 0;
+
+function isSupabaseRestRequest(input: RequestInfo | URL) {
+  const url = typeof input === "string"
+    ? input
+    : input instanceof URL
+      ? input.href
+      : input.url;
+  return url.startsWith(`${SUPABASE_URL}/rest/v1/`);
+}
+
+function unavailableRestResponse() {
+  return new Response(JSON.stringify({
+    message: "Supabase REST is temporarily unavailable",
+    code: "REST_CIRCUIT_OPEN",
+  }), {
+    status: 503,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function resilientSupabaseFetch(input: RequestInfo | URL, init?: RequestInit) {
+  if (!isSupabaseRestRequest(input)) return fetch(input, init);
+  if (Date.now() < restCircuitOpenUntil) return unavailableRestResponse();
+
+  const controller = new AbortController();
+  const sourceSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+  const abortFromSource = () => controller.abort(sourceSignal?.reason);
+  sourceSignal?.addEventListener("abort", abortFromSource, { once: true });
+  const timeoutId = window.setTimeout(() => controller.abort("supabase-rest-timeout"), REST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(input, { ...init, signal: controller.signal });
+    if (response.status >= 500) restCircuitOpenUntil = Date.now() + REST_CIRCUIT_OPEN_MS;
+    return response;
+  } catch (error) {
+    restCircuitOpenUntil = Date.now() + REST_CIRCUIT_OPEN_MS;
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+    sourceSignal?.removeEventListener("abort", abortFromSource);
+  }
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabaseTyped = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  global: {
+    fetch: resilientSupabaseFetch,
+  },
   auth: {
     storage: localStorage,
     persistSession: true,
@@ -19,7 +68,4 @@ export const supabaseTyped = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLI
   }
 });
 
-// The schema in this repo evolves quickly and the generated `Database` types can lag behind.
-// Export an untyped client for the app runtime so routes don't get blocked by TS schema drift.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase = supabaseTyped as any;
+export const supabase = supabaseTyped;

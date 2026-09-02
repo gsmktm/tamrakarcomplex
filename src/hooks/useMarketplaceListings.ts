@@ -66,11 +66,14 @@ export type MarketplaceListingsParams = {
   sort_by?: string;
 };
 
+const marketplaceRequestSignal = () => AbortSignal.timeout(4000);
+
 export function useMarketplaceListings(params: MarketplaceListingsParams = {}) {
   const query = useQuery({
     queryKey: ["marketplace-listings", params],
     staleTime: 3 * 60 * 1000, // 3 min — marketplace listings change frequently
-    placeholderData: (prev) => prev,
+    placeholderData: (previous) => previous ?? getFallbackMarketplaceResult(params),
+    retry: false,
     queryFn: async () => {
       let request = (supabase as any)
         .from("public_marketplace_items")
@@ -117,8 +120,19 @@ export function useMarketplaceListings(params: MarketplaceListingsParams = {}) {
         const to = from + params.limit - 1;
         request = request.range(from, to);
       }
+      request = request.abortSignal(marketplaceRequestSignal());
 
-      const { data, error, count } = await request;
+      let data: MarketplaceListingRecord[] | null = null;
+      let count: number | null = null;
+      let error: unknown = null;
+      try {
+        const result = await request;
+        data = result.data as MarketplaceListingRecord[] | null;
+        count = result.count;
+        error = result.error;
+      } catch (requestError) {
+        error = requestError;
+      }
       
       if (error) {
         return getManualUnifiedMarketplace(params);
@@ -161,7 +175,12 @@ function normalizeListing(listing: MarketplaceListingRecord): MarketplaceListing
       ? Object.values(listing.images as unknown as Record<string, string>).filter(Boolean)
       : [];
 
-  const resolvedFirst = resolveListingImage(listing.title ?? null, listing.brand ?? null, rawImages);
+  const resolvedFirst = resolveListingImage(
+    listing.title ?? null,
+    listing.brand ?? null,
+    rawImages,
+    listing.model ?? null,
+  );
   const images: string[] = resolvedFirst
     ? [resolvedFirst, ...rawImages.filter((u) => u !== resolvedFirst)]
     : rawImages;
@@ -207,17 +226,17 @@ async function getManualUnifiedMarketplace(params: MarketplaceListingsParams) {
       .from("store_products")
       .select("*, store:stores(id, name, slug, seo_slug, location, logo_url, is_verified, is_featured, package_slug, subscription_status)")
       .eq("status", "active")
-      .gt("stock_quantity", 0),
+      .gt("stock_quantity", 0)
+      .abortSignal(marketplaceRequestSignal()),
     supabase
       .from("sell_listings")
       .select("*, store:stores(id, name, slug, seo_slug, location, logo_url, is_verified, is_featured, package_slug, subscription_status)")
-      .eq("status", "active"),
+      .eq("status", "active")
+      .abortSignal(marketplaceRequestSignal()),
   ]);
 
   if (storeProductsResult.error && userListingsResult.error) {
-    const fallback = filterFallbackListings(params);
-    const from = params.offset ?? 0;
-    return { listings: fallback.slice(from, from + (params.limit ?? fallback.length)), total: fallback.length };
+    return getFallbackMarketplaceResult(params);
   }
 
   const storeProducts = (storeProductsResult.data || []).map((item: any) => normalizeListing({
@@ -260,12 +279,22 @@ async function getManualUnifiedMarketplace(params: MarketplaceListingsParams) {
   }));
 
   let listings = [...storeProducts, ...userListings];
+  if (listings.length === 0) return getFallbackMarketplaceResult(params);
 
   listings = applyUnifiedFilters(listings, params);
 
   const total = listings.length;
   const from = params.offset ?? 0;
   return { listings: listings.slice(from, from + (params.limit ?? listings.length)), total };
+}
+
+function getFallbackMarketplaceResult(params: MarketplaceListingsParams) {
+  const fallback = filterFallbackListings(params);
+  const from = params.offset ?? 0;
+  return {
+    listings: fallback.slice(from, from + (params.limit ?? fallback.length)),
+    total: fallback.length,
+  };
 }
 
 function applyUnifiedFilters(listings: MarketplaceListingRecord[], params: MarketplaceListingsParams) {

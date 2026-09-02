@@ -5,9 +5,9 @@ import {
   checkFeatureAccess,
   checkPackageLimit,
   getStoreEntitlements,
-  resolveEffectiveStorePackage,
   type FeatureAccessResult,
 } from "@/lib/storeEntitlements";
+import { resolveStorePackageContext } from "@/lib/storePackageRuntime";
 import { getPackageLimit, type PackageLimitKey, type StorePackageSlug } from "@/lib/storePackages";
 
 type Feature = PackageLimitKey | "product" | "admin" | "branch" | "promo";
@@ -27,19 +27,25 @@ export function useSubscriptionLimits() {
     queryKey: ["store-subscription-context", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data: store } = await supabase
-        .from("stores")
-        .select("id, package_slug, subscription_status, subscription_end_date")
-        .eq("owner_id", user!.id)
+      const { data: membership } = await supabase
+        .from("store_admins")
+        .select("store_id")
+        .eq("user_id", user!.id)
+        .eq("status", "active")
+        .limit(1)
         .maybeSingle();
+
+      let storeQuery = supabase
+        .from("stores")
+        .select("id, package_slug, subscription_status, subscription_end_date, package:store_packages(slug)");
+      storeQuery = membership?.store_id
+        ? storeQuery.eq("id", membership.store_id)
+        : storeQuery.or(`owner_id.eq.${user!.id},owner_user_id.eq.${user!.id}`).limit(1);
+      const { data: store } = await storeQuery.maybeSingle();
 
       if (!store) return null;
 
-      const packageSlug = resolveEffectiveStorePackage({
-        package_slug: store.package_slug,
-        subscription_status: store.subscription_status,
-        subscription_end_date: store.subscription_end_date,
-      });
+      const packageSlug = resolveStorePackageContext(store).effectivePackageSlug;
 
       return {
         storeId: store.id,

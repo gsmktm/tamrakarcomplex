@@ -20,7 +20,8 @@ import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
 import { getErrorMessage, cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import type { StoreRow, StoreSubscriptionRow, PackageRow } from "@/types/app";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
+import type { StoreRow } from "@/types/app";
 import type { Json } from "@/integrations/supabase/types";
 import { 
   DropdownMenu, 
@@ -41,13 +42,15 @@ import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { getStorePackageMeta, formatStorePackageName } from "@/lib/storePackages";
 import { fetchStoreTierOverrides, resolveTierForStore, type StoreTierOverrides } from "@/lib/storeTier";
-
-interface StoreWithSubscriptionsRaw extends StoreRow {
-  store_subscriptions?: (StoreSubscriptionRow & { packages: PackageRow })[] | null;
-}
+import { STORES_COLUMNS, STORE_PACKAGES_COLUMNS, PAGINATION } from "@/lib/supabaseColumnMaps";
 
 interface StoreWithSubscription extends StoreRow {
-  store_subscriptions?: (StoreSubscriptionRow & { packages: PackageRow }) | null;
+  package?: {
+    id: string;
+    name: string;
+    slug: string;
+    price: number;
+  } | null;
 }
 
 function isMissingRelationshipError(error: unknown) {
@@ -114,6 +117,7 @@ const StoreManager = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [editingStore, setEditingStore] = useState<StoreRow | null>(null);
   const [search, setSearch] = useState("");
+  const [storePage, setStorePage] = useState(0);
   const [tierOverride, setTierOverride] = useState<"free" | "silver" | "gold" | "diamond">("free");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const navigate = useNavigate();
@@ -124,6 +128,7 @@ const StoreManager = () => {
   const { user, role } = useAuth();
   const isStoreAdmin = role === "storeadmin";
   const isPlatformAdmin = role === "suadmin" || role === "staffadmin";
+  const { storeIds: membershipStoreIds } = useStoreMembership(user?.id);
 
   const { data: storeTierOverrides } = useQuery<StoreTierOverrides | null>({
     queryKey: ["store_package_overrides"],
@@ -158,45 +163,34 @@ const StoreManager = () => {
   });
 
   const { data: stores, isLoading, error: storesError } = useQuery({
-    queryKey: ["admin_stores", user?.id, role],
+    queryKey: ["admin_stores", user?.id, role, storePage, search],
     queryFn: async () => {
       try {
         // 1. Get stores user has access to
         let storeIds: string[] = [];
-        
-        if (role === "suadmin" || role === "staffadmin") {
-          // Platform admins see all stores — storeIds stays empty, no filter applied
-        } else if (role === "storeadmin" && user?.id) {
-          // Store admins see stores they belong to
-          const { data: memberships } = await supabase
-            .from("store_admins")
-            .select("store_id")
-            .eq("user_id", user.id)
-            .eq("status", "active");
-          
-          // Also check legacy owner_id
-          const { data: ownedStores } = await supabase
-            .from("stores")
-            .select("id")
-            .eq("owner_id", user.id);
-            
-          storeIds = Array.from(new Set([
-            ...(memberships?.map(m => m.store_id) || []),
-            ...(ownedStores?.map(s => s.id) || [])
-          ]));
+
+        if (role === "storeadmin") {
+          storeIds = membershipStoreIds;
         }
 
         if (storeIds.length === 0 && role !== "suadmin" && role !== "staffadmin") return [];
 
+        const from = storePage * PAGINATION.PAGE_SIZE_SMALL;
+        const to = from + PAGINATION.PAGE_SIZE_SMALL - 1;
+        const cols = STORES_COLUMNS.join(",");
+
         const loadBaseStores = async () => {
-          let baseQuery = supabase.from("stores").select("*, store_packages(name)");
+          let baseQuery = supabase.from("stores").select(`${cols}, store_packages(name)`).order("name").range(from, to);
           if (storeIds.length > 0) {
             baseQuery = baseQuery.in("id", storeIds);
           }
+          if (search.trim()) {
+            baseQuery = baseQuery.ilike("name", `%${search.trim()}%`);
+          }
           const { data: baseData, error: baseError } = await baseQuery.order("name");
           if (baseError) {
-            if (isMissingRelationshipError(baseError)) {
-              let fallbackQuery = supabase.from("stores").select("*");
+          if (isMissingRelationshipError(baseError)) {
+            let fallbackQuery = supabase.from("stores").select(cols).order("name").range(from, to);
               if (storeIds.length > 0) fallbackQuery = fallbackQuery.in("id", storeIds);
               const { data: fallbackData, error: fallbackError } = await fallbackQuery.order("name");
               if (fallbackError) throw fallbackError;
@@ -204,26 +198,25 @@ const StoreManager = () => {
             }
             throw baseError;
           }
-          return (baseData ?? []) as StoreRow[];
+          return (baseData ?? []) as StoreWithSubscription[];
         };
 
         const tryLoadWithSubscriptions = async () => {
-          let query = supabase.from("stores").select(`
-              *,
-              store_subscriptions (
-                *,
-                packages (*)
-              )
-            `);
+          let query = supabase.from("stores").select(
+            `${cols}, package:store_packages(id, name, slug, price, billing_cycle, product_limit, accessory_limit, staff_limit, exchange_enabled, repair_enabled, custom_seo_enabled, analytics_level, featured_enabled, verified_badge_enabled, homepage_promotion_enabled, created_at, updated_at)`
+          );
           if (storeIds.length > 0) {
             query = query.in("id", storeIds);
           }
-          const { data, error } = await query.order("created_at", { ascending: false });
+          if (search.trim()) {
+            query = query.ilike("name", `%${search.trim()}%`);
+          }
+          const { data, error } = await query.order("name").range(from, to);
           if (error) throw error;
-          return (data ?? []) as StoreWithSubscriptionsRaw[];
+          return (data ?? []) as StoreWithSubscription[];
         };
 
-        let data: StoreWithSubscriptionsRaw[] | StoreRow[] = [];
+        let data: StoreWithSubscription[] = [];
 
         try {
           data = await tryLoadWithSubscriptions();
@@ -232,16 +225,7 @@ const StoreManager = () => {
           data = await loadBaseStores();
         }
 
-        // Flatten store_subscriptions from array to single object (when join exists)
-        return (data || []).map((store) => {
-          const s = store as StoreWithSubscriptionsRaw;
-          const subscriptions = s.store_subscriptions;
-          const activeSub = Array.isArray(subscriptions) && subscriptions.length > 0 ? subscriptions[0] : null;
-          return {
-            ...s,
-            store_subscriptions: activeSub,
-          } as StoreWithSubscription;
-        });
+        return data;
       } catch (err) {
         handleSupabaseError(err, "StoreManager: Failed to fetch stores list");
         return [];
@@ -253,12 +237,12 @@ const StoreManager = () => {
   const { data: packages } = useQuery({
     queryKey: ["admin_packages"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("packages").select("*").order("sort_order", { ascending: true });
+      const { data, error } = await supabase.from("store_packages").select(STORE_PACKAGES_COLUMNS.join(",")).order("price", { ascending: true });
       if (error) {
-        if (isMissingRelationshipError(error)) return [] as PackageRow[];
+        if (isMissingRelationshipError(error)) return [];
         throw error;
       }
-      return (data ?? []) as PackageRow[];
+      return data ?? [];
     },
   });
 
@@ -289,38 +273,19 @@ const StoreManager = () => {
 
   const assignSubscriptionMutation = useMutation({
     mutationFn: async ({ storeId, packageId, duration }: { storeId: string, packageId: string, duration: 'monthly' | 'yearly' }) => {
-      const startDate = new Date();
       const endDate = new Date();
       if (duration === 'monthly') endDate.setMonth(endDate.getMonth() + 1);
       else endDate.setFullYear(endDate.getFullYear() + 1);
 
-      const { error } = await supabase.from("store_subscriptions").upsert(
-        {
-          store_id: storeId,
+      const { error } = await supabase
+        .from("stores")
+        .update({
           package_id: packageId,
-          status: "active",
-          is_enabled: true,
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          auto_renew: true,
-        },
-        { onConflict: "store_id" },
-      );
-
-      if (error) {
-        if (isMissingRelationshipError(error)) {
-          const { error: legacyError } = await supabase
-            .from("stores")
-            .update({
-              subscription_status: "active",
-              subscription_end_date: endDate.toISOString(),
-            })
-            .eq("id", storeId);
-          if (legacyError) throw legacyError;
-          return;
-        }
-        throw error;
-      }
+          subscription_status: "active",
+          subscription_end_date: endDate.toISOString(),
+        })
+        .eq("id", storeId);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin_stores"] });
@@ -531,11 +496,8 @@ const StoreManager = () => {
     }
   };
 
-  const filteredStores = stores?.filter((store) =>
-    store.name.toLowerCase().includes(search.toLowerCase()) ||
-    store.location.toLowerCase().includes(search.toLowerCase()) ||
-    (store.shop_no && store.shop_no.toLowerCase().includes(search.toLowerCase()))
-  );
+  // Search and pagination handled server-side via query
+  const filteredStores = stores;
 
   return (
     <div className="space-y-6">
@@ -872,18 +834,18 @@ const StoreManager = () => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {store.store_subscriptions?.packages?.slug ? (
+                    {store.package?.slug ? (
                       <div className="space-y-1.5">
                         <Badge
                           variant="outline"
-                          className={cn("font-bold text-[10px] uppercase px-2 py-0", getStorePackageMeta(store.store_subscriptions.packages.slug)?.badgeClassName)}
+                          className={cn("font-bold text-[10px] uppercase px-2 py-0", getStorePackageMeta(store.package.slug)?.badgeClassName)}
                         >
-                          {formatStorePackageName(store.store_subscriptions.packages.slug, store.store_subscriptions.packages.name)}
+                          {formatStorePackageName(store.package.slug, store.package.name)}
                         </Badge>
-                        {store.store_subscriptions?.end_date ? (
+                        {store.subscription_end_date ? (
                           <div className="flex items-center text-[9px] text-muted-foreground font-medium uppercase tracking-wider">
                             <Calendar className="mr-1 h-2.5 w-2.5" />
-                            Ends: {format(new Date(store.store_subscriptions.end_date), "MMM d")}
+                            Ends: {format(new Date(store.subscription_end_date), "MMM d")}
                           </div>
                         ) : null}
                       </div>
@@ -966,7 +928,7 @@ const StoreManager = () => {
                                 <div key={pkg.id} className="px-2 py-2 rounded-lg hover:bg-muted/50 transition-colors">
                                   <div className="text-[11px] font-bold mb-1.5 flex items-center justify-between">
                                     <span>{pkg.name}</span>
-                                    <span className="text-[9px] text-muted-foreground font-normal">Rs. {pkg.monthly_price}/mo</span>
+                                    <span className="text-[9px] text-muted-foreground font-normal">Rs. {pkg.price}/mo</span>
                                   </div>
                                   <div className="flex gap-1">
                                     <Button 
@@ -1044,11 +1006,41 @@ const StoreManager = () => {
                 </TableRow>
               ))
             )}
-          </TableBody>
-        </Table>
+           </TableBody>
+         </Table>
+       </div>
+
+       {filteredStores && filteredStores.length === PAGINATION.PAGE_SIZE_SMALL && (
+         <div className="flex justify-center mt-4">
+           <nav aria-label="Store pagination">
+             <Pagination>
+               <PaginationContent>
+                 <PaginationItem>
+                   <PaginationPrevious
+                     href="#"
+                     isActive={storePage === 0}
+                     onClick={() => storePage > 0 && setStorePage(storePage - 1)}
+                   />
+                 </PaginationItem>
+                 <PaginationItem>
+                   <PaginationLink href="#" isActive>
+                     Page {storePage + 1}
+                   </PaginationLink>
+                 </PaginationItem>
+                 <PaginationItem>
+                   <PaginationNext
+                     href="#"
+                     isActive
+                     onClick={() => setStorePage(storePage + 1)}
+                   />
+                 </PaginationItem>
+               </PaginationContent>
+             </Pagination>
+            </nav>
+          </div>
+        )}
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 export default StoreManager;

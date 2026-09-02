@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { VISITOR_LOGS_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -74,7 +75,8 @@ export default function Analytics() {
     queryFn: async () => {
       try {
       const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-      
+      const sixtyDaysAgo = subDays(new Date(), 60).toISOString();
+
       const [
         { data: revenueData },
         { data: ordersData },
@@ -87,7 +89,10 @@ export default function Analytics() {
         { data: uniqueVisitorsToday },
         { data: visitorStatsData },
         { data: recentVisitorLogs },
-        { data: countriesGrouped }
+        { data: countriesGrouped },
+        { data: prevRevenueData },
+        { data: prevOrdersData },
+        { data: prevUsersData },
       ] = await Promise.all([
         supabase.from("orders").select("total_amount, created_at").gte("created_at", thirtyDaysAgo),
         supabase.from("orders").select("id, created_at").gte("created_at", thirtyDaysAgo),
@@ -99,8 +104,11 @@ export default function Analytics() {
         supabase.from("visitor_logs").select("*", { count: "exact", head: true }),
         supabase.from("visitor_logs").select("*", { count: "exact", head: true }).eq("is_unique", true).gte("created_at", startOfDay(new Date()).toISOString()),
         supabase.rpc("get_visitor_stats", { p_period: visitorPeriod }),
-        supabase.from("visitor_logs").select("*").order("created_at", { ascending: false }).limit(10),
-        supabase.rpc("get_top_visitor_countries", { p_limit: 5 })
+        supabase.from("visitor_logs").select(VISITOR_LOGS_COLUMNS.join(",")).order("created_at", { ascending: false }).limit(10),
+        supabase.rpc("get_top_visitor_countries", { p_limit: 5 }),
+        supabase.from("orders").select("total_amount").gte("created_at", sixtyDaysAgo).lt("created_at", thirtyDaysAgo),
+        supabase.from("orders").select("id").gte("created_at", sixtyDaysAgo).lt("created_at", thirtyDaysAgo),
+        supabase.from("profiles").select("id").gte("created_at", sixtyDaysAgo).lt("created_at", thirtyDaysAgo),
       ]);
 
       // Process visitor stats for chart
@@ -146,12 +154,28 @@ export default function Analytics() {
         value
       }));
 
+      const currentRevenue = (revenueData || []).reduce((acc, curr) => acc + Number(curr.total_amount), 0);
+      const prevRevenue = (prevRevenueData || []).reduce((acc, curr) => acc + Number(curr.total_amount), 0);
+      const currentOrders = (ordersData || []).length;
+      const prevOrders = (prevOrdersData || []).length;
+      const currentUsers = (usersData || []).length;
+      const prevUsers = (prevUsersData || []).length;
+
+      const calcGrowth = (curr: number, prev: number): string => {
+        if (prev === 0) return curr > 0 ? "+100%" : "—";
+        const pct = ((curr - prev) / prev) * 100;
+        return (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%";
+      };
+
       return {
-        totalRevenue: (revenueData || []).reduce((acc, curr) => acc + Number(curr.total_amount), 0) || 0,
-        totalOrders: (ordersData || []).length || 0,
+        totalRevenue: currentRevenue,
+        totalOrders: currentOrders,
         totalStores: (storesData || []).length || 0,
-        totalUsers: (usersData || []).length || 0,
+        totalUsers: currentUsers,
         totalListings: (listingsData || []).length || 0,
+        revenueGrowth: calcGrowth(currentRevenue, prevRevenue),
+        ordersGrowth: calcGrowth(currentOrders, prevOrders),
+        usersGrowth: calcGrowth(currentUsers, prevUsers),
         revenueChartData,
         ordersChartData,
         subPieData,
@@ -230,9 +254,9 @@ export default function Analytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">Rs. {stats?.totalRevenue.toLocaleString()}</div>
-            <div className="flex items-center text-xs text-green-500 mt-1">
+            <div className="flex items-center text-xs text-muted-foreground mt-1">
               <TrendingUp className="h-3 w-3 mr-1" />
-              +12.5% from last month
+              {stats?.revenueGrowth ?? "—"} vs last 30d
             </div>
           </CardContent>
         </Card>
@@ -243,9 +267,9 @@ export default function Analytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">+{stats?.totalOrders}</div>
-            <div className="flex items-center text-xs text-green-500 mt-1">
+            <div className="flex items-center text-xs text-muted-foreground mt-1">
               <TrendingUp className="h-3 w-3 mr-1" />
-              +8.2% from last month
+              {stats?.ordersGrowth ?? "—"} vs last 30d
             </div>
           </CardContent>
         </Card>
@@ -269,9 +293,9 @@ export default function Analytics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">+{stats?.totalUsers}</div>
-            <div className="flex items-center text-xs text-green-500 mt-1">
+            <div className="flex items-center text-xs text-muted-foreground mt-1">
               <TrendingUp className="h-3 w-3 mr-1" />
-              +15.3% from last month
+              {stats?.usersGrowth ?? "—"} vs last 30d
             </div>
           </CardContent>
         </Card>

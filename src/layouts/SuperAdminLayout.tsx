@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   ShieldAlert,
   LogOut,
   Menu,
   ExternalLink,
+  ChevronDown,
   ChevronRight,
   Users,
   Store,
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +36,7 @@ export default function SuperAdminLayout() {
   const { user, role, signOut } = useAuth();
   const { permissions } = usePermissions();
   const [navQuery, setNavQuery] = useState("");
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   const menuGroups = useMemo(
     () => getFilteredMenu("suadmin", role === "suadmin" ? permissions : null),
@@ -53,21 +56,48 @@ export default function SuperAdminLayout() {
       .filter((group) => group.items.length > 0);
   }, [menuGroups, navQuery]);
 
+  const sectionAliases = useMemo<Record<string, string[]>>(() => ({
+    "/suadmin": ["/suadmin", "/suadmin/me"],
+    "/suadmin/team-access": ["/suadmin/team-access", "/suadmin/staff-admins", "/suadmin/staff-permissions", "/suadmin/staff-tasks", "/suadmin/staff-performance"],
+    "/suadmin/customers": ["/suadmin/customers", "/suadmin/users", "/suadmin/user-rewards", "/suadmin/user-risk"],
+    "/suadmin/operations": ["/suadmin/operations", "/suadmin/catalog", "/suadmin/master-data", "/suadmin/brands", "/suadmin/products", "/suadmin/price-list", "/suadmin/price-list-simple", "/suadmin/emi-plans", "/suadmin/device-verification", "/suadmin/commerce", "/suadmin/orders", "/suadmin/leads", "/suadmin/listings", "/suadmin/exchanges", "/suadmin/campaigns", "/suadmin/service-desk", "/suadmin/repairs", "/suadmin/unlocking", "/suadmin/valuation"],
+    "/suadmin/store-network": ["/suadmin/store-network", "/suadmin/stores", "/suadmin/store-applications", "/suadmin/store-admins", "/suadmin/store-admin-permissions", "/suadmin/store-admin-tasks", "/suadmin/store-staff"],
+    "/suadmin/billing": ["/suadmin/billing", "/suadmin/payouts", "/suadmin/subscriptions"],
+    "/suadmin/publishing": ["/suadmin/publishing", "/suadmin/articles", "/suadmin/guides", "/suadmin/content"],
+    "/suadmin/engagement": ["/suadmin/engagement", "/suadmin/messages", "/suadmin/chatbot", "/suadmin/polls"],
+    "/suadmin/growth": ["/suadmin/growth", "/suadmin/analytics", "/suadmin/seo"],
+    "/suadmin/system": ["/suadmin/system", "/suadmin/console", "/suadmin/audit", "/suadmin/maintenance", "/suadmin/health", "/suadmin/settings"],
+  }), []);
+
+  const isItemActive = useCallback((href: string) => {
+    const aliases = sectionAliases[href];
+    if (aliases) {
+      return aliases.some((alias) => location.pathname === alias || (alias !== "/suadmin" && location.pathname.startsWith(`${alias}/`)));
+    }
+    return location.pathname === href || (href !== "/suadmin" && location.pathname.startsWith(href));
+  }, [location.pathname, sectionAliases]);
+
   // Derive current page label + section for topbar breadcrumb
   const { currentLabel, currentSection } = useMemo(() => {
     for (const group of menuGroups) {
       for (const item of group.items) {
-        const exact = location.pathname === item.href;
-        const prefix =
-          item.href !== "/suadmin" &&
-          location.pathname.startsWith(item.href);
-        if (exact || prefix) {
+        if (isItemActive(item.href)) {
           return { currentLabel: item.label, currentSection: group.title };
         }
       }
     }
-    return { currentLabel: "Dashboard", currentSection: "Overview" };
-  }, [menuGroups, location.pathname]);
+    return { currentLabel: "Dashboard", currentSection: "Command Center" };
+  }, [menuGroups, isItemActive]);
+
+  const isDuplicateCrumb = currentSection === currentLabel;
+
+  useEffect(() => {
+    setOpenGroups((current) => ({
+      ...current,
+      "Command Center": current["Command Center"] ?? true,
+      [currentSection]: true,
+    }));
+  }, [currentSection]);
 
   const userInitials = useMemo(() => {
     const name =
@@ -112,40 +142,95 @@ export default function SuperAdminLayout() {
       </div>
 
       {/* Nav groups */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-5 scrollbar-hide">
-        {filteredGroups.map((group) => (
-          <div key={group.title} className="space-y-1">
-            <h3 className="px-3 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground/40 mb-1">
-              {group.title}
-            </h3>
-            <ul className="space-y-0.5">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  location.pathname === item.href ||
-                  (item.href !== "/suadmin" &&
-                    location.pathname.startsWith(item.href));
-                return (
-                  <li key={item.href}>
-                    <Link
-                      to={item.href}
-                      onClick={onNavigate}
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
-                        isActive
-                          ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1 scrollbar-hide">
+        {filteredGroups.map((group) => {
+          const hasActiveItem = group.items.some((item) => isItemActive(item.href));
+          const isOpen = navQuery.trim()
+            ? true
+            : (openGroups[group.title] ?? (group.title === "Command Center" || hasActiveItem));
+
+          if (group.items.length === 1) {
+            const item = group.items[0];
+            const Icon = item.icon;
+            const isActive = isItemActive(item.href);
+
+            return (
+              <Link
+                key={group.title}
+                to={item.href}
+                onClick={onNavigate}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all duration-150",
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="truncate">{group.title}</span>
+              </Link>
+            );
+          }
+
+          return (
+            <Collapsible
+              key={group.title}
+              open={isOpen}
+              onOpenChange={(open) =>
+                setOpenGroups((current) => ({ ...current, [group.title]: open }))
+              }
+              className="rounded-lg"
+            >
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.1em] transition-colors",
+                    hasActiveItem
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  )}
+                >
+                  <ChevronDown
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0 transition-transform",
+                      !isOpen && "-rotate-90"
+                    )}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{group.title}</span>
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-semibold">
+                    {group.items.length}
+                  </Badge>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ul className="mt-1 space-y-0.5 pb-2 pl-2">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = isItemActive(item.href);
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          to={item.href}
+                          onClick={onNavigate}
+                          className={cn(
+                            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
+                            isActive
+                              ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                              : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                          )}
+                        >
+                          <Icon className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CollapsibleContent>
+            </Collapsible>
+          );
+        })}
       </nav>
 
       {/* Sidebar footer */}
@@ -191,10 +276,14 @@ export default function SuperAdminLayout() {
 
               {/* Breadcrumb */}
               <nav className="flex items-center gap-1.5 text-sm">
-                <span className="text-muted-foreground hidden sm:inline">
-                  {currentSection}
-                </span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 hidden sm:inline" />
+                {!isDuplicateCrumb && (
+                  <>
+                    <span className="text-muted-foreground hidden sm:inline">
+                      {currentSection}
+                    </span>
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 hidden sm:inline" />
+                  </>
+                )}
                 <span className="font-semibold text-foreground">
                   {currentLabel}
                 </span>

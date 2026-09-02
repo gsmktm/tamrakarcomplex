@@ -13,9 +13,6 @@ AS $$
         SELECT 1 FROM public.user_roles 
         WHERE user_id = auth.uid() 
         AND role = 'suadmin'
-    ) OR (
-        -- Hardcoded backup for safety during transitions
-        lower(auth.jwt() ->> 'email') IN ('superadmin@tamrakarcomplex.com', 'gsmktm@gmail.com', 'gskmtm@gmail.com', 'gsktm@gmail.com', 'admin@tamrakarcomplex.com')
     );
 $$;
 
@@ -43,7 +40,7 @@ AS $$
     SELECT public.is_admin() OR EXISTS (
         SELECT 1 FROM public.user_roles 
         WHERE user_id = auth.uid() 
-        AND (role = 'store_owner' OR role = 'moderator')
+        AND role = 'storeadmin'
     );
 $$;
 
@@ -58,7 +55,7 @@ AS $$
   SELECT NOT EXISTS (
     SELECT 1
     FROM public.user_roles
-    WHERE role IN ('admin'::public.app_role, 'suadmin'::public.app_role)
+    WHERE role IN ('suadmin'::public.app_role, 'staffadmin'::public.app_role)
   );
 $$;
 

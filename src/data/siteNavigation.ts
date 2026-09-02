@@ -64,16 +64,19 @@ export const siteNavigationGroups: SiteNavGroup[] = [
       { name: "Contact Us", href: "/contact-us", description: "Get in touch with our team" },
       { name: "Privacy Policy", href: "/privacy-policy", description: "How we collect and use data" },
       { name: "Terms of Service", href: "/terms-of-service", description: "Platform terms and usage guidelines" },
+      { name: "Shipping & Delivery", href: "/shipping-delivery", description: "Delivery, pickup, timing, and charges" },
+      { name: "Returns & Refunds", href: "/returns-refunds", description: "Seller returns, refunds, and dispute process" },
+      { name: "Marketplace Disclosure", href: "/marketplace-disclosure", description: "Seller identity, reference prices, and purchase availability" },
       { name: "Wishlist", href: "/wishlist", description: "Saved gadgets and listings to revisit later" },
       { name: "My Profile", href: "/user/me", description: "Complete your profile to sell faster" },
     ],
   },
   {
     name: "Learn",
-    href: "/news",
+    href: "/stores/article",
     description: "News, reviews, guides, and buying advice in one newsroom.",
     items: [
-      { name: "News", href: "/news", description: "Launches, price drops, and Nepal tech updates" },
+      { name: "News", href: "/stores/article", description: "Launches, price drops, and Nepal tech updates" },
       { name: "Reviews", href: "/reviews", description: "Hands-on opinions and verdicts before you spend" },
       { name: "Mobile Guides", href: "/mobile-guides", description: "Buying guides, tips, and explainers for phones" },
       { name: "Laptop Guides", href: "/laptop-guides", description: "Best picks and practical laptop advice" },
@@ -97,7 +100,7 @@ export const footerLinkGroups = [
   {
     title: "Learn",
     links: [
-      { name: "News", href: "/news" },
+      { name: "News", href: "/stores/article" },
       { name: "Reviews", href: "/reviews" },
       { name: "Mobile Guides", href: "/mobile-guides" },
       { name: "Laptop Guides", href: "/laptop-guides" },
@@ -110,6 +113,9 @@ export const footerLinkGroups = [
       { name: "Contact Us", href: "/contact-us" },
       { name: "Privacy Policy", href: "/privacy-policy" },
       { name: "Terms of Service", href: "/terms-of-service" },
+      { name: "Shipping & Delivery", href: "/shipping-delivery" },
+      { name: "Returns & Refunds", href: "/returns-refunds" },
+      { name: "Marketplace Disclosure", href: "/marketplace-disclosure" },
     ],
   },
 ];

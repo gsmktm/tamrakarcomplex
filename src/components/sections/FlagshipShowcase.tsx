@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { SafeImage } from "@/components/common/SafeImage";
+import { resolveListingImage } from "@/lib/phoneImages";
 import {
   Smartphone,
   Laptop,
@@ -31,26 +33,73 @@ interface ProductCard {
   icon: React.ReactNode;
   brand: string;
   slug?: string;
+  image?: string | null;
 }
 
 // ─── Hardcoded Fallbacks ───────────────────────────────────────────────────────
 const APPLE_PRODUCTS: ProductCard[] = [
-  { id: "a1", name: "iPhone 16 Pro Max", subtitle: "Titanium · A18 Pro", price: "NPR 2,05,000", priceValue: 205000, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
-  { id: "a2", name: "iPhone 16", subtitle: "Dynamic Island · A18", price: "NPR 1,45,000", priceValue: 145000, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
-  { id: "a3", name: "MacBook Air M3", subtitle: "18-hr battery · 13″", price: "NPR 1,85,000", priceValue: 185000, icon: <Laptop className="w-6 h-6" />, brand: "Apple" },
-  { id: "a4", name: "iPad Pro M4", subtitle: "OLED · Ultra Retina", price: "NPR 1,65,000", priceValue: 165000, icon: <Tablet className="w-6 h-6" />, brand: "Apple" },
-  { id: "a5", name: "Apple Watch Series 10", subtitle: "Thinnest ever · watchOS 11", price: "NPR 75,000", priceValue: 75000, icon: <Watch className="w-6 h-6" />, brand: "Apple" },
-  { id: "a6", name: "AirPods Pro 2", subtitle: "ANC · Vision Pro audio", price: "NPR 42,000", priceValue: 42000, icon: <Headphones className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17pm", name: "iPhone 17 Pro Max", subtitle: "A19 Pro · 256GB", price: "NPR 2,48,999", priceValue: 248999, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17p", name: "iPhone 17 Pro", subtitle: "A19 Pro · 256GB", price: "NPR 2,28,999", priceValue: 228999, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17air", name: "iPhone 17 Air", subtitle: "Ultra-thin · 256GB", price: "NPR 1,83,999", priceValue: 183999, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17", name: "iPhone 17", subtitle: "A19 · 256GB", price: "NPR 1,67,999", priceValue: 167999, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17e", name: "iPhone 17e", subtitle: "A19 · 256GB", price: "NPR 1,27,799", priceValue: 127799, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "aw11", name: "Apple Watch Series 11", subtitle: "S10 · watchOS", price: "Price on request", priceValue: 0, icon: <Watch className="w-6 h-6" />, brand: "Apple" },
 ];
 
+function appleProductRecency(product: { name?: string; specs?: Record<string, unknown> | null }) {
+  const name = product.name ?? "";
+  const metadataYear = Number(product.specs?.release_year ?? product.specs?.releaseYear);
+  const explicitYear = Number(name.match(/\b(20\d{2})\b/)?.[1]);
+  let year = metadataYear > 2000 ? metadataYear : explicitYear > 2000 ? explicitYear : 0;
+  let generation = 0;
+
+  const iphone = name.match(/iphone\s+(\d+)/i);
+  const watch = name.match(/watch(?:\s+series)?\s+(\d+)/i);
+  const chip = name.match(/\bM(\d+)\b/i);
+
+  if (iphone) {
+    const iphoneGeneration = Number(iphone[1]);
+    const variantRank = /pro max/i.test(name) ? 5 : /\bpro\b/i.test(name) ? 4 : /air|plus/i.test(name) ? 3 : /\d+e\b/i.test(name) ? 1 : 2;
+    generation = iphoneGeneration * 10 + variantRank;
+    year ||= 2008 + iphoneGeneration;
+  } else if (watch) {
+    generation = Number(watch[1]);
+    year ||= 2014 + generation;
+  } else if (chip) {
+    generation = Number(chip[1]);
+    year ||= 2020 + generation;
+  }
+
+  return year * 100 + generation;
+}
+
 const SAMSUNG_PRODUCTS: ProductCard[] = [
-  { id: "s1", name: "Galaxy S25 Ultra", subtitle: "Snapdragon 8 Elite · S Pen", price: "NPR 1,95,000", priceValue: 195000, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
-  { id: "s2", name: "Galaxy S25+", subtitle: "Snapdragon 8 Elite · 6.7″", price: "NPR 1,45,000", priceValue: 145000, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
-  { id: "s3", name: "Galaxy Z Fold 6", subtitle: "Foldable · 7.6″ AMOLED", price: "NPR 3,20,000", priceValue: 320000, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
-  { id: "s4", name: "Galaxy Z Flip 6", subtitle: "Compact Flip · Flex Window", price: "NPR 1,55,000", priceValue: 155000, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
-  { id: "s5", name: "Galaxy Tab S9", subtitle: "Dynamic AMOLED · S Pen", price: "NPR 1,25,000", priceValue: 125000, icon: <Tablet className="w-6 h-6" />, brand: "Samsung" },
-  { id: "s6", name: "Galaxy Buds3 Pro", subtitle: "360 Audio · ANC", price: "NPR 38,000", priceValue: 38000, icon: <Headphones className="w-6 h-6" />, brand: "Samsung" },
+  { id: "s26u", name: "Galaxy S26 Ultra", subtitle: "Galaxy AI · S Pen", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
+  { id: "s26p", name: "Galaxy S26+", subtitle: "Galaxy AI · Large display", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
+  { id: "s26", name: "Galaxy S26", subtitle: "Galaxy AI · Flagship performance", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
+  { id: "zfold7", name: "Galaxy Z Fold7", subtitle: "Latest book-style foldable", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
+  { id: "zflip7", name: "Galaxy Z Flip7", subtitle: "Latest compact foldable", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
+  { id: "s25fe", name: "Galaxy S25 FE", subtitle: "Fan Edition · Galaxy AI", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
 ];
+
+function productSlug(product: ProductCard) {
+  return `${product.brand} ${product.name}`
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\+/g, " plus ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/^apple-apple-/, "apple-")
+    .replace(/^samsung-samsung-/, "samsung-");
+}
+
+function productLink(product: ProductCard) {
+  return product.slug ? `/product/${product.slug}` : `/mobile/${productSlug(product)}`;
+}
+
+function productThumbnail(product: ProductCard) {
+  return resolveListingImage(product.name, product.brand, product.image ? [product.image] : [], product.name);
+}
 
 const TRENDING_FALLBACK = [
   { rank: 1, name: "Galaxy S25 Ultra", brand: "Samsung", price: "NPR 1,95,000" },
@@ -139,21 +188,30 @@ function DecisionChips({
 
 // Apple product card
 function AppleCard({ product }: { product: ProductCard }) {
+  const thumbnail = productThumbnail(product);
+
   return (
     <Link
-      to={`/buy?brand=${product.brand}&search=${encodeURIComponent(product.name)}`}
-      className="group flex-shrink-0 w-52 bg-white/5 border border-white/10 backdrop-blur rounded-2xl p-5 flex flex-col gap-3 hover:-translate-y-1 hover:ring-1 hover:ring-white/25 transition-all duration-300 hover:bg-white/8"
+      to={productLink(product)}
+      className="flagship-strip-card group flex-shrink-0 w-52 backdrop-blur rounded-2xl p-5 flex flex-col gap-3 hover:-translate-y-1 transition-all duration-300"
     >
-      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/70 group-hover:text-white transition-colors">
-        {product.icon}
+      <div className="flagship-strip-icon relative h-36 w-full overflow-hidden rounded-xl flex items-center justify-center transition-colors">
+        <SafeImage
+          src={thumbnail}
+          alt={`${product.name} thumbnail`}
+          className="h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"
+          aspect="free"
+          width={176}
+          height={144}
+        />
       </div>
       <div className="flex-1">
-        <p className="text-white font-semibold text-sm leading-tight">{product.name}</p>
-        <p className="text-white/50 text-xs mt-0.5">{product.subtitle}</p>
+        <p className="flagship-strip-name font-semibold text-sm leading-tight">{product.name}</p>
+        <p className="flagship-strip-muted text-xs mt-0.5">{product.subtitle}</p>
       </div>
       <div>
-        <p className="text-white/90 font-bold text-sm">{product.price}</p>
-        <div className="mt-2 flex items-center gap-1 text-xs text-blue-400 font-medium group-hover:gap-2 transition-all">
+        <p className="flagship-strip-price font-bold text-sm">{product.price}</p>
+        <div className="flagship-strip-link mt-2 flex items-center gap-1 text-xs font-medium group-hover:gap-2 transition-all">
           <span>View</span>
           <ArrowRight className="w-3 h-3" />
         </div>
@@ -164,21 +222,29 @@ function AppleCard({ product }: { product: ProductCard }) {
 
 // Samsung product card
 function SamsungCard({ product }: { product: ProductCard }) {
+  const thumbnail = productThumbnail(product);
   return (
     <Link
-      to={`/buy?brand=${product.brand}&search=${encodeURIComponent(product.name)}`}
-      className="group flex-shrink-0 w-52 bg-white/5 border border-purple-500/20 backdrop-blur rounded-2xl p-5 flex flex-col gap-3 hover:-translate-y-1 hover:ring-1 hover:ring-purple-400/40 transition-all duration-300 hover:bg-[#1e2445]"
+      to={productLink(product)}
+      className="flagship-strip-card group flex-shrink-0 w-52 backdrop-blur rounded-2xl p-5 flex flex-col gap-3 hover:-translate-y-1 transition-all duration-300"
     >
-      <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-300 group-hover:text-purple-200 transition-colors">
-        {product.icon}
+      <div className="flagship-strip-icon relative h-36 w-full overflow-hidden rounded-xl flex items-center justify-center transition-colors">
+        <SafeImage
+          src={thumbnail}
+          alt={`${product.name} thumbnail`}
+          className="h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"
+          aspect="free"
+          width={176}
+          height={144}
+        />
       </div>
       <div className="flex-1">
-        <p className="text-white font-semibold text-sm leading-tight">{product.name}</p>
-        <p className="text-white/50 text-xs mt-0.5">{product.subtitle}</p>
+        <p className="flagship-strip-name font-semibold text-sm leading-tight">{product.name}</p>
+        <p className="flagship-strip-muted text-xs mt-0.5">{product.subtitle}</p>
       </div>
       <div>
-        <p className="text-white/90 font-bold text-sm">{product.price}</p>
-        <div className="mt-2 flex items-center gap-1 text-xs text-purple-400 font-medium group-hover:gap-2 transition-all">
+        <p className="flagship-strip-price font-bold text-sm">{product.price}</p>
+        <div className="flagship-strip-link mt-2 flex items-center gap-1 text-xs font-medium group-hover:gap-2 transition-all">
           <span>View</span>
           <ArrowRight className="w-3 h-3" />
         </div>
@@ -188,24 +254,21 @@ function SamsungCard({ product }: { product: ProductCard }) {
 }
 
 // Generic small product card
-function MiniCard({ product, variant = "light" }: { product: ProductCard; variant?: "light" | "dark" }) {
+function MiniCard({ product }: { product: ProductCard; variant?: "light" | "dark" }) {
+  const thumbnail = productThumbnail(product);
   return (
     <Link
-      to={`/buy?brand=${product.brand}&search=${encodeURIComponent(product.name)}`}
-      className={`group flex items-center gap-3 rounded-xl p-3 transition-all duration-200 ${
-        variant === "dark"
-          ? "bg-white/5 border border-white/8 hover:bg-white/10"
-          : "bg-zinc-800/60 border border-white/8 hover:bg-zinc-700/60"
-      }`}
+      to={productLink(product)}
+      className="group flex items-center gap-3 rounded-xl p-3 transition-all duration-200 bg-muted/50 border border-border hover:bg-muted"
     >
-      <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-white/60 flex-shrink-0">
-        {product.icon}
+      <div className="w-11 h-11 overflow-hidden rounded-lg bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
+        <SafeImage src={thumbnail} alt="" className="h-full w-full object-contain p-1" aspect="free" width={44} height={44} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-white text-sm font-semibold truncate">{product.name}</p>
-        <p className="text-white/50 text-xs">{product.price}</p>
+        <p className="text-foreground text-sm font-semibold truncate">{product.name}</p>
+        <p className="text-muted-foreground text-xs">{product.price}</p>
       </div>
-      <ChevronRight className="w-4 h-4 text-white/30 group-hover:text-white/70 flex-shrink-0 transition-colors" />
+      <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-foreground flex-shrink-0 transition-colors" />
     </Link>
   );
 }
@@ -213,85 +276,54 @@ function MiniCard({ product, variant = "light" }: { product: ProductCard; varian
 // ─── Hero Section ──────────────────────────────────────────────────────────────
 function DualBrandHero() {
   return (
-    <section className="relative w-full min-h-[60vh] flex flex-col lg:flex-row overflow-hidden">
-      {/* Apple Side */}
-      <div className="relative flex-1 bg-black flex flex-col justify-center items-center lg:items-start px-8 py-16 lg:px-16 min-h-[320px] lg:min-h-0 group overflow-hidden">
-        {/* Background radial glow */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_50%,rgba(59,130,246,0.12),transparent_70%)] pointer-events-none" />
-        <div className="absolute top-6 left-6 lg:top-8 lg:left-12">
-          <span className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur border border-white/20 rounded-full px-3 py-1 text-white/80 text-xs font-semibold tracking-wide">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-            Apple Ecosystem
-          </span>
-        </div>
-        {/* Floating phone silhouette */}
-        <div className="absolute right-8 bottom-8 opacity-10 text-[120px] leading-none select-none pointer-events-none group-hover:opacity-15 transition-opacity duration-500 hidden lg:block">
-          📱
-        </div>
-        <div className="relative z-10 text-center lg:text-left mt-8 lg:mt-0">
-          <p className="text-white/40 text-xs font-medium uppercase tracking-[0.2em] mb-2">Think Different</p>
-          <h2 className="font-display text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-none mb-3">
-            Apple
-          </h2>
-          <p className="text-white/60 text-base lg:text-lg mb-2 font-medium">iPhone 16 Pro Max.</p>
-          <p className="text-white/40 text-sm mb-6">The most personal Pro ever.</p>
-          <p className="text-white/50 text-sm mb-6">
-            From{" "}
-            <span className="text-white font-bold text-lg">NPR 1,45,000</span>
-          </p>
-          <Link
-            to="/buy?brand=Apple"
-            className="inline-flex items-center gap-2 bg-white text-black font-semibold text-sm px-6 py-3 rounded-full hover:bg-white/90 transition-all duration-200 hover:gap-3 shadow-lg"
-          >
-            Explore Apple
-            <ArrowRight className="w-4 h-4" />
+    <section className="flagship-duel" aria-labelledby="flagship-duel-title">
+      <h2 id="flagship-duel-title" className="sr-only">Apple and Samsung flagship collections</h2>
+      <div className="flagship-duel-grid" aria-hidden />
+
+      <article className="flagship-duel-panel flagship-duel-apple">
+        <span className="flagship-duel-serial">TC / CUPERTINO / 01</span>
+        <div className="flagship-duel-copy">
+          <span className="flagship-duel-badge"><Sparkles className="h-3.5 w-3.5" />Apple Ecosystem</span>
+          <p className="flagship-duel-kicker">Think Different</p>
+          <h3>Apple<span>iPhone 17 Pro Max.</span></h3>
+          <p className="flagship-duel-tagline">The most personal Pro ever.</p>
+          <div className="flagship-duel-price"><small>From</small><strong>NPR 1,45,000</strong></div>
+          <Link to="/mobile/apple-iphone-17-pro-max" className="flagship-duel-link">
+            View iPhone 17 Pro Max <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-      </div>
+        <div className="flagship-device flagship-device-apple" aria-hidden>
+          <span className="flagship-device-lens lens-one" />
+          <span className="flagship-device-lens lens-two" />
+          <span className="flagship-device-lens lens-three" />
+          <span className="flagship-device-mark">A19<br />PRO</span>
+        </div>
+        <span className="flagship-duel-ring" aria-hidden />
+      </article>
 
-      {/* VS Divider */}
-      <div className="hidden lg:flex flex-col items-center justify-center relative z-20 w-0">
-        <div className="absolute inset-y-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
-        <div className="relative z-10 w-10 h-10 rounded-full bg-zinc-900 border border-white/20 flex items-center justify-center text-white/60 text-xs font-bold shadow-xl">
-          VS
-        </div>
-      </div>
+      <div className="flagship-duel-core" aria-hidden><span>VS</span><small>FLAGSHIP</small></div>
 
-      {/* Samsung Side */}
-      <div className="relative flex-1 bg-[#0d0f1e] flex flex-col justify-center items-center lg:items-end px-8 py-16 lg:px-16 min-h-[320px] lg:min-h-0 group overflow-hidden">
-        {/* Purple gradient bg */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_50%,rgba(139,92,246,0.18),transparent_70%)] pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_80%,rgba(59,130,246,0.1),transparent_60%)] pointer-events-none" />
-        <div className="absolute top-6 right-6 lg:top-8 lg:right-12">
-          <span className="inline-flex items-center gap-1.5 bg-purple-500/20 backdrop-blur border border-purple-400/30 rounded-full px-3 py-1 text-purple-200 text-xs font-semibold tracking-wide">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-            Galaxy Flagship
-          </span>
-        </div>
-        {/* Floating phone silhouette */}
-        <div className="absolute left-8 bottom-8 opacity-10 text-[120px] leading-none select-none pointer-events-none group-hover:opacity-15 transition-opacity duration-500 hidden lg:block">
-          📱
-        </div>
-        <div className="relative z-10 text-center lg:text-right mt-8 lg:mt-0">
-          <p className="text-purple-300/60 text-xs font-medium uppercase tracking-[0.2em] mb-2">Epic Every Day</p>
-          <h2 className="font-display text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-none mb-3 bg-gradient-to-r from-purple-300 to-blue-300 bg-clip-text text-transparent">
-            Samsung
-          </h2>
-          <p className="text-white/60 text-base lg:text-lg mb-2 font-medium">Galaxy S25 Ultra.</p>
-          <p className="text-white/40 text-sm mb-6">Intelligence. Elevated.</p>
-          <p className="text-white/50 text-sm mb-6">
-            From{" "}
-            <span className="text-white font-bold text-lg">NPR 1,45,000</span>
-          </p>
-          <Link
-            to="/buy?brand=Samsung"
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold text-sm px-6 py-3 rounded-full hover:from-purple-400 hover:to-blue-400 transition-all duration-200 hover:gap-3 shadow-lg shadow-purple-900/50"
-          >
-            Explore Samsung
-            <ArrowRight className="w-4 h-4" />
+      <article className="flagship-duel-panel flagship-duel-samsung">
+        <span className="flagship-duel-serial">TC / SEOUL / 02</span>
+        <div className="flagship-duel-copy">
+          <span className="flagship-duel-badge"><Zap className="h-3.5 w-3.5" />Galaxy Flagship</span>
+          <p className="flagship-duel-kicker">Epic Every Day</p>
+          <h3>Samsung<span>Galaxy S26 Ultra.</span></h3>
+          <p className="flagship-duel-tagline">Intelligence. Elevated.</p>
+          <div className="flagship-duel-price"><small>From</small><strong>NPR 1,45,000</strong></div>
+          <Link to="/mobile/samsung-galaxy-s26-ultra" className="flagship-duel-link">
+            View Galaxy S26 Ultra <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-      </div>
+        <div className="flagship-device flagship-device-samsung" aria-hidden>
+          <span className="flagship-device-pen" />
+          <span className="flagship-device-camera camera-one" />
+          <span className="flagship-device-camera camera-two" />
+          <span className="flagship-device-camera camera-three" />
+          <span className="flagship-device-mark">GALAXY<br />AI</span>
+        </div>
+        <span className="flagship-duel-ring" aria-hidden />
+      </article>
     </section>
   );
 }
@@ -305,11 +337,17 @@ function AppleShowcaseStrip() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("products")
-        .select("id, name, subtitle, price_value, brand, slug")
+        .select("id, name, subtitle, price_value, brand, slug, image, images, specs, created_at")
         .eq("brand", "Apple")
-        .limit(6);
+        .order("created_at", { ascending: false })
+        .limit(24);
       if (error || !data?.length) return null;
-      return data as any[];
+      return (data as any[])
+        .sort((a, b) =>
+          appleProductRecency(b) - appleProductRecency(a)
+          || String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")),
+        )
+        .slice(0, 6);
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -324,23 +362,24 @@ function AppleShowcaseStrip() {
         icon: <Smartphone className="w-6 h-6" />,
         brand: p.brand,
         slug: p.slug,
+        image: p.image || (Array.isArray(p.images) ? p.images[0] : null),
       }))
-    : APPLE_PRODUCTS;
+    : [...APPLE_PRODUCTS].sort((a, b) => appleProductRecency(b) - appleProductRecency(a));
 
   return (
-    <section id="apple-strip" className="bg-zinc-950 py-12">
+    <section id="apple-strip" className="flagship-product-strip flagship-product-strip-apple py-12">
       <div className="container mx-auto px-4">
         <div className="flex items-end justify-between mb-6">
           <div>
-            <p className="text-white/40 text-xs uppercase tracking-widest font-medium mb-1">Cupertino Originals</p>
-            <h2 className="font-display text-2xl lg:text-3xl font-bold text-white">
+            <p className="flagship-strip-eyebrow text-xs uppercase tracking-widest font-medium mb-1">Cupertino Originals</p>
+            <h2 className="flagship-strip-heading font-display text-2xl lg:text-3xl font-bold">
               Apple Lineup{" "}
-              <span className="text-white/40 font-normal">— Nepal Edition</span>
+              <span className="flagship-strip-muted font-normal">— Nepal Edition</span>
             </h2>
           </div>
           <Link
-            to="/buy?brand=Apple"
-            className="hidden sm:flex items-center gap-1.5 text-sm text-blue-400 font-medium hover:text-blue-300 transition-colors"
+            to="/cat/mobiles/apple"
+            className="flagship-strip-link hidden sm:flex items-center gap-1.5 text-sm font-medium transition-colors"
           >
             See all <ChevronRight className="w-4 h-4" />
           </Link>
@@ -355,8 +394,8 @@ function AppleShowcaseStrip() {
           ))}
           {/* End card */}
           <Link
-            to="/buy?brand=Apple"
-            className="flex-shrink-0 w-40 border border-white/10 rounded-2xl flex flex-col items-center justify-center gap-2 text-white/40 hover:text-white/70 hover:border-white/20 transition-all duration-200 p-5"
+            to="/cat/mobiles/apple"
+            className="flagship-strip-end flex-shrink-0 w-40 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 p-5"
           >
             <ArrowRight className="w-5 h-5" />
             <span className="text-xs font-medium text-center">View all Apple</span>
@@ -376,11 +415,18 @@ function SamsungFlagshipStrip() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("products")
-        .select("id, name, subtitle, price_value, brand, slug")
+        .select("id, name, subtitle, price_value, brand, slug, image, images, specs, created_at")
         .eq("brand", "Samsung")
-        .limit(6);
+        .eq("in_stock", true)
+        .order("created_at", { ascending: false })
+        .limit(24);
       if (error || !data?.length) return null;
-      return data as any[];
+      return (data as any[])
+        .sort((a, b) =>
+          appleProductRecency(b) - appleProductRecency(a)
+          || String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")),
+        )
+        .slice(0, 6);
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -395,19 +441,20 @@ function SamsungFlagshipStrip() {
         icon: <Smartphone className="w-6 h-6" />,
         brand: p.brand,
         slug: p.slug,
+        image: p.image || (Array.isArray(p.images) ? p.images[0] : null),
       }))
     : SAMSUNG_PRODUCTS;
 
   return (
-    <section id="samsung-strip" className="py-12 relative overflow-hidden" style={{ backgroundColor: "#0d0f1e" }}>
+    <section id="samsung-strip" className="flagship-product-strip flagship-product-strip-samsung py-12 relative overflow-hidden">
       {/* Subtle gradient bg */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_20%,rgba(139,92,246,0.12),transparent_60%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_10%_80%,rgba(59,130,246,0.08),transparent_60%)] pointer-events-none" />
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex items-end justify-between mb-6">
           <div>
-            <p className="text-purple-400/60 text-xs uppercase tracking-widest font-medium mb-1">Galaxy Series</p>
-            <h2 className="font-display text-2xl lg:text-3xl font-bold text-white">
+            <p className="flagship-strip-eyebrow text-xs uppercase tracking-widest font-medium mb-1">Galaxy Series</p>
+            <h2 className="flagship-strip-heading font-display text-2xl lg:text-3xl font-bold">
               Galaxy Flagship{" "}
               <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                 — Available Now
@@ -415,8 +462,8 @@ function SamsungFlagshipStrip() {
             </h2>
           </div>
           <Link
-            to="/buy?brand=Samsung"
-            className="hidden sm:flex items-center gap-1.5 text-sm text-purple-400 font-medium hover:text-purple-300 transition-colors"
+            to="/cat/mobiles/samsung"
+            className="flagship-strip-link hidden sm:flex items-center gap-1.5 text-sm font-medium transition-colors"
           >
             See all <ChevronRight className="w-4 h-4" />
           </Link>
@@ -430,8 +477,8 @@ function SamsungFlagshipStrip() {
             <SamsungCard key={product.id} product={product} />
           ))}
           <Link
-            to="/buy?brand=Samsung"
-            className="flex-shrink-0 w-40 border border-purple-500/20 rounded-2xl flex flex-col items-center justify-center gap-2 text-purple-400/40 hover:text-purple-400 hover:border-purple-500/40 transition-all duration-200 p-5"
+            to="/cat/mobiles/samsung"
+            className="flagship-strip-end flex-shrink-0 w-40 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all duration-200 p-5"
           >
             <ArrowRight className="w-5 h-5" />
             <span className="text-xs font-medium text-center">View all Galaxy</span>
@@ -450,7 +497,7 @@ function AlgorithmSection() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("products")
-        .select("id, name, brand, price_value")
+        .select("id, name, brand, price_value, slug, image, images")
         .order("view_count", { ascending: false })
         .limit(5);
       if (error || !data?.length) return null;
@@ -465,6 +512,8 @@ function AlgorithmSection() {
         name: p.name,
         brand: p.brand,
         price: `NPR ${Number(p.price_value).toLocaleString("en-IN")}`,
+        slug: p.slug,
+        image: p.image || (Array.isArray(p.images) ? p.images[0] : null),
       }))
     : TRENDING_FALLBACK;
 
@@ -474,7 +523,7 @@ function AlgorithmSection() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("products")
-        .select("id, name, subtitle, price_value, brand")
+        .select("id, name, subtitle, price_value, brand, slug, image, images")
         .lte("price_value", 30000)
         .order("price_value", { ascending: false })
         .limit(3);
@@ -493,6 +542,8 @@ function AlgorithmSection() {
         priceValue: p.price_value,
         icon: <Smartphone className="w-6 h-6" />,
         brand: p.brand,
+        slug: p.slug,
+        image: p.image || (Array.isArray(p.images) ? p.images[0] : null),
       }))
     : VALUE_FALLBACK;
 
@@ -502,7 +553,7 @@ function AlgorithmSection() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("products")
-        .select("id, name, subtitle, price_value, brand")
+        .select("id, name, subtitle, price_value, brand, slug, image, images")
         .order("created_at", { ascending: false })
         .limit(4);
       if (error || !data?.length) return null;
@@ -520,6 +571,8 @@ function AlgorithmSection() {
         priceValue: p.price_value,
         icon: <Smartphone className="w-6 h-6" />,
         brand: p.brand,
+        slug: p.slug,
+        image: p.image || (Array.isArray(p.images) ? p.images[0] : null),
       }))
     : JUST_IN_FALLBACK;
 
@@ -557,7 +610,7 @@ function AlgorithmSection() {
               {trending.map((item) => (
                 <Link
                   key={item.rank}
-                  to={`/buy?brand=${item.brand}&search=${encodeURIComponent(item.name)}`}
+                  to={productLink({ ...item, id: String(item.rank), subtitle: "", priceValue: 0, icon: null })}
                   className="flex items-center gap-3 group py-1"
                 >
                   <span
@@ -582,7 +635,7 @@ function AlgorithmSection() {
               ))}
             </div>
             <Link
-              to="/buy?sort=trending"
+              to="/cat/mobiles?sort=trending"
               className="mt-auto flex items-center justify-center gap-1.5 text-xs text-orange-400 font-semibold hover:text-orange-500 transition-colors pt-2 border-t border-border"
             >
               View all trending <ArrowRight className="w-3.5 h-3.5" />
@@ -609,7 +662,7 @@ function AlgorithmSection() {
               ))}
             </div>
             <Link
-              to="/buy?maxPrice=30000"
+              to="/cat/mobiles?maxPrice=30000"
               className="mt-auto flex items-center justify-center gap-1.5 text-xs text-green-500 font-semibold hover:text-green-600 transition-colors pt-2 border-t border-border"
             >
               See all under 30K <ArrowRight className="w-3.5 h-3.5" />
@@ -636,7 +689,7 @@ function AlgorithmSection() {
               ))}
             </div>
             <Link
-              to="/buy?sort=newest"
+              to="/cat/mobiles?sort=newest"
               className="mt-auto flex items-center justify-center gap-1.5 text-xs text-blue-500 font-semibold hover:text-blue-600 transition-colors pt-2 border-t border-border"
             >
               See all new arrivals <ArrowRight className="w-3.5 h-3.5" />

@@ -1,21 +1,23 @@
 # Tamrakar Complex - Tech Marketplace Nepal
 
-> The ultimate tech marketplace in Nepal for mobile phones, laptops, and gadget repairs.
+> A Nepal-focused product discovery, independent-store marketplace, price-reference, and gadget service platform.
 
-Tamrakar Complex is the digital hub for Nepal's largest physical gadget market. It connects users with certified stores, provides real-time gadget pricing, and handles professional repair requests.
+Tamrakar Complex helps users discover products, compare Nepal market price references, contact independent stores, and request gadget services. A catalog price is not a guaranteed offer unless the product page identifies the seller, stock, final price, and purchase path.
 
 ## Core Features
 
 - [Marketplace](https://tamrakarcomplex.com/marketplace): Browse and sell used or new gadgets with ease.
-- [Mobile Prices](https://tamrakarcomplex.com/mobile-price): Real-time updated prices for all mobile brands in Nepal.
+- [Mobile Prices](https://tamrakarcomplex.com/cat/mobiles): Phone catalog and Nepal market price references.
 - [Repair Hub](https://tamrakarcomplex.com/repair): Professional repair services with tracking for smartphones and laptops.
 - [Valuation Estimator](https://tamrakarcomplex.com/valuation-estimator): Get an instant AI-powered price estimate for your old phone.
-- [Store Directory](https://tamrakarcomplex.com/stores): Find and contact verified tech stores in Tamrakar Complex.
+- [Store Directory](https://tamrakarcomplex.com/stores): Find and contact listed tech stores in Tamrakar Complex.
+- [Marketplace Disclosure](https://tamrakarcomplex.com/marketplace-disclosure): Seller identity and reference-price explanation.
+- [Shipping & Delivery](https://tamrakarcomplex.com/shipping-delivery): Delivery and pickup terms.
+- [Returns & Refunds](https://tamrakarcomplex.com/returns-refunds): Seller-specific return and dispute information.
 
 ## For Store Owners
 
 - [Store Registration](https://tamrakarcomplex.com/auth): Join the platform to list products and reach thousands of customers.
-- [Pricing Plans](https://tamrakarcomplex.com/pricing.md): View our subscription tiers for store administrators.
 
 ## Technical Details
 

@@ -33,16 +33,17 @@ export function useMyStores() {
         .or(`owner_id.eq.${user.id},owner_user_id.eq.${user.id}`)
         .order("name");
 
-      // 2. Stores assigned via store_admins table
-      const { data: adminRows } = await supabase
-        .from("store_admins")
-        .select("store_id")
-        .eq("user_id", user.id);
+      // 2. Stores assigned as an administrator or active store staff member.
+      const [{ data: adminRows }, { data: staffRows }] = await Promise.all([
+        supabase.from("store_admins").select("store_id").eq("user_id", user.id).eq("status", "active"),
+        (supabase as any).from("store_staff").select("store_id").eq("user_id", user.id).eq("status", "active"),
+      ]);
 
       let assignedStores: typeof ownedStores = [];
 
-      if (adminRows && adminRows.length > 0) {
-        const assignedIds = adminRows.map((r: { store_id: string }) => r.store_id);
+      const membershipRows = [...(adminRows ?? []), ...(staffRows ?? [])];
+      if (membershipRows.length > 0) {
+        const assignedIds = [...new Set(membershipRows.map((r: { store_id: string }) => r.store_id))];
         const { data: assigned } = await supabase
           .from("stores")
           .select("id, name, package_slug, subscription_status, subscription_end_date")

@@ -24,9 +24,14 @@ import { Edit, Plus, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Json } from "@/integrations/supabase/types";
 import { getErrorMessage } from "@/lib/utils";
-import type { DeviceCatalogRow, ValuationRuleInsert, ValuationRuleRow } from "@/types/app";
-
-type ValuationRuleView = ValuationRuleRow & {
+type ValuationRuleView = {
+  id: string;
+  catalog_product_id: string;
+  base_price: number;
+  demand_factor: number | null;
+  age_depreciation: Json | null;
+  condition_factors: Json | null;
+  defect_adjustments: Json | null;
   canonical_slug: string;
 };
 
@@ -36,43 +41,45 @@ export const ValuationRulesTable = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  type DeviceCatalogLookup = Pick<DeviceCatalogRow, "id" | "brand" | "model" | "canonical_slug">;
+  type DeviceCatalogLookup = { id: string; name: string; slug: string; brand?: { name?: string | null } | null };
 
   const { data: devices = [] } = useQuery<DeviceCatalogLookup[]>({
-    queryKey: ["admin-device-catalog", "lookup"],
+    queryKey: ["admin-live-catalog", "valuation-lookup"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("device_catalog")
-        .select("id, brand, model, canonical_slug")
-        .order("brand", { ascending: true });
+        .from("catalog_products")
+        .select("id, name, slug, brand:brands(name)")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
 
       if (error) throw error;
-      return (data ?? []) as DeviceCatalogLookup[];
+      return (data ?? []) as unknown as DeviceCatalogLookup[];
     },
   });
 
   const { data: rules, isLoading } = useQuery<ValuationRuleView[]>({
     queryKey: ["admin-valuation-rules"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("valuation_rules")
         .select("*")
-        .order("last_updated", { ascending: false });
+        .not("catalog_product_id", "is", null)
+        .order("updated_at", { ascending: false });
       
       if (error) throw error;
-      return (data ?? []).map((rule) => ({
+      return (data ?? []).map((rule: any) => ({
         ...rule,
-        canonical_slug: devices.find((device) => device.id === rule.device_id)?.canonical_slug || "",
+        canonical_slug: devices.find((device) => device.id === rule.catalog_product_id)?.slug || "",
       }));
     },
     enabled: devices.length > 0,
   });
 
   const upsertMutation = useMutation({
-    mutationFn: async (values: ValuationRuleInsert) => {
-      const { error } = await supabase
+    mutationFn: async (values: Record<string, unknown>) => {
+      const { error } = await (supabase as any)
         .from("valuation_rules")
-        .upsert(values)
+        .upsert(values, { onConflict: "catalog_product_id" })
         .select();
       
       if (error) throw error;
@@ -109,18 +116,24 @@ export const ValuationRulesTable = () => {
     
     try {
       const canonicalSlug = String(formData.get("canonical_slug") || "");
-      const device = devices.find((item) => item.canonical_slug === canonicalSlug);
+      const device = devices.find((item) => item.slug === canonicalSlug);
       if (!device) {
         throw new Error("Select a valid device slug from the device catalog first.");
       }
 
-      const updates: ValuationRuleInsert = {
-        device_id: device.id,
+      const basePrice = Number(formData.get("base_price"));
+      const demandFactor = Number(formData.get("demand_factor") || 1);
+      if (!Number.isFinite(basePrice) || basePrice < 5000 || basePrice > 2000000) throw new Error("Base price must be between Rs. 5,000 and Rs. 2,000,000.");
+      if (!Number.isFinite(demandFactor) || demandFactor < 0.5 || demandFactor > 1.5) throw new Error("Demand factor must be between 0.50 and 1.50.");
+      const updates: Record<string, unknown> = {
+        catalog_product_id: device.id,
         base_price: Number(formData.get("base_price")),
-        demand_factor: formData.get("demand_factor") ? Number(formData.get("demand_factor")) : null,
+        demand_factor: demandFactor,
         age_depreciation: JSON.parse(String(formData.get("age_depreciation") || "{}")) as Json,
         condition_factors: JSON.parse(String(formData.get("condition_factors") || "{}")) as Json,
         defect_adjustments: JSON.parse(String(formData.get("defect_adjustments") || "{}")) as Json,
+        active: true,
+        updated_at: new Date().toISOString(),
       };
 
       if (editingItem) {
@@ -152,12 +165,12 @@ export const ValuationRulesTable = () => {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label>Device Slug (e.g. apple-iphone-13)</Label>
+                <Label>Live product slug</Label>
                 <Input name="canonical_slug" list="device-slugs" defaultValue={editingItem?.canonical_slug || ""} required />
                 <datalist id="device-slugs">
                   {devices.map((device) => (
-                    <option key={device.id} value={device.canonical_slug || ""}>
-                      {device.brand} {device.model}
+                    <option key={device.id} value={device.slug || ""}>
+                      {device.brand?.name} {device.name}
                     </option>
                   ))}
                 </datalist>
@@ -168,7 +181,7 @@ export const ValuationRulesTable = () => {
               </div>
               <div className="space-y-2">
                 <Label>Demand Factor</Label>
-                <Input name="demand_factor" type="number" step="0.01" defaultValue={editingItem?.demand_factor ?? 1} />
+                <Input name="demand_factor" type="number" min="0.5" max="1.5" step="0.01" defaultValue={editingItem?.demand_factor ?? 1} />
                 <p className="text-xs text-muted-foreground">1.00 = neutral. &gt;1.00 increases quotes. &lt;1.00 decreases quotes.</p>
               </div>
               <div className="space-y-2">
@@ -228,7 +241,7 @@ export const ValuationRulesTable = () => {
           <TableBody>
             {rules?.map((rule) => (
               <TableRow key={rule.id}>
-                <TableCell className="font-mono">{rule.canonical_slug || rule.device_id}</TableCell>
+                <TableCell className="font-mono">{rule.canonical_slug || rule.catalog_product_id}</TableCell>
                 <TableCell>Rs. {rule.base_price.toLocaleString()}</TableCell>
                 <TableCell className="text-xs max-w-[200px] truncate">
                   {JSON.stringify(rule.condition_factors)}

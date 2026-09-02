@@ -46,6 +46,8 @@ export function SEO({
         noindex?: boolean | null;
       } | null;
     },
+    initialData: null,
+    retry: false,
     staleTime: 1000 * 60 * 10,
   });
 
@@ -72,10 +74,12 @@ export function SEO({
     "name": "Tamrakar Complex",
     "url": siteUrl,
     "logo": `${siteUrl}/logo.png`,
-    "sameAs": [
-      "https://facebook.com/tamrakarcomplex",
-      "https://twitter.com/tamrakarcomplex"
-    ],
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Pako, New Road",
+      "addressLocality": "Kathmandu",
+      "addressCountry": "NP"
+    },
     "contactPoint": {
       "@type": "ContactPoint",
       "telephone": "+977-015351731",
@@ -95,7 +99,7 @@ export function SEO({
       "@type": "SearchAction",
       "target": {
         "@type": "EntryPoint",
-        "urlTemplate": `${siteUrl}/buy?q={search_term_string}`
+        "urlTemplate": `${siteUrl}/cat/mobiles?search={search_term_string}`
       },
       "query-input": "required name=search_term_string"
     }
@@ -110,7 +114,6 @@ export function SEO({
       <meta name="robots" content={robots} />
       <meta name="googlebot" content={robots} />
       <meta property="og:site_name" content="Tamrakar Complex" />
-      <meta name="twitter:site" content="@tamrakarcomplex" />
       <link rel="canonical" href={fullUrl} />
       {effectiveKeywords?.length ? <meta name="keywords" content={effectiveKeywords.join(", ")} /> : null}
 

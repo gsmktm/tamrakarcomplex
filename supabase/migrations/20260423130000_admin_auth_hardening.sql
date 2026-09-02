@@ -26,7 +26,7 @@ AS $$
 BEGIN
   RETURN NOT EXISTS (
     SELECT 1 FROM public.user_roles 
-    WHERE role IN ('admin', 'suadmin')
+    WHERE role IN ('suadmin', 'staffadmin')
   );
 END;
 $$;
@@ -43,17 +43,6 @@ AS $$
         SELECT 1 FROM public.user_roles 
         WHERE user_id = auth.uid() 
         AND role = 'suadmin'
-    ) OR (
-        lower(auth.jwt() ->> 'email') IN (
-          'suadmin@tamrakarcomplex.com',
-          'admin@tamrakarcomplex.com', 
-          'bootstrap-admin@example.invalid', 
-          'gsmktm@gmail.com', 
-          'gskmtm@gmail.com', 
-          'gsktm@gmail.com', 
-          'superadmin@tamrakarcomplex.com',
-          'info@tamrakarcomplex.com'
-        )
     );
 $$;
 
@@ -67,13 +56,7 @@ AS $$
     SELECT public.is_super_admin() OR EXISTS (
         SELECT 1 FROM public.user_roles 
         WHERE user_id = auth.uid() 
-        AND role = 'admin'
-    ) OR (
-        lower(auth.jwt() ->> 'email') IN (
-          'admin@tamrakarcomplex.com', 
-          'suadmin@tamrakarcomplex.com',
-          'bootstrap-admin@example.invalid'
-        )
+        AND role = 'staffadmin'
     );
 $$;
 
@@ -116,12 +99,11 @@ BEGIN
     WHERE user_roles.user_id = au.id
     ORDER BY CASE user_roles.role
       WHEN 'suadmin' THEN 1
-      WHEN 'admin' THEN 2
-      WHEN 'store_owner' THEN 3
-      WHEN 'moderator' THEN 4
-      WHEN 'public_user' THEN 5
-      WHEN 'user' THEN 6
-      ELSE 7
+      WHEN 'staffadmin' THEN 2
+      WHEN 'storeadmin' THEN 3
+      WHEN 'storestaff' THEN 4
+      WHEN 'user' THEN 5
+      ELSE 6
     END
     LIMIT 1
   ) ur ON true
@@ -145,70 +127,15 @@ AS $$
     SELECT public.is_admin() OR EXISTS (
         SELECT 1 FROM public.user_roles 
         WHERE user_id = auth.uid() 
-        AND (role = 'store_owner' OR role = 'moderator')
-    ) OR (
-        lower(auth.jwt() ->> 'email') IN ('store@tamrakarcomplex.com')
+        AND role = 'storeadmin'
     );
 $$;
 
--- 3. Fix dev_ensure_confirmed_admin to include ALL admin emails
--- Explicitly drop potential overloaded versions that might be confusing the schema cache
+-- 3. Remove dev_ensure_confirmed_admin (dev-only function with hardcoded emails)
+-- This function is no longer needed. Use proper role assignment via user_roles table instead.
 DROP FUNCTION IF EXISTS public.dev_ensure_confirmed_admin(text);
 
-CREATE OR REPLACE FUNCTION public.dev_ensure_confirmed_admin(p_email text)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, auth
-AS $$
-BEGIN
-  IF lower(p_email) NOT IN (
-    'suadmin@tamrakarcomplex.com',
-    'admin@tamrakarcomplex.com',
-    'gsmktm@gmail.com',
-    'gskmtm@gmail.com',
-    'gsktm@gmail.com',
-    'superadmin@tamrakarcomplex.com',
-    'bootstrap-admin@example.invalid',
-    'info@tamrakarcomplex.com',
-    'store@tamrakarcomplex.com',
-    'user@tamrakarcomplex.com'
-  ) THEN
-    RETURN false;
-  END IF;
-
-  -- Aggressively force confirm and clear tokens
-  UPDATE auth.users
-  SET email_confirmed_at = now(),
-      confirmed_at = now(),
-      last_sign_in_at = COALESCE(last_sign_in_at, now()),
-      updated_at = now(),
-      confirmation_token = '',
-      recovery_token = '',
-      email_change_token_new = '',
-      raw_app_meta_data = jsonb_set(
-        COALESCE(raw_app_meta_data, '{"provider": "email", "providers": ["email"]}'::jsonb),
-        '{email_verified}',
-        'true'::jsonb
-      ),
-      raw_user_meta_data = jsonb_set(
-        COALESCE(raw_user_meta_data, '{}'::jsonb),
-        '{email_verified}',
-        'true'::jsonb
-      )
-  WHERE lower(email) = lower(p_email);
-
-  RETURN true;
-END;
-$$;
-
--- Grant permissions so frontend can call it
-GRANT EXECUTE ON FUNCTION public.dev_ensure_confirmed_admin(text) TO anon, authenticated;
-
--- Ensure the cache is refreshed
-NOTIFY pgrst, 'reload schema';
-
--- 4. Update bootstrap_admin to include all new admin emails
+-- 4. Update bootstrap_admin to use only user_roles table
 CREATE OR REPLACE FUNCTION public.bootstrap_admin()
 RETURNS boolean
 LANGUAGE plpgsql
@@ -225,17 +152,8 @@ BEGIN
 
   SELECT email, instance_id INTO v_user_email, v_instance_id FROM auth.users WHERE id = auth.uid();
 
-  -- Allow ALL blessed emails to bypass the "exists" check
-  IF NOT public.no_admin_exists() AND lower(v_user_email) NOT IN (
-    'suadmin@tamrakarcomplex.com',
-    'admin@tamrakarcomplex.com',
-    'gsmktm@gmail.com',
-    'gskmtm@gmail.com',
-    'gsktm@gmail.com',
-    'superadmin@tamrakarcomplex.com',
-    'bootstrap-admin@example.invalid',
-    'info@tamrakarcomplex.com'
-  ) THEN
+  -- Only allow bootstrap if no admin exists yet
+  IF NOT public.no_admin_exists() THEN
     RETURN false;
   END IF;
 
@@ -258,14 +176,9 @@ BEGIN
   VALUES (auth.uid(), lower(v_user_email), split_part(v_user_email, '@', 1))
   ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
 
-  -- Assign Roles
-  DELETE FROM public.user_roles WHERE user_id = auth.uid();
-  
+  -- Assign suadmin role only
   INSERT INTO public.user_roles (user_id, role)
-  VALUES (auth.uid(), 'suadmin'::public.app_role);
-  
-  INSERT INTO public.user_roles (user_id, role)
-  VALUES (auth.uid(), 'admin'::public.app_role)
+  VALUES (auth.uid(), 'suadmin'::public.app_role)
   ON CONFLICT DO NOTHING;
 
   RETURN true;
@@ -302,7 +215,7 @@ BEGIN
   LOOP
     -- Determine role based on email
     IF lower(v_email) = 'bootstrap-admin@example.invalid' THEN
-      v_target_role := 'admin'::public.app_role;
+      v_target_role := 'staffadmin'::public.app_role;
     ELSIF lower(v_email) = 'gsmktm@gmail.com' THEN
       v_target_role := 'suadmin'::public.app_role;
     ELSE
@@ -395,14 +308,7 @@ BEGIN
     INSERT INTO public.user_roles (user_id, role)
     VALUES (v_user_id, v_target_role);
 
-    -- If suadmin, also grant admin for backward compatibility in some views
-    IF v_target_role = 'suadmin' THEN
-      INSERT INTO public.user_roles (user_id, role)
-      VALUES (v_user_id, 'admin'::public.app_role)
-      ON CONFLICT DO NOTHING;
-    END IF;
-
-  END LOOP;
+    END LOOP;
 END $$;
 
 -- 5. Security Hardening: Ensure RLS for user_roles

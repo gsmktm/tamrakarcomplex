@@ -126,7 +126,7 @@ export const HomeCompareMini = () => {
                     placeholder="Select Phone 1" 
                   />
                 </div>
-                <div className="font-black text-slate-500 italic">VS</div>
+                <div className="font-black text-muted-foreground italic">VS</div>
                 <div className="flex-1">
                   <PhoneSelector 
                     selected={phone2} 

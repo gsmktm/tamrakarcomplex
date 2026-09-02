@@ -2,8 +2,8 @@ export const SITE_URL = "https://tamrakarcomplex.com";
 export const DEFAULT_OG_IMAGE = "/og-image.png";
 
 export type SeoRouteKey =
-  | "/mobile-price"
-  | "/mobile-price/brand/:brand"
+  | "/cat/mobiles"
+  | "/cat/mobiles/:brand"
   | "/product/:slug"
   | "/stores"
   | "/stores/:slug"
@@ -12,8 +12,8 @@ export type SeoRouteKey =
   | "/sell-your-phone"
   | "/repair"
   | "/repair/device/:slug"
-  | "/news"
-  | "/article/:slug";
+  | "/stores/article"
+  | "/stores/article/:slug";
 
 export type SeoPageConfig = {
   route_key: SeoRouteKey;
@@ -26,15 +26,15 @@ export type SeoPageConfig = {
 
 export const SEO_PAGE_CONFIGS: SeoPageConfig[] = [
   {
-    route_key: "/mobile-price",
+    route_key: "/cat/mobiles",
     label: "Mobile Price List",
-    title: "Mobile Price in Nepal",
-    description: "Compare the latest mobile phone prices in Nepal with verified specs, availability, and store offers at Tamrakar Complex.",
-    keywords: ["mobile price Nepal", "smartphone price Nepal", "Tamrakar Complex mobile price"],
+    title: "Mobile Price in Nepal 2026",
+    description: "Compare the latest mobile phone prices in Nepal with verified specs, availability, EMI plans, and store offers at Tamrakar Complex.",
+    keywords: ["mobile price Nepal", "smartphone price Nepal", "mobile price in Nepal 2026", "Tamrakar Complex mobile price"],
     og_image: DEFAULT_OG_IMAGE,
   },
   {
-    route_key: "/mobile-price/brand/:brand",
+    route_key: "/cat/mobiles/:brand",
     label: "Brand Price Page",
     title: "{brand} Mobile Price in Nepal",
     description: "Check the latest {brand} mobile prices in Nepal with specs, variants, and buying options from Tamrakar Complex.",
@@ -106,7 +106,7 @@ export const SEO_PAGE_CONFIGS: SeoPageConfig[] = [
     og_image: DEFAULT_OG_IMAGE,
   },
   {
-    route_key: "/news",
+    route_key: "/stores/article",
     label: "News",
     title: "Tech News Nepal",
     description: "Read the latest gadget launches, mobile price updates, tech news, reviews, and guides from Tamrakar Complex.",
@@ -114,7 +114,7 @@ export const SEO_PAGE_CONFIGS: SeoPageConfig[] = [
     og_image: DEFAULT_OG_IMAGE,
   },
   {
-    route_key: "/article/:slug",
+    route_key: "/stores/article/:slug",
     label: "Article Detail",
     title: "{title}",
     description: "Read {title} from Tamrakar Complex with practical tech news, guides, reviews, and buying advice.",

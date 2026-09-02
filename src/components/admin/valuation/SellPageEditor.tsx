@@ -147,7 +147,7 @@ export function SellPageEditor() {
               </div>
               {/* Live preview */}
               {newLogoUrl && (
-                <div className="h-10 w-10 border rounded-lg bg-white flex items-center justify-center flex-shrink-0">
+                <div className="h-10 w-10 border rounded-lg bg-background flex items-center justify-center flex-shrink-0">
                   <img src={newLogoUrl} alt="preview" className="h-8 w-8 object-contain" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                 </div>
               )}
@@ -191,7 +191,7 @@ export function SellPageEditor() {
                 ) : (
                   <div className="flex items-center justify-between p-3 hover:shadow-sm transition-all">
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="h-9 w-9 bg-white border rounded flex-shrink-0 flex items-center justify-center">
+                      <div className="h-9 w-9 bg-background border rounded flex-shrink-0 flex items-center justify-center">
                         <img src={url} alt={brand} className="h-7 w-7 object-contain"
                           onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                       </div>

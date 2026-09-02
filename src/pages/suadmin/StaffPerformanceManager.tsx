@@ -35,7 +35,9 @@ export default function StaffPerformanceManager() {
       const staffRoleResult = isSuperAdmin
         ? await supabase.from("user_roles").select("user_id").eq("role", "staffadmin")
         : null;
-      if (staffRoleResult?.error) throw staffRoleResult.error;
+      if (staffRoleResult?.error) {
+        console.warn("Unable to load staff roles", staffRoleResult.error);
+      }
       const staffIds = isSuperAdmin ? (staffRoleResult?.data ?? []).map((row) => row.user_id) : [user?.id].filter(Boolean);
       if (isSuperAdmin && staffIds.length === 0) {
         return { tasks: [], auditLogs: [], profiles: [] };
@@ -59,14 +61,14 @@ export default function StaffPerformanceManager() {
           : Promise.resolve({ data: [], error: null }),
       ]);
 
-      if (tasksResult.error) throw tasksResult.error;
-      if (auditResult.error) throw auditResult.error;
-      if (staffResult.error) throw staffResult.error;
+      if (tasksResult.error) console.warn("Unable to load staff task performance", tasksResult.error);
+      if (auditResult.error) console.warn("Unable to load staff audit performance", auditResult.error);
+      if (staffResult.error) console.warn("Unable to load staff profiles", staffResult.error);
 
       return {
-        tasks: (tasksResult.data ?? []) as StaffTask[],
-        auditLogs: (auditResult.data ?? []) as AuditLog[],
-        profiles: (staffResult.data ?? []) as StaffProfile[],
+        tasks: (tasksResult.error ? [] : tasksResult.data ?? []) as StaffTask[],
+        auditLogs: (auditResult.error ? [] : auditResult.data ?? []) as AuditLog[],
+        profiles: (staffResult.error ? [] : staffResult.data ?? []) as StaffProfile[],
       };
     },
     enabled: !!user?.id,

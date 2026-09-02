@@ -27,8 +27,6 @@ interface NavGroup {
 interface NavigationBarProps {
   topLevelHomeItem: NavItem;
   siteNavigationGroups: NavGroup[];
-  exploreLandingItem: NavItem;
-  exploreItems: NavItem[];
   visibleQuickItems: NavItem[];
 }
 
@@ -42,8 +40,6 @@ const navTrigger =
 export function NavigationBar({
   topLevelHomeItem,
   siteNavigationGroups,
-  exploreLandingItem,
-  exploreItems,
   visibleQuickItems,
 }: NavigationBarProps) {
   const navigate = useNavigate();
@@ -83,6 +79,24 @@ export function NavigationBar({
               <NavigationMenuLink asChild>
                 <Link to="/marketplace" className={navLink}>
                   Marketplace
+                </Link>
+              </NavigationMenuLink>
+            </NavigationMenuItem>
+
+            {/* Repair */}
+            <NavigationMenuItem>
+              <NavigationMenuLink asChild>
+                <Link to="/repair" className={navLink}>
+                  Repair
+                </Link>
+              </NavigationMenuLink>
+            </NavigationMenuItem>
+
+            {/* Unlocking */}
+            <NavigationMenuItem>
+              <NavigationMenuLink asChild>
+                <Link to="/unlocking" className={navLink}>
+                  Unlocking
                 </Link>
               </NavigationMenuLink>
             </NavigationMenuItem>
@@ -142,50 +156,6 @@ export function NavigationBar({
                 </NavigationMenuContent>
               </NavigationMenuItem>
             ))}
-
-            {/* Explore */}
-            <NavigationMenuItem value="explore">
-              <NavigationMenuTrigger
-                className={cn(
-                  navTrigger,
-                  "bg-transparent hover:bg-transparent data-[state=open]:bg-transparent",
-                )}
-                onPointerEnter={() => setOpenMenu("explore")}
-                onPointerLeave={() => setOpenMenu("")}
-                onClick={() => { navigate(exploreLandingItem.href); setOpenMenu(""); }}
-              >
-                {exploreLandingItem.name}
-              </NavigationMenuTrigger>
-              <NavigationMenuContent onPointerEnter={() => setOpenMenu("explore")} onPointerLeave={() => setOpenMenu("")}>
-                <div className="w-[500px] p-5">
-                  <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground mb-3">
-                    Browse by category
-                  </p>
-                  <ul className="grid gap-1 md:grid-cols-2">
-                    {exploreItems.map((item) => (
-                      <li key={item.name}>
-                        <NavigationMenuLink asChild>
-                          <Link
-                            to={item.href}
-                            className="group flex items-start gap-3 select-none rounded-sm p-3 no-underline outline-none transition-colors hover:bg-secondary focus:bg-secondary"
-                          >
-                            <div className="flex-1">
-                              <div className="text-sm font-semibold text-foreground">{item.name}</div>
-                              {item.description && (
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                                  {item.description}
-                                </p>
-                              )}
-                            </div>
-                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 translate-x-0 group-hover:translate-x-1 transition-transform duration-200" style={{ transitionTimingFunction: "var(--ease-out-quart)" }} />
-                          </Link>
-                        </NavigationMenuLink>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </NavigationMenuContent>
-            </NavigationMenuItem>
 
             {/* Quick items */}
             {visibleQuickItems.map((category) => (

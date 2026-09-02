@@ -41,7 +41,7 @@ export function ModelPicker({ value, onSelect, placeholder = "Select phone model
       // In a real app, we might need a getModelById method
       // For now, we'll assume it's part of the search results or handled by the parent
     }
-  }, [value]);
+  }, [value, selectedModel]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

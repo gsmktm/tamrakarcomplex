@@ -9,24 +9,47 @@ const CATEGORY_BY_BRAND: Record<string, string> = {
   Apple: "Smartphones",
   Samsung: "Smartphones",
   Xiaomi: "Smartphones",
+  Poco: "Smartphones",
   POCO: "Smartphones",
   Honor: "Smartphones",
   Vivo: "Smartphones",
   Oppo: "Smartphones",
+  OPPO: "Smartphones",
   Realme: "Smartphones",
   OnePlus: "Smartphones",
   Google: "Smartphones",
   Infinix: "Smartphones",
   Tecno: "Smartphones",
-  Itel: "Smartphones",
   Motorola: "Smartphones",
   ZTE: "Smartphones",
+  Nokia: "Smartphones",
+  Huawei: "Smartphones",
+  Sony: "Smartphones",
+  Nothing: "Smartphones",
+  Asus: "Laptops",
   Lenovo: "Laptops",
   Dell: "Laptops",
-  HP: "Laptops",
-  Asus: "Laptops",
-  Acer: "Laptops",
 };
+
+const CATEGORY_ALIASES: Record<string, string[]> = {
+  smartphones: ["smartphones", "smartphone", "mobile", "mobiles", "phones", "phone"],
+  laptops: ["laptops", "laptop", "notebook", "notebooks", "macbook"],
+  tablets: ["tablets", "tablet", "ipad", "ipads"],
+  earbuds: ["earbuds", "earbud", "tws"],
+  headphones: ["headphones", "headphone", "headset", "headsets"],
+  smartwatches: ["smartwatches", "smartwatch", "watch", "watches", "wearable", "wearables"],
+  monitors: ["monitors", "monitor", "display", "displays"],
+  speakers: ["speakers", "speaker", "bluetooth speaker", "audio speaker"],
+  "pc builds": ["pc builds", "pc build", "desktop", "desktops", "gaming pc", "gaming pcs"],
+  gaming: ["gaming", "console", "consoles", "controller", "controllers"],
+  drones: ["drones", "drone"],
+};
+
+function getCategoryAliases(category?: string) {
+  const normalized = category?.trim().toLowerCase();
+  if (!normalized || normalized === "all") return [];
+  return CATEGORY_ALIASES[normalized] ?? [normalized];
+}
 
 function formatPrice(value?: number) {
   if (!value || value <= 0) return "Rs. Contact";
@@ -81,7 +104,11 @@ export function queryFallbackProducts(options: {
   let list = getFallbackProducts();
 
   if (category && category !== "all") {
-    list = list.filter((product) => product.category.toLowerCase().includes(category));
+    const aliases = getCategoryAliases(category);
+    list = list.filter((product) => {
+      const productCategory = product.category.toLowerCase();
+      return aliases.some((alias) => productCategory.includes(alias));
+    });
   }
 
   if (brand && brand !== "all") {

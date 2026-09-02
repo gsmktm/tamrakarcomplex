@@ -5,6 +5,14 @@ const ROUTES_DIR = path.join(__dirname, '../src/routes');
 const PAGES_DIR = path.join(__dirname, '../src/pages');
 const SRC_DIR = path.join(__dirname, '../src');
 
+// Known API routes defined in server.js/server.cjs
+const KNOWN_API_ROUTES = [
+  { path: '/api/contact', methods: ['POST'] },
+  { path: '/api/orders', methods: ['POST'] },
+  { path: '/api/repair-requests', methods: ['POST'] },
+  { path: '/api/wishlist', methods: ['POST'] },
+];
+
 function getDefinedRoutes() {
   const routes = new Set();
   const routeFiles = fs.readdirSync(ROUTES_DIR).filter(f => f.endsWith('.tsx'));
@@ -24,10 +32,8 @@ function getDefinedRoutes() {
       if (route.startsWith('/')) {
         routes.add(route);
       } else if (parentPath) {
-        // Handle relative paths in nested routes
         const fullPath = (parentPath + '/' + route).replace(/\/+/g, '/');
         routes.add(fullPath);
-        // Also add the version with trailing asterisk if it exists
         if (route.endsWith('/*')) {
           routes.add(fullPath.replace('/*', ''));
         }
@@ -71,8 +77,8 @@ function checkLinks(definedRoutes) {
       if (
         link.startsWith('http') || 
         link.includes('${') || 
-        link.startsWith('#') || 
-        link.startsWith('mailto:') || 
+        link.startsWith('#') ||
+        link.startsWith('mailto:') ||
         link.startsWith('tel:') ||
         link === '.' ||
         link.endsWith('.xml') ||
@@ -106,14 +112,41 @@ function checkLinks(definedRoutes) {
   return errors;
 }
 
+function checkApiRoutes() {
+  let errors = 0;
+  
+  // Check that API routes referenced in frontend code exist in server definitions
+  const serverFiles = [
+    path.join(__dirname, '../server.js'),
+    path.join(__dirname, '../server.cjs'),
+  ];
+  
+  let serverContent = '';
+  serverFiles.forEach(f => {
+    if (fs.existsSync(f)) {
+      serverContent += fs.readFileSync(f, 'utf8') + '\n';
+    }
+  });
+  
+  KNOWN_API_ROUTES.forEach(apiRoute => {
+    const routePattern = new RegExp(`app\\.(?:post|get|put|delete|patch)\\s*\\(["']${apiRoute.path}["']`);
+    if (!routePattern.test(serverContent)) {
+      console.error(`[MISSING API ROUTE] ${apiRoute.path} is referenced but not defined in server`);
+      errors++;
+    }
+  });
+  
+  return errors;
+}
+
 function getAllFiles(dirPath, arrayOfFiles) {
   const files = fs.readdirSync(dirPath);
   arrayOfFiles = arrayOfFiles || [];
 
   files.forEach(function(file) {
-    if (fs.statSync(dirPath + "/" + file).isDirectory()) {
-      if (file !== 'node_modules' && file !== 'dist') {
-        arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
+    if (fs.statSync(path.join(dirPath, file)).isDirectory()) {
+      if (file !== 'node_modules' && file !== 'dist' && file !== '.git') {
+        arrayOfFiles = getAllFiles(path.join(dirPath, file), arrayOfFiles);
       }
     } else {
       arrayOfFiles.push(path.join(dirPath, "/", file));
@@ -128,12 +161,17 @@ const routes = getDefinedRoutes();
 console.log(`Found ${routes.size} defined routes.`);
 
 console.log('Checking all links in src/...');
-const errorCount = checkLinks(routes);
+const linkErrors = checkLinks(routes);
 
-if (errorCount > 0) {
-  console.log(`\nFinished with ${errorCount} potential route errors.`);
+console.log('Checking API route consistency...');
+const apiErrors = checkApiRoutes();
+
+const totalErrors = linkErrors + apiErrors;
+
+if (totalErrors > 0) {
+  console.log(`\nFinished with ${totalErrors} potential route errors.`);
   process.exit(1);
 } else {
-  console.log('\nAll internal links seem to have matching routes!');
+  console.log('\nAll internal links and API routes seem consistent!');
   process.exit(0);
 }

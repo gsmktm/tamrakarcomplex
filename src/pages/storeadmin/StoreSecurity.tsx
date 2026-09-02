@@ -14,7 +14,7 @@ export default function StoreSecurity() {
       // Placeholder for security logs - assuming future audit_logs table
       const { data: staff, error: staffError } = await supabase
         .from("store_admins")
-        .select("*")
+        .select("id, role, status, created_at")
         .eq("store_id", user?.id);
 
       if (staffError) throw staffError;

@@ -1,5 +1,6 @@
 import React from "react";
 import { AlertTriangle } from "lucide-react";
+import { recoverFromChunkLoadError } from "@/lib/chunkLoadRecovery";
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -23,6 +24,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
+    recoverFromChunkLoadError(error);
   }
 
   resetError = () => {

@@ -60,12 +60,19 @@ export function Header() {
   );
 
   const visibleQuickItems = useMemo(
-    () =>
-      navItems.filter((item, index, items) => {
+    () => {
+      const quickItems = navItems.filter((item, index, items) => {
         const href = item.href?.trim();
         if (!href) return false;
         return items.findIndex((candidate) => candidate.href === href) === index && !groupedHrefs.has(href);
-      }),
+      });
+
+      if (!quickItems.some((item) => item.href === "/mobile-price")) {
+        quickItems.push({ name: "Price List", href: "/mobile-price" });
+      }
+
+      return quickItems;
+    },
     [groupedHrefs, navItems],
   );
 
@@ -124,46 +131,33 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full dark">
+    <header className="sticky top-0 z-50 w-full">
       {/* ── Trust bar ──────────────────────────────────────────────────────── */}
-      <div
-        className="text-[11px] font-medium hidden md:block border-b"
-        style={{
-          background: "linear-gradient(90deg, oklch(8% 0.022 258) 0%, oklch(10% 0.028 265) 100%)",
-          borderColor: "oklch(62% 0.25 285 / 0.20)",
-        }}
-      >
+      <div className="text-[11px] font-medium hidden md:block border-b bg-[#11130F] border-white/10">
         <div className="container flex items-center justify-between h-8 gap-4">
           <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1.5" style={{ color: "oklch(75% 0 0 / 0.70)" }}>
-              <MapPin className="h-3.5 w-3.5" style={{ color: "oklch(78% 0.165 65)" }} aria-hidden />
-              New Road, Kathmandu - Nepal's Mobile Mega Market
+            <span className="inline-flex items-center gap-1.5 text-white/70">
+              <MapPin className="h-3.5 w-3.5 text-[#D8FF3E]" aria-hidden />
+              Tamrakar Complex, New Road - Verified Mobile Shops
             </span>
-            <span style={{ color: "oklch(62% 0.25 285 / 0.40)" }}>◆</span>
-            <span className="inline-flex items-center gap-1.5" style={{ color: "oklch(75% 0 0 / 0.70)" }}>
-              <BadgeCheck className="h-3.5 w-3.5" style={{ color: "oklch(62% 0.25 285)" }} aria-hidden />
+            <span className="text-white/30">•</span>
+            <span className="inline-flex items-center gap-1.5 text-white/70">
+              <BadgeCheck className="h-3.5 w-3.5 text-[#10B981]" aria-hidden />
               Verified Stores Only
             </span>
           </div>
-          <div className="flex items-center gap-4" style={{ color: "oklch(65% 0 0 / 0.60)" }}>
-            <a href="/stores" className="transition-colors hover:text-white" style={{ color: "inherit" }}>Find Stores</a>
-            <span style={{ color: "oklch(62% 0.25 285 / 0.35)" }}>◆</span>
-            <a href="/repair" className="transition-colors hover:text-white" style={{ color: "inherit" }}>Book Repair</a>
-            <span style={{ color: "oklch(62% 0.25 285 / 0.35)" }}>◆</span>
-            <a href="/sell-your-phone" className="transition-colors font-semibold" style={{ color: "oklch(78% 0.165 65)" }}>Sell Phone</a>
+          <div className="flex items-center gap-4 text-white/60">
+            <a href="/stores" className="transition-colors hover:text-white">Find Stores</a>
+            <span className="text-white/30">•</span>
+            <a href="/repair" className="transition-colors hover:text-white">Book Repair</a>
+            <span className="text-white/30">•</span>
+            <a href="/sell-your-phone" className="transition-colors font-semibold text-[#D8FF3E]">Sell Phone</a>
           </div>
         </div>
       </div>
 
       {/* ── Main bar ─────────────────────────────────────────────────────── */}
-      <div
-        className="border-b"
-        style={{
-          background: "linear-gradient(180deg, oklch(10% 0.026 258) 0%, oklch(9% 0.023 256) 100%)",
-          borderColor: "oklch(62% 0.25 285 / 0.15)",
-          boxShadow: "0 4px 24px oklch(62% 0.25 285 / 0.06)",
-        }}
-      >
+      <div className="border-b bg-[#11130F] border-white/10 shadow-sm">
         <div className="container flex h-14 items-center gap-4">
           {/* Wordmark */}
           <Link
@@ -172,45 +166,40 @@ export function Header() {
             aria-label="Tamrakar Complex home"
           >
             <div
-              className="flex h-8 w-8 items-center justify-center"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm"
               style={{
-                background: "oklch(62% 0.25 285 / 0.15)",
-                border: "1px solid oklch(62% 0.25 285 / 0.35)",
-                clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
+                border: "1px solid rgba(216, 255, 62, 0.35)",
               }}
             >
-              <img src={logo} alt="" className="h-full w-full object-contain p-0.5" />
+              <img src={logo} alt="Tamrakar Complex" width={32} height={32} className="h-7 w-7 object-contain" loading="eager" />
             </div>
             <span className="hidden font-display text-base font-bold tracking-tight sm:block text-white">
-              Tamrakar<span style={{ color: "oklch(62% 0.25 285)" }}>.</span>
+              Tamrakar<span className="text-[#D8FF3E]">.</span>
             </span>
           </Link>
 
-          {/* Search bar — desktop */}
+          {/* Search bar - desktop */}
           <button
             onClick={() => setIsSearchDialogOpen(true)}
-            className="hidden lg:flex flex-1 max-w-lg ml-4 items-center gap-2 h-9 px-3 text-sm transition-all pressable"
+            className="hidden lg:flex flex-1 max-w-lg ml-4 items-center gap-2 h-10 px-3 text-sm transition-all pressable rounded-xl"
             aria-label="Open search"
             style={{
-              background: "oklch(100% 0 0 / 0.05)",
-              border: "1px solid oklch(62% 0.25 285 / 0.22)",
-              clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)",
-              color: "oklch(65% 0 0 / 0.50)",
+              background: "rgba(255, 255, 255, 0.06)",
+              border: "1px solid rgba(255, 255, 255, 0.10)",
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "oklch(100% 0 0 / 0.08)";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "oklch(62% 0.25 285 / 0.40)";
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.09)";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(59, 130, 246, 0.30)";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "oklch(100% 0 0 / 0.05)";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "oklch(62% 0.25 285 / 0.22)";
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.06)";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255, 255, 255, 0.10)";
             }}
           >
-            <Search className="h-3.5 w-3.5 shrink-0" style={{ color: "oklch(62% 0.25 285 / 0.70)" }} />
-            <span className="truncate flex-1 text-left">Search iPhone, Samsung, MacBook, repair…</span>
+            <Search className="h-3.5 w-3.5 shrink-0 text-white/50" />
+            <span className="truncate flex-1 text-left text-white/50">Search iPhone, Samsung, MacBook, shop, repair…</span>
             <kbd
-              className="hidden xl:inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium"
-              style={{ border: "1px solid oklch(62% 0.25 285 / 0.30)", background: "oklch(62% 0.25 285 / 0.10)", color: "oklch(62% 0.25 285 / 0.70)" }}
+              className="hidden xl:inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium border border-white/15 bg-white/5 text-white/50"
             >
               ⌘K
             </kbd>
@@ -233,10 +222,7 @@ export function Header() {
               <Link to="/wishlist" aria-label="Wishlist">
                 <Heart className="h-4 w-4" />
                 {wishlistCount > 0 && (
-                  <span
-                    className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center px-1 text-[9px] font-bold"
-                    style={{ background: "oklch(78% 0.165 65)", color: "oklch(9% 0.022 258)", clipPath: "polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 0 100%)" }}
-                  >
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center px-1 text-[9px] font-bold rounded-full bg-[#FF6848] text-[#11130F]">
                     {wishlistCount > 9 ? "9+" : wishlistCount}
                   </span>
                 )}
@@ -248,9 +234,9 @@ export function Header() {
               href={`https://api.whatsapp.com/send?phone=${contactInfo.whatsapp}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden md:flex h-9 w-9 items-center justify-center text-white hover:opacity-90 transition-opacity pressable"
+              className="hidden md:flex h-9 w-9 items-center justify-center text-white hover:opacity-90 transition-opacity pressable rounded-lg"
               aria-label="WhatsApp"
-              style={{ background: "#25D366", clipPath: "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)" }}
+              style={{ background: "#25D366" }}
             >
               <MessageCircle className="h-4 w-4" />
             </a>
@@ -258,12 +244,8 @@ export function Header() {
             {/* Amber Sell CTA */}
             <Link
               to="/sell-your-phone"
-              className="hidden xl:inline-flex h-8 items-center px-4 text-xs font-bold transition-opacity hover:opacity-90 pressable"
-              style={{
-                background: "linear-gradient(90deg, oklch(78% 0.165 65), oklch(72% 0.18 55))",
-                color: "oklch(9% 0.022 258)",
-                clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)",
-              }}
+              className="hidden xl:inline-flex h-8 items-center px-4 text-xs font-bold transition-all hover:opacity-90 pressable bg-[#D8FF3E] text-[#11130F]"
+              style={{ clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)" }}
             >
               Sell Phone
             </Link>
@@ -278,13 +260,7 @@ export function Header() {
                       ? "/staffadmin/console"
                       : "/storeadmin/console"
                 }
-                className="hidden xl:inline-flex h-8 items-center px-4 text-xs font-semibold transition-all hover:opacity-90 pressable"
-                style={{
-                  background: "oklch(62% 0.25 285 / 0.15)",
-                  color: "oklch(72% 0.20 285)",
-                  border: "1px solid oklch(62% 0.25 285 / 0.35)",
-                  clipPath: "polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%)",
-                }}
+                className="hidden xl:inline-flex h-8 items-center px-4 text-xs font-semibold transition-all hover:opacity-90 pressable rounded-lg border border-[#3B82F6]/30 bg-[#3B82F6]/15 text-[#60A5FA]"
               >
                 Console
               </Link>
@@ -309,8 +285,6 @@ export function Header() {
       <NavigationBar
         topLevelHomeItem={topLevelHomeItem}
         siteNavigationGroups={siteNavigationGroups}
-        exploreLandingItem={exploreLandingItem}
-        exploreItems={exploreItems}
         visibleQuickItems={visibleQuickItems}
       />
 
@@ -319,8 +293,6 @@ export function Header() {
         onClose={() => setIsMobileMenuOpen(false)}
         topLevelHomeItem={topLevelHomeItem}
         siteNavigationGroups={siteNavigationGroups}
-        exploreLandingItem={exploreLandingItem}
-        exploreItems={exploreItems}
         visibleQuickItems={visibleQuickItems}
         user={user}
       />

@@ -14,6 +14,16 @@ export function slugify(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+export function safeExternalUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Safely converts any value to a string for rendering.
  * Prevents "Objects are not valid as a React child" errors.

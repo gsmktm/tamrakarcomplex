@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 
 interface Payout {
@@ -54,6 +55,7 @@ export default function PayoutManager() {
   });
 
   const queryClient = useQueryClient();
+  const { storeIds: myStoreIds } = useStoreMembership(user?.id);
 
   const { data: payouts, isLoading: payoutsLoading, error: payoutsError } = useQuery({
     queryKey: ["payouts", filters, user?.id, role],
@@ -68,24 +70,7 @@ export default function PayoutManager() {
         .order("created_at", { ascending: false });
 
       // Store admins can only see payouts for their stores
-      if (isStoreAdmin && !isPlatformAdmin && user?.id) {
-        // Get store IDs from store_admins or owner_id
-        const { data: memberships } = await supabase
-          .from("store_admins")
-          .select("store_id")
-          .eq("user_id", user.id)
-          .eq("status", "active");
-        
-        const { data: ownedStores } = await supabase
-          .from("stores")
-          .select("id")
-          .eq("owner_id", user.id);
-        
-        const myStoreIds = Array.from(new Set([
-          ...(memberships || []).map(m => m.store_id),
-          ...(ownedStores || []).map(s => s.id)
-        ]));
-
+      if (isStoreAdmin && !isPlatformAdmin) {
         if (myStoreIds.length === 0) {
           return [];
         }
@@ -127,23 +112,7 @@ export default function PayoutManager() {
         .limit(50);
 
       // Store admins can only see commissions for their stores
-      if (isStoreAdmin && !isPlatformAdmin && user?.id) {
-        const { data: memberships } = await supabase
-          .from("store_admins")
-          .select("store_id")
-          .eq("user_id", user.id)
-          .eq("status", "active");
-        
-        const { data: ownedStores } = await supabase
-          .from("stores")
-          .select("id")
-          .eq("owner_id", user.id);
-        
-        const myStoreIds = Array.from(new Set([
-          ...(memberships || []).map(m => m.store_id),
-          ...(ownedStores || []).map(s => s.id)
-        ]));
-
+      if (isStoreAdmin && !isPlatformAdmin) {
         if (myStoreIds.length === 0) {
           return [];
         }
@@ -164,14 +133,11 @@ export default function PayoutManager() {
       status: string;
       paid_at?: string;
     }) => {
-      const updates: { status: string; paid_at?: string } = { status };
-      if (paid_at) updates.paid_at = paid_at;
-
-      const { error } = await supabase
-        .from("store_payouts")
-        .update(updates)
-        .eq("id", id);
-
+      const { error } = await supabase.rpc("update_store_payout_status", {
+        p_payout_id: id,
+        p_status: status,
+        p_paid_at: paid_at ?? null,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -185,12 +151,12 @@ export default function PayoutManager() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'processing': return 'bg-blue-100 text-blue-800';
-      case 'paid': return 'bg-green-100 text-green-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      case 'cancelled': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300';
+      case 'processing': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'paid': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'cancelled': return 'bg-muted text-muted-foreground';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 

@@ -12,7 +12,26 @@ type Props = {
   height?: number;
 };
 
-const BLOCKED_HOSTS = ["fdn2.gsmarena.com", "fdn.gsmarena.com"];
+// List of proxies to try for gsmarena images
+const PROXIES = [
+  (url: string) => `https://images.weserv.nl/?url=${encodeURIComponent(url)}`,
+  (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+
+function getFallbackProxy(url: string, attempt: number): string {
+  const proxyFn = PROXIES[attempt % PROXIES.length];
+  return proxyFn(url);
+}
+
+function isGsmArenaUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    return new URL(url).hostname.includes("gsmarena.com");
+  } catch {
+    return false;
+  }
+}
 
 function toProxy(url: string): string {
   if (!url) return "/default-product.svg";
@@ -21,10 +40,8 @@ function toProxy(url: string): string {
   if (url.startsWith("/")) return url;
 
   try {
-    const u = new URL(url);
-    if (BLOCKED_HOSTS.includes(u.hostname)) {
-      return `https://images.weserv.nl/?url=${encodeURIComponent(u.hostname + u.pathname)}`;
-    }
+    const parsed = new URL(url);
+    if (parsed.hostname.includes("gsmarena.com")) return getFallbackProxy(url, 0);
     return url;
   } catch {
     // If it's not a valid URL and not a relative path, might be a broken path
@@ -35,12 +52,35 @@ function toProxy(url: string): string {
 export function SafeImage({ src, alt, className, style, aspect = "free", loading = "lazy", width, height }: Props) {
   const initial = useMemo(() => (src ? toProxy(src) : "/default-product.svg"), [src]);
   const [current, setCurrent] = useState<string>(initial);
+  const [attempt, setAttempt] = useState<number>(isGsmArenaUrl(src) ? 0 : -1);
 
   useEffect(() => {
     setCurrent(initial);
-  }, [initial]);
+    setAttempt(isGsmArenaUrl(src) ? 0 : -1);
+  }, [initial, src]);
 
   const onError = () => {
+    if (!src) {
+      setCurrent("/default-product.svg");
+      return;
+    }
+
+    // Check if we need to try another proxy (for gsmarena images)
+    try {
+      const u = new URL(src);
+      if (u.hostname.includes("gsmarena.com")) {
+        const nextAttempt = attempt + 1;
+        if (nextAttempt < PROXIES.length) {
+          setAttempt(nextAttempt);
+          setCurrent(getFallbackProxy(src, nextAttempt));
+          return;
+        }
+      }
+    } catch {
+      // do nothing
+    }
+
+    // If all else fails, use the default
     setCurrent("/default-product.svg");
   };
 
@@ -59,7 +99,6 @@ export function SafeImage({ src, alt, className, style, aspect = "free", loading
       {...(width ? { width } : {})}
       {...(height ? { height } : {})}
       referrerPolicy="no-referrer"
-      crossOrigin="anonymous"
     />
   );
 }

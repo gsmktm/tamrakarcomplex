@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { STORE_REVIEWS_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { useAuth } from "@/hooks/useAuth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,7 @@ export default function ReviewManager() {
   const { data: reviews, isLoading } = useQuery({
     queryKey: ["store_reviews_admin", activeStoreId],
     queryFn: async () => {
-      let query = supabase.from("store_reviews").select("*");
+      let query = supabase.from("store_reviews").select(STORE_REVIEWS_COLUMNS.join(","));
       if (activeStoreId) {
         query = query.eq("store_id", activeStoreId);
       }

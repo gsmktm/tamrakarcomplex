@@ -232,7 +232,7 @@ export default function UnlockingHub() {
     if (f.includes('network') || f.includes('direct unlock')) return "bg-emerald-500/10 text-emerald-600 border-emerald-200";
     if (f.includes('root')) return "bg-amber-500/10 text-amber-600 border-amber-200";
     if (f.includes('bootloader')) return "bg-purple-500/10 text-purple-600 border-purple-200";
-    return "bg-slate-100 text-slate-600 border-slate-200";
+    return "bg-slate-100 text-muted-foreground border-border";
   };
 
   const breadcrumbSchema = {
@@ -300,7 +300,7 @@ export default function UnlockingHub() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/50">
+    <div className="min-h-screen flex flex-col bg-background">
       <SEO
         title="Phone Unlocking Services in Nepal - iPhone, Samsung FRP, MDM, IMEI"
         description="Buy or request phone unlocking services in Kathmandu: iPhone carrier unlock, Samsung FRP, MDM remove, iCloud bypass tools, IMEI checks, unbarring, and Android software service."
@@ -318,7 +318,7 @@ export default function UnlockingHub() {
           <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px] animate-pulse delay-700" />
           
           <div className="container max-w-5xl text-center space-y-8 relative z-10">
-            <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 px-6 py-2 rounded-full text-primary font-black uppercase tracking-widest text-xs">
+            <div className="inline-flex items-center gap-3 bg-card/10 backdrop-blur-md border border-white/20 px-6 py-2 rounded-full text-primary font-black uppercase tracking-widest text-xs">
               <Shield className="h-4 w-4" />
               Official Tamrakar Unlocking Lab
             </div>
@@ -332,7 +332,7 @@ export default function UnlockingHub() {
             <div className="relative max-w-2xl mx-auto group">
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 h-6 w-6 group-focus-within:text-primary transition-all" />
               <Input
-                className="pl-16 h-14 bg-white text-black text-lg rounded-2xl border-none shadow-2xl focus-visible:ring-8 focus-visible:ring-primary/20 transition-all"
+                className="pl-16 h-14 bg-card text-foreground text-lg rounded-2xl border-none shadow-2xl focus-visible:ring-8 focus-visible:ring-primary/20 transition-all"
                 placeholder="Search model (e.g. Pixel 9, S24 Ultra)..."
                 value={searchQuery}
                 onChange={(e) => {
@@ -352,8 +352,8 @@ export default function UnlockingHub() {
                 <Badge variant="outline" className="mb-2 bg-emerald-50 text-emerald-700 border-emerald-200">
                   Purchase Service
                 </Badge>
-                <h2 className="text-2xl font-bold text-slate-900">Unlocking Service Menu</h2>
-                <p className="text-sm text-slate-500 max-w-2xl">
+                <h2 className="text-2xl font-bold text-foreground">Unlocking Service Menu</h2>
+                <p className="text-sm text-muted-foreground max-w-2xl">
                   Select a specific carrier, FRP, MDM, iCloud tool, check, or unbarring service. Prices are estimates from credit rate and staff verifies final eligibility before processing.
                 </p>
               </div>
@@ -385,14 +385,14 @@ export default function UnlockingHub() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {paginatedServiceOffers.map((service) => (
-                <Card key={service.id} className="rounded-2xl border-slate-200 hover:border-primary/40 hover:shadow-lg transition-all">
+                <Card key={service.id} className="rounded-2xl border-border hover:border-primary/40 hover:shadow-lg transition-all">
                   <CardContent className="p-5 space-y-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-wider">
                           {service.category}
                         </Badge>
-                        <h3 className="mt-2 text-base font-black text-slate-900 leading-snug">
+                        <h3 className="mt-2 text-base font-black text-foreground leading-snug">
                           {service.name}
                         </h3>
                       </div>
@@ -402,24 +402,24 @@ export default function UnlockingHub() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-xl bg-slate-50 p-3">
+                      <div className="rounded-xl bg-muted p-3">
                         <div className="text-[10px] font-bold uppercase text-slate-400">Estimate</div>
-                        <div className="font-black text-slate-900">Rs. {service.estimatedNpr.toLocaleString()}</div>
+                        <div className="font-black text-foreground">Rs. {service.estimatedNpr.toLocaleString()}</div>
                       </div>
-                      <div className="rounded-xl bg-slate-50 p-3">
+                      <div className="rounded-xl bg-muted p-3">
                         <div className="text-[10px] font-bold uppercase text-slate-400">Credit</div>
-                        <div className="font-black text-slate-900">{service.creditPrice}</div>
+                        <div className="font-black text-foreground">{service.creditPrice}</div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Clock3 className="h-4 w-4 text-primary" />
                       {service.turnaround}
                     </div>
 
                     <div className="flex flex-wrap gap-1.5">
                       {service.tags.slice(0, 4).map((tag) => (
-                        <span key={tag} className="rounded-full border bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                        <span key={tag} className="rounded-full border bg-card px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
                           {tag}
                         </span>
                       ))}
@@ -434,14 +434,14 @@ export default function UnlockingHub() {
             </div>
 
             {filteredServiceOffers.length === 0 ? (
-              <div className="rounded-2xl border border-dashed bg-white p-10 text-center">
+              <div className="rounded-2xl border border-dashed bg-card p-10 text-center">
                 <Search className="mx-auto h-8 w-8 text-slate-300" />
-                <h3 className="mt-3 font-bold text-slate-900">No matching services</h3>
-                <p className="mt-1 text-sm text-slate-500">Try another keyword or category.</p>
+                <h3 className="mt-3 font-bold text-foreground">No matching services</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Try another keyword or category.</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-3 rounded-2xl border bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-medium text-slate-500">
+              <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-medium text-muted-foreground">
                   Showing {paginatedServiceOffers.length} of {filteredServiceOffers.length} services from the complete service export.
                 </p>
                 <div className="flex items-center gap-2">
@@ -453,7 +453,7 @@ export default function UnlockingHub() {
                   >
                     Previous
                   </Button>
-                  <span className="px-2 text-xs font-black text-slate-500">
+                  <span className="px-2 text-xs font-black text-muted-foreground">
                     {servicePage} / {serviceTotalPages}
                   </span>
                   <Button
@@ -471,7 +471,7 @@ export default function UnlockingHub() {
 
           {/* Feature Tabs */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-slate-900">Select a Service</h2>
+            <h2 className="text-2xl font-bold text-foreground">Select a Service</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {FEATURES.map((feature) => {
                 const Icon = feature.icon;
@@ -494,14 +494,14 @@ export default function UnlockingHub() {
                       "relative p-6 rounded-3xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl text-left",
                       showFeatureDetail === feature.label 
                         ? "border-primary bg-primary/5 shadow-lg" 
-                        : "border-slate-200 bg-white hover:border-slate-300"
+                        : "border-border bg-card hover:border-slate-300"
                     )}
                   >
                     <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center mb-4", feature.color)}>
                       <Icon className="h-6 w-6" />
                     </div>
-                    <h3 className="font-bold text-slate-900 mb-1">{feature.label}</h3>
-                    <p className="text-xs text-slate-500 line-clamp-2 mb-3">{feature.description}</p>
+                    <h3 className="font-bold text-foreground mb-1">{feature.label}</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{feature.description}</p>
                     <Badge variant="secondary" className="text-xs font-bold">
                       {feature.models} Models
                     </Badge>
@@ -519,7 +519,7 @@ export default function UnlockingHub() {
                   <ArrowLeft className="h-4 w-4" /> Back to All Services
                 </Button>
                 <div className="h-8 w-px bg-slate-200" />
-                <h2 className="text-2xl font-bold text-slate-900">{showFeatureDetail} Supported Devices</h2>
+                <h2 className="text-2xl font-bold text-foreground">{showFeatureDetail} Supported Devices</h2>
                 <Badge variant="outline" className="text-sm font-bold">
                   {featureFilteredModels.length} devices
                 </Badge>
@@ -594,7 +594,7 @@ export default function UnlockingHub() {
           </div>
 
           {/* Results Count */}
-          <div className="text-center text-sm text-slate-500">
+          <div className="text-center text-sm text-muted-foreground">
             Showing {paginatedModels.length} of {featureFilteredModels.length} devices
             {showFeatureDetail && ` supporting ${showFeatureDetail}`}
             {selectedBrand && ` from ${selectedBrand}`}
@@ -607,14 +607,14 @@ export default function UnlockingHub() {
                 <Skeleton key={i} className="h-52 w-full rounded-2xl" />
               ))
             ) : paginatedModels.length > 0 ? paginatedModels.map((item) => (
-              <Card key={item.id} className="rounded-2xl border border-slate-200 hover:border-primary/30 hover:shadow-lg transition-all duration-300 overflow-hidden group">
+              <Card key={item.id} className="rounded-2xl border border-border hover:border-primary/30 hover:shadow-lg transition-all duration-300 overflow-hidden group">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider text-[10px] mb-1">
+                      <Badge variant="secondary" className="bg-slate-100 text-muted-foreground font-bold uppercase tracking-wider text-[10px] mb-1">
                         {item.brand}
                       </Badge>
-                      <h3 className="text-xl font-black text-slate-900 group-hover:text-primary transition-colors">
+                      <h3 className="text-xl font-black text-foreground group-hover:text-primary transition-colors">
                         {item.model}
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
@@ -643,7 +643,7 @@ export default function UnlockingHub() {
                       </span>
                     ))}
                     {item.supported_features.length > 6 && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-muted-foreground border border-border">
                         +{item.supported_features.length - 6} more
                       </span>
                     )}
@@ -663,8 +663,8 @@ export default function UnlockingHub() {
                 <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Search className="h-8 w-8 text-slate-300" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">No devices found</h3>
-                <p className="text-slate-500">Try adjusting your search or filter criteria.</p>
+                <h3 className="text-xl font-bold text-foreground mb-2">No devices found</h3>
+                <p className="text-muted-foreground">Try adjusting your search or filter criteria.</p>
               </div>
             )}
           </div>
@@ -746,7 +746,7 @@ export default function UnlockingHub() {
 
       <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
         <DialogContent className="flex max-h-[92dvh] w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-3xl p-0 sm:max-w-2xl">
-          <DialogHeader className="shrink-0 border-b bg-white px-5 py-4 sm:px-6">
+          <DialogHeader className="shrink-0 border-b bg-card px-5 py-4 sm:px-6">
             <DialogTitle className="text-xl font-black leading-tight">
               {selectedOfferForRequest ? "Purchase Unlocking Service" : "Request Unlocking Service"}
             </DialogTitle>
@@ -759,29 +759,29 @@ export default function UnlockingHub() {
           <form onSubmit={handleSubmitRequest} className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4 sm:px-6">
             {selectedOfferForRequest && (
-              <div className="overflow-hidden rounded-2xl border bg-slate-50">
+              <div className="overflow-hidden rounded-2xl border bg-muted">
                 <div className="grid gap-4 p-4 sm:grid-cols-[1fr_auto] sm:items-start">
                   <div className="min-w-0">
                     <Badge className="mb-2 max-w-full truncate">{selectedOfferForRequest.category}</Badge>
-                    <div className="text-base font-black leading-snug text-slate-900 sm:text-lg">{selectedOfferForRequest.name}</div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 font-bold">
+                    <div className="text-base font-black leading-snug text-foreground sm:text-lg">{selectedOfferForRequest.name}</div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-card px-2 py-1 font-bold">
                         <Clock3 className="h-3.5 w-3.5 text-primary" />
                         {selectedOfferForRequest.turnaround}
                       </span>
-                      <span className="rounded-full bg-white px-2 py-1 font-bold">
+                      <span className="rounded-full bg-card px-2 py-1 font-bold">
                         {selectedOfferForRequest.creditPrice} Credit
                       </span>
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-white px-4 py-3 text-left shadow-sm sm:text-right">
+                  <div className="rounded-2xl bg-card px-4 py-3 text-left shadow-sm sm:text-right">
                     <div className="text-[10px] uppercase font-bold text-slate-400">Estimate</div>
                     <div className="whitespace-nowrap text-lg font-black text-primary">Rs. {selectedOfferForRequest.estimatedNpr.toLocaleString()}</div>
                   </div>
                 </div>
-                <div className="grid gap-2 border-t bg-white/70 px-4 py-3 sm:grid-cols-2">
+                <div className="grid gap-2 border-t bg-card/70 px-4 py-3 sm:grid-cols-2">
                   {selectedOfferForRequest.requirements.map((item) => (
-                    <div key={item} className="flex min-w-0 items-start gap-2 text-xs font-medium text-slate-600">
+                    <div key={item} className="flex min-w-0 items-start gap-2 text-xs font-medium text-muted-foreground">
                       <BadgeCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
                       <span>{item}</span>
                     </div>
@@ -862,7 +862,7 @@ export default function UnlockingHub() {
                       onClick={() => setRequestForm(prev => ({ ...prev, paymentMethod: value }))}
                       className={cn(
                         "rounded-xl border px-3 py-2 text-left text-xs font-bold transition-colors",
-                        requestForm.paymentMethod === value ? "border-primary bg-primary/5 text-primary" : "border-slate-200 hover:bg-slate-50"
+                        requestForm.paymentMethod === value ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted"
                       )}
                     >
                       {label}
@@ -884,7 +884,7 @@ export default function UnlockingHub() {
                       onClick={() => setRequestForm(prev => ({ ...prev, urgency: value }))}
                       className={cn(
                         "rounded-xl border px-3 py-2 text-left text-xs font-bold transition-colors",
-                        requestForm.urgency === value ? "border-primary bg-primary/5 text-primary" : "border-slate-200 hover:bg-slate-50"
+                        requestForm.urgency === value ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted"
                       )}
                     >
                       {label}
@@ -904,7 +904,7 @@ export default function UnlockingHub() {
               />
             </div>
             </div>
-            <DialogFooter className="shrink-0 border-t bg-white px-5 py-4 sm:px-6">
+            <DialogFooter className="shrink-0 border-t bg-card px-5 py-4 sm:px-6">
               <Button type="submit" className="h-12 w-full rounded-xl font-black" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>

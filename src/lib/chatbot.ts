@@ -78,18 +78,17 @@ export const defaultChatbotSources: ChatbotSources = {
 };
 
 export const defaultChatbotConfig: ChatbotConfig = {
-  welcome_message: "Namaste! Ask me about mobile price, product availability, exchange, repair, store contact or order support.",
+  welcome_message: "Namaste! Tell me what you need help with: product price, availability, exchange, repair, warranty, or order support.",
   is_active: true,
   support_name: "Tamrakar Support",
   allow_anonymous: true,
-  require_contact: true,
-  auto_create_customer: true,
-  show_store_contacts: true,
+  require_contact: false,
+  auto_create_customer: false,
+  show_store_contacts: false,
   sources_enabled: defaultChatbotSources,
-  fallback_message: "I could not find an exact answer. Please share your phone number and our support team will contact you.",
-  training_prompt: "Answer customer questions using TamrakarComplex.com product, price, store, repair, exchange and official content data. Keep answers short, helpful and truthful. If the answer is not available, collect customer contact and create a support request.",
+  fallback_message: "I could not find an exact answer. Please share the product model or service you need, and Tamrakar Support will guide you to the correct next step.",
+  training_prompt: "Answer customer questions using TamrakarComplex.com product, price, repair, exchange and official content data. Keep answers short, helpful and truthful. Never reveal individual shop names, shop details, phone numbers, WhatsApp numbers, or private contact information.",
   business_info: {
-    phone: "+9779851091542",
     email: "support@tamrakarcomplex.com",
     location: "Tamrakar Complex, New Road, Kathmandu",
     hours: "10 AM - 7 PM",
@@ -106,7 +105,11 @@ export const normalizeChatbotConfig = (raw: Partial<ChatbotConfig> | null | unde
   business_info: {
     ...defaultChatbotConfig.business_info,
     ...((raw?.business_info as ChatbotConfig["business_info"] | undefined) || {}),
+    phone: undefined,
   },
+  require_contact: false,
+  auto_create_customer: false,
+  show_store_contacts: false,
 });
 
 export async function fetchPublicChatbotConfig(): Promise<ChatbotConfig> {
@@ -127,13 +130,13 @@ export async function saveChatbotConfig(config: ChatbotConfig): Promise<void> {
     is_active: config.is_active,
     support_name: config.support_name,
     allow_anonymous: config.allow_anonymous,
-    require_contact: config.require_contact,
-    auto_create_customer: config.auto_create_customer,
-    show_store_contacts: config.show_store_contacts,
+    require_contact: false,
+    auto_create_customer: false,
+    show_store_contacts: false,
     sources_enabled: config.sources_enabled,
     fallback_message: config.fallback_message,
     training_prompt: config.training_prompt,
-    business_info: config.business_info,
+    business_info: { ...config.business_info, phone: undefined },
     updated_at: new Date().toISOString(),
   };
 
@@ -161,12 +164,10 @@ export async function askChatbot(params: {
   });
 
   if (error) {
-    if (error.code === "PGRST202" || String(error.message || "").includes("Could not find the function public.chatbot_answer")) {
-      return askChatbotFromPublicTables(params);
-    }
-    throw error;
+    // Fall back for any RPC error — function missing, table missing, or network error
+    return askChatbotFromPublicTables(params);
   }
-  return data as ChatbotAnswer;
+  return sanitizeChatbotAnswer(data as ChatbotAnswer);
 }
 
 async function askChatbotFromPublicTables(params: {
@@ -179,7 +180,7 @@ async function askChatbotFromPublicTables(params: {
   const sessionId = `local-${Date.now()}`;
   const trackingCode = `LOCAL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 
-  const [products, articles, guides, pages, devices, stores] = await Promise.all([
+  const [products, articles, guides, pages, devices, trainingItems] = await Promise.all([
     safeSelect("products", "id,name,slug,brand,price,price_value,description,in_stock", (q) =>
       q.or(`name.ilike.${like},brand.ilike.${like},description.ilike.${like}`).limit(5),
     ),
@@ -187,7 +188,9 @@ async function askChatbotFromPublicTables(params: {
     safeSelect("guides", "id,title,slug,excerpt", (q) => q.ilike("title", like).limit(3)),
     safeSelect("content_pages", "id,title,slug,content", (q) => q.ilike("title", like).limit(3)),
     safeSelect("device_catalog", "id,brand,model,canonical_slug", (q) => q.ilike("model", like).limit(5)),
-    safeSelect("stores", "id,name,phone,location", (q) => q.limit(3)),
+    safeSelect("chatbot_training_items", "question,answer,keywords", (q) =>
+      q.eq("is_active", true).order("priority", { ascending: true }).limit(200),
+    ),
   ]);
 
   const productCards = products.map((item) => ({
@@ -203,44 +206,58 @@ async function askChatbotFromPublicTables(params: {
     price_text: "Open price list for latest official price",
   }));
 
-  const storeCards = stores.map((item) => ({
-    ...item,
-    href: "/stores",
-  }));
-
-  const answer = buildFallbackAnswer({
-    query,
-    products: productCards,
-    articles,
-    guides,
-    pages,
-    devices: officialPrices,
-    stores: storeCards,
+  // Match training items by keyword or question similarity
+  const queryLower = query.toLowerCase();
+  const queryIntent = detectIntent(query);
+  const matchedTraining = trainingItems.find((item) => {
+    const q = String(item.question || "").toLowerCase();
+    const category = String(item.category || "").toLowerCase();
+    const kws = (item.keywords || []) as string[];
+    if (queryIntent !== "store_contact" && /(store|shop|contact)/.test(category)) return false;
+    if (queryIntent !== "store_contact" && String(item.answer || "").includes("does not show individual shop details")) return false;
+    if (q.includes(queryLower) || queryLower.includes(q.split(" ")[0])) return true;
+    return kws.some((kw) => queryLower.includes(kw.toLowerCase()) || kw.toLowerCase().includes(queryLower));
   });
 
-  await supabase.from("contact_messages").insert({
-    name: params.customer.name || "Chat Customer",
-    email: params.customer.email || "chatbot@tamrakarcomplex.com",
-    subject: "chatbot: fallback",
-    message: JSON.stringify({
-      question: query,
-      phone: params.customer.phone || null,
-      source_url: params.sourceUrl || null,
-      tracking_code: trackingCode,
-      note: "Fallback used because chatbot_answer RPC is not installed.",
-    }),
-  });
+  const answer = matchedTraining
+    ? String(matchedTraining.answer)
+    : buildFallbackAnswer({
+        query,
+        products: productCards,
+        articles,
+        guides,
+        pages,
+        devices: officialPrices,
+      });
 
-  return {
+  // Safe insert — ignore errors if contact_messages doesn't exist
+  try {
+    await supabase.from("contact_messages").insert({
+      name: params.customer.name || "Chat Customer",
+      email: params.customer.email || "chatbot@tamrakarcomplex.com",
+      subject: "chatbot: fallback",
+      message: JSON.stringify({
+        question: query,
+        phone: params.customer.phone || null,
+        source_url: params.sourceUrl || null,
+        tracking_code: trackingCode,
+        note: "Fallback used because chatbot_answer RPC is not installed.",
+      }),
+    });
+  } catch {
+    // ignore — table may not exist yet
+  }
+
+  return sanitizeChatbotAnswer({
     ok: true,
     session_id: sessionId,
     tracking_code: trackingCode,
-    intent: detectIntent(query),
+    intent: queryIntent,
     answer,
     products: productCards,
     official_prices: officialPrices,
-    stores: storeCards,
-  };
+    stores: [],
+  });
 }
 
 async function safeSelect(table: string, columns: string, apply: (query: any) => any): Promise<Array<Record<string, any>>> {
@@ -269,15 +286,44 @@ function buildFallbackAnswer(result: {
   guides: Array<Record<string, any>>;
   pages: Array<Record<string, any>>;
   devices: Array<Record<string, any>>;
-  stores: Array<Record<string, any>>;
 }) {
   if (result.products.length) return "Product भेटियो। तल price, detail र link छ।";
   if (result.devices.length) return "Model भेटियो। तल price list link छ।";
   if (result.articles.length || result.guides.length || result.pages.length) return "Related information भेटियो। कृपया तलको result हेर्नुहोस्।";
-  if (detectIntent(result.query) === "store_contact" && result.stores.length) return "Tamrakar Complex का केही store contact तल छन्।";
+  if (detectIntent(result.query) === "store_contact") return privacyContactAnswer;
   if (detectIntent(result.query) === "exchange") return "For phone exchange, please share brand, model, storage, battery health, condition, warranty and accessories. Our team will confirm the final value.";
   if (detectIntent(result.query) === "repair") return "For repair, please share device brand/model and problem such as screen, battery, charging, software, unlock or water damage.";
-  return "I could not find an exact answer from the installed public data. Please share your phone number and our support team will contact you.";
+  return "I could not find an exact answer from the available public data. Please share the product model or service you need so I can guide the next step.";
+}
+
+const privacyContactAnswer =
+  "For privacy and safety, Tamrakar Support does not show individual shop details or phone numbers in chat. I can still help with products, prices, repair, exchange, warranty, and the correct request flow.";
+
+const phonePattern = /(?:\+?\s*977[-\s]?)?(?:0?1[-\s]?\d{6,8}|9[678]\d{8})/g;
+
+export function sanitizeChatbotAnswer(answer: ChatbotAnswer): ChatbotAnswer {
+  const intent = answer.intent || detectIntent(answer.answer || "");
+  const safeAnswer =
+    intent === "store_contact"
+      ? privacyContactAnswer
+      : String(answer.answer || "").replace(phonePattern, "[contact hidden]");
+
+  return {
+    ...answer,
+    answer: safeAnswer,
+    stores: [],
+    store_offers: (answer.store_offers || []).map((offer) => {
+      const {
+        store_name: _storeName,
+        store_phone: _storePhone,
+        store_location: _storeLocation,
+        phone: _phone,
+        location: _location,
+        ...safeOffer
+      } = offer;
+      return safeOffer;
+    }),
+  };
 }
 
 export async function fetchChatbotOverview() {
@@ -308,7 +354,11 @@ export async function upsertTrainingItem(item: Partial<ChatbotTrainingItem> & { 
     question: item.question.trim(),
     answer: item.answer.trim(),
     category: item.category || "general",
-    keywords: item.keywords || [],
+    keywords: Array.isArray(item.keywords)
+      ? item.keywords
+      : typeof item.keywords === "string" && item.keywords.trim()
+        ? item.keywords.split(",").map((k) => k.trim()).filter(Boolean)
+        : [],
     priority: item.priority ?? 100,
     is_active: item.is_active ?? true,
     updated_at: new Date().toISOString(),

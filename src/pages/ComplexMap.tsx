@@ -103,7 +103,7 @@ export default function ComplexMap() {
                           store ? "border-primary/40 bg-primary/5 hover:border-primary hover:bg-primary/10" : "border-slate-800 bg-slate-900/50"
                         )}
                       >
-                        <div className="text-[10px] font-mono text-slate-500 mb-1">{shopNo}</div>
+                        <div className="text-[10px] font-mono text-muted-foreground mb-1">{shopNo}</div>
                         {store ? (
                           <Link to={storeUrl} className="flex flex-col items-center">
                             <StoreIcon className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />

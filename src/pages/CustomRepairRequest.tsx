@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -50,7 +50,7 @@ const formSchema = z.object({
   device_id: z.string().optional(),
 });
 
-const BRANDS = [
+const FALLBACK_BRANDS = [
   { id: "Apple", label: "Apple" },
   { id: "Samsung", label: "Samsung" },
   { id: "Xiaomi", label: "Xiaomi" },
@@ -59,7 +59,7 @@ const BRANDS = [
   { id: "Vivo", label: "Vivo" },
   { id: "Realme", label: "Realme" },
   { id: "Google", label: "Google" },
-  { id: "Other", label: "Other" }
+  { id: "Other", label: "Other" },
 ];
 
 const ISSUES = [
@@ -69,7 +69,7 @@ const ISSUES = [
   { id: "camera", label: "Camera Issues", icon: Camera, color: "text-purple-500", bg: "bg-purple-50" },
   { id: "water_damage", label: "Water Damage", icon: Droplets, color: "text-cyan-500", bg: "bg-cyan-50" },
   { id: "software", label: "Software / Boot", icon: Cpu, color: "text-green-500", bg: "bg-green-50" },
-  { id: "other", label: "Other Problems", icon: HelpCircle, color: "text-slate-500", bg: "bg-slate-50" },
+  { id: "other", label: "Other Problems", icon: HelpCircle, color: "text-muted-foreground", bg: "bg-muted" },
 ];
 
 export default function CustomRepairRequest() {
@@ -99,7 +99,6 @@ export default function CustomRepairRequest() {
 
   useEffect(() => {
     if (prefilledIssue) {
-      // Map common prefilled issues to issue_type
       const lowerIssue = prefilledIssue.toLowerCase();
       if (lowerIssue.includes("battery") || lowerIssue.includes("power")) form.setValue("issue_type", "battery");
       if (lowerIssue.includes("charging")) form.setValue("issue_type", "charging");
@@ -117,10 +116,32 @@ export default function CustomRepairRequest() {
       }
     }
     if (prefilledGuide) {
-      // Guide logic if needed
       form.setValue("guide_id", prefilledGuide);
     }
-  }, [prefilledDevice, prefilledGuide, devices, form]);
+  }, [prefilledDevice, prefilledGuide, prefilledIssue, devices, form]);
+
+  // Dynamic brands from DB devices, with fallbacks
+  const brands = useMemo(() => {
+    if (!devices?.length) return FALLBACK_BRANDS;
+    const dbBrands = Array.from(new Set(devices.map(d => d.brand).filter(Boolean)));
+    if (dbBrands.length === 0) return FALLBACK_BRANDS;
+    return dbBrands.map(b => ({ id: b, label: b }));
+  }, [devices]);
+
+  // Watch selected brand for model filtering
+  const selectedBrand = form.watch("device_brand");
+
+  // Models derived from DB devices filtered by selected brand
+  const models = useMemo(() => {
+    if (!devices?.length || !selectedBrand) return [];
+    return devices.filter(d => d.brand === selectedBrand).map(d => d.name);
+  }, [devices, selectedBrand]);
+
+  // Reset model when brand changes (but not during initial prefilled-device load)
+  useEffect(() => {
+    if (selectedBrand && prefilledDevice) return;
+    if (selectedBrand) form.setValue("device_model", "");
+  }, [selectedBrand, prefilledDevice, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
@@ -159,7 +180,7 @@ export default function CustomRepairRequest() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/50">
+    <div className="min-h-screen flex flex-col bg-background">
       <SEO
         title="Book a Gadget Repair"
         description="Book smartphone diagnostics and repair service for screen, battery, charging, camera, and software issues."
@@ -176,7 +197,7 @@ export default function CustomRepairRequest() {
           </Link>
         </Button>
       </div>
-      <Card className="border-slate-100 shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
+      <Card className="border-border shadow-xl rounded-2xl overflow-hidden">
         <div className="bg-primary h-2" />
         <CardHeader className="space-y-1 pb-8">
           <CardTitle className="text-3xl font-bold">Book a Professional Repair</CardTitle>
@@ -241,27 +262,27 @@ export default function CustomRepairRequest() {
                 )}
               />
 
-              <div className="space-y-4">
-                <FormLabel className="text-sm font-semibold">Select Device Brand</FormLabel>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                  {BRANDS.map((brand) => (
-                    <FormField
-                      key={brand.id}
-                      control={form.control}
-                      name="device_brand"
-                      render={({ field }) => (
+              <FormField
+                control={form.control}
+                name="device_brand"
+                render={({ field }) => (
+                  <FormItem className="space-y-4">
+                    <FormLabel className="text-sm font-semibold">Select Device Brand</FormLabel>
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                      {brands.map((brand) => (
                         <div
+                          key={brand.id}
                           onClick={() => field.onChange(brand.id)}
                           className={cn(
-                            "cursor-pointer flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all hover:bg-slate-50",
+                            "relative cursor-pointer flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all hover:bg-muted",
                             field.value === brand.id 
                               ? "border-primary bg-primary/5 shadow-sm" 
-                              : "border-slate-100 bg-white"
+                              : "border-border bg-card"
                           )}
                         >
                           <span className={cn(
                             "text-xs font-bold",
-                            field.value === brand.id ? "text-primary" : "text-slate-600"
+                            field.value === brand.id ? "text-primary" : "text-muted-foreground"
                           )}>
                             {brand.label}
                           </span>
@@ -271,45 +292,66 @@ export default function CustomRepairRequest() {
                             </div>
                           )}
                         </div>
-                      )}
-                    />
-                  ))}
-                </div>
-                <FormMessage />
-              </div>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
                 name="device_model"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-semibold">Device Model Name</FormLabel>
+                    <FormLabel className="text-sm font-semibold">Device Model</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. iPhone 13 Pro Max" className="h-11 rounded-xl" {...field} />
+                      {models.length > 0 ? (
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue placeholder="Select your model..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {models.map((model) => (
+                              <SelectItem key={model} value={model}>
+                                {model}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="Other">Other (specify below)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          placeholder={selectedBrand ? `e.g. ${selectedBrand} model name` : "Select a brand first"}
+                          className="h-11 rounded-xl"
+                          disabled={!selectedBrand}
+                          {...field}
+                        />
+                      )}
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <div className="space-y-4">
-                <FormLabel className="text-sm font-semibold">What's the primary issue?</FormLabel>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {ISSUES.map((issue) => {
-                    const Icon = issue.icon;
-                    return (
-                      <FormField
-                        key={issue.id}
-                        control={form.control}
-                        name="issue_type"
-                        render={({ field }) => (
+              <FormField
+                control={form.control}
+                name="issue_type"
+                render={({ field }) => (
+                  <FormItem className="space-y-4">
+                    <FormLabel className="text-sm font-semibold">What's the primary issue?</FormLabel>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {ISSUES.map((issue) => {
+                        const Icon = issue.icon;
+                        return (
                           <div
+                            key={issue.id}
                             onClick={() => field.onChange(issue.id)}
                             className={cn(
                               "relative cursor-pointer flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all text-center space-y-3",
                               field.value === issue.id 
                                 ? "border-primary bg-primary/5 ring-1 ring-primary shadow-md scale-[1.02]" 
-                                : "border-slate-100 bg-white hover:border-slate-200"
+                                : "border-border bg-card hover:border-border/80"
                             )}
                           >
                             <div className={cn("p-3 rounded-full", issue.bg, issue.color)}>
@@ -317,7 +359,7 @@ export default function CustomRepairRequest() {
                             </div>
                             <span className={cn(
                               "text-xs font-semibold leading-tight",
-                              field.value === issue.id ? "text-primary" : "text-slate-700"
+                              field.value === issue.id ? "text-primary" : "text-foreground"
                             )}>
                               {issue.label}
                             </span>
@@ -327,13 +369,13 @@ export default function CustomRepairRequest() {
                               </div>
                             )}
                           </div>
-                        )}
-                      />
-                    );
-                  })}
-                </div>
-                <FormMessage />
-              </div>
+                        );
+                      })}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
@@ -365,7 +407,7 @@ export default function CustomRepairRequest() {
                           <Button
                             variant={"outline"}
                             className={cn(
-                              "w-full h-11 pl-3 text-left font-normal rounded-xl border-slate-200",
+                              "w-full h-11 pl-3 text-left font-normal rounded-xl border-border",
                               !field.value && "text-muted-foreground"
                             )}
                           >
@@ -378,7 +420,7 @@ export default function CustomRepairRequest() {
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 rounded-2xl border-slate-100 shadow-xl" align="start">
+                      <PopoverContent className="w-auto p-0 rounded-2xl border-border shadow-xl" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}

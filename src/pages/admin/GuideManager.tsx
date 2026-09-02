@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { GUIDES_COLUMNS } from "@/lib/supabaseColumnMaps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +68,7 @@ export default function GuideManager() {
     queryKey: ["guides", "admin"],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.from("guides").select("*").order("created_at", { ascending: false });
+        const { data, error } = await supabase.from("guides")        .select(GUIDES_COLUMNS.join(",")).order("created_at", { ascending: false });
         if (error) throw error;
         return data as Guide[];
       } catch (err) {

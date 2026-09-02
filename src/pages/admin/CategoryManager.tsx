@@ -13,7 +13,7 @@ export default function CategoryManager() {
       try {
         const { data, error } = await supabase
           .from("product_categories")
-          .select("*")
+          .select("id, name, slug, description")
           .order("name");
         if (error) throw error;
         return data;

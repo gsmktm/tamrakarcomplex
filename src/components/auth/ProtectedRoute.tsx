@@ -3,7 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
-import { locationToPath } from "@/lib/authRedirects";
+import { getAuthPathForLocation } from "@/lib/authRedirects";
 import type { AppRole, StaffPermissionAction } from "@/lib/permissions";
 
 type ProtectedRouteProps = {
@@ -23,8 +23,9 @@ export function ProtectedRoute({
   const { user, loading, role } = useAuth();
   const { isLoading: permissionsLoading, canAccessModule } = usePermissions();
 
+  const isResolvingAuth = loading || (!!user && !role);
   const needsPermissionCheck = role === "staffadmin" && Boolean(requiredModule);
-  if (loading || (needsPermissionCheck && permissionsLoading)) {
+  if (isResolvingAuth || (needsPermissionCheck && permissionsLoading)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -33,11 +34,7 @@ export function ProtectedRoute({
   }
 
   if (!user) {
-    return <Navigate to="/auth" state={{ from: locationToPath(location) }} replace />;
-  }
-
-  if (!role) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to={getAuthPathForLocation(location)} replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(role as AppRole)) {

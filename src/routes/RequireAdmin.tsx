@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
-import { locationToPath } from "@/lib/authRedirects";
+import { getAuthPathForLocation } from "@/lib/authRedirects";
 
 /**
  * Legacy RequireAdmin guard. 
@@ -22,7 +22,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    return <Navigate to="/auth" state={{ from: locationToPath(location) }} replace />;
+    return <Navigate to={getAuthPathForLocation(location)} replace />;
   }
 
   const isAuthorized = role === "suadmin" || role === "staffadmin";
