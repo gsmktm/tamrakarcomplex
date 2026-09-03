@@ -22,7 +22,7 @@ export function BottomNav() {
 
   return (
     <nav
-      aria-label="Primary"
+      aria-label="Mobile primary"
       className="md:hidden fixed inset-x-0 bottom-0 z-40 glass-card border-t pb-safe"
     >
       <ul className="flex items-stretch justify-around">
@@ -42,6 +42,7 @@ export function BottomNav() {
                   )
                 }
                 aria-label={label}
+                aria-current={(active || (exact && pathname === "/")) ? "page" : undefined}
               >
                 {({ isActive }) => (
                   <>

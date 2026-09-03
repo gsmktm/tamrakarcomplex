@@ -20,7 +20,7 @@ export function computeHasActiveSubscription(
   if (status !== "active") return false;
   if (!subscriptionEndDate) return true; // no expiry = active
   const date = new Date(String(subscriptionEndDate));
-  if (Number.isNaN(date.getTime())) return true;
+  if (Number.isNaN(date.getTime())) return false;
   return date.getTime() > Date.now();
 }
 

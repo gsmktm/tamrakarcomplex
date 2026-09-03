@@ -36,4 +36,22 @@ describe("resolveStorePackageContext", () => {
     });
     expect(result.effectivePackageSlug).toBe("silver");
   });
+
+  it("applies live package limits and treats a negative catalog limit as unlimited", () => {
+    const result = resolveStorePackageContext({
+      package: { slug: "gold", product_limit: 42, accessory_limit: 17, staff_limit: -1 },
+      subscription_status: "active",
+    });
+    expect(result.entitlements.productListingLimit).toBe(42);
+    expect(result.entitlements.accessoryListingLimit).toBe(17);
+    expect(result.entitlements.staffMemberLimit).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it("fails closed when a paid subscription has an invalid expiry", () => {
+    expect(resolveStorePackageContext({
+      package: { slug: "diamond" },
+      subscription_status: "active",
+      subscription_end_date: "not-a-date",
+    }).effectivePackageSlug).toBe("free");
+  });
 });

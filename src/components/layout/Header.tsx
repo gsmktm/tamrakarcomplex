@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BadgeCheck, Heart, MapPin, Menu, MessageCircle, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ export function Header() {
   const { count: wishlistCount } = useWishlist();
   const location = useLocation();
   const navigate = useNavigate();
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
 
   const groupedHrefs = useMemo(
     () =>
@@ -123,7 +124,21 @@ export function Header() {
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMobileMenuOpen(false);
+        mobileMenuButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isMobileMenuOpen]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -147,11 +162,11 @@ export function Header() {
             </span>
           </div>
           <div className="flex items-center gap-4 text-white/60">
-            <a href="/stores" className="transition-colors hover:text-white">Find Stores</a>
+            <Link to="/stores" className="transition-colors hover:text-white">Find Stores</Link>
             <span className="text-white/30">•</span>
-            <a href="/repair" className="transition-colors hover:text-white">Book Repair</a>
+            <Link to="/repair" className="transition-colors hover:text-white">Book Repair</Link>
             <span className="text-white/30">•</span>
-            <a href="/sell-your-phone" className="transition-colors font-semibold text-[#D8FF3E]">Sell Phone</a>
+            <Link to="/sell-your-phone" className="transition-colors font-semibold text-[#D8FF3E]">Sell Phone</Link>
           </div>
         </div>
       </div>
@@ -208,8 +223,8 @@ export function Header() {
           {/* Actions */}
           <div className="flex items-center gap-1.5 ml-auto">
             {/* Mobile search */}
-            <Button variant="ghost" size="icon" className="lg:hidden h-9 w-9 text-white/70 hover:text-white hover:bg-white/10" onClick={() => setIsSearchDialogOpen(true)}>
-              <Search className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="lg:hidden h-10 w-10 text-white/70 hover:text-white hover:bg-white/10" onClick={() => setIsSearchDialogOpen(true)} aria-label="Search">
+              <Search className="h-4 w-4" aria-hidden="true" />
             </Button>
 
             <ThemeToggle className="h-9 w-9 text-white/70 hover:text-white hover:bg-white/10" />
@@ -235,10 +250,10 @@ export function Header() {
               target="_blank"
               rel="noopener noreferrer"
               className="hidden md:flex h-9 w-9 items-center justify-center text-white hover:opacity-90 transition-opacity pressable rounded-lg"
-              aria-label="WhatsApp"
+              aria-label="Chat with Tamrakar Complex on WhatsApp"
               style={{ background: "#25D366" }}
             >
-              <MessageCircle className="h-4 w-4" />
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
             </a>
 
             {/* Amber Sell CTA */}
@@ -270,13 +285,16 @@ export function Header() {
 
             {/* Mobile menu toggle */}
             <Button
+              ref={mobileMenuButtonRef}
               variant="ghost"
               size="icon"
-              className="lg:hidden h-9 w-9 text-white/70 hover:text-white hover:bg-white/10"
+              className="lg:hidden h-10 w-10 text-white/70 hover:text-white hover:bg-white/10"
               onClick={() => setIsMobileMenuOpen((open) => !open)}
               aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-primary-menu"
             >
-              {isMobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              {isMobileMenuOpen ? <X className="h-4 w-4" aria-hidden="true" /> : <Menu className="h-4 w-4" aria-hidden="true" />}
             </Button>
           </div>
         </div>

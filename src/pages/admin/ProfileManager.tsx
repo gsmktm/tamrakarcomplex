@@ -342,7 +342,7 @@ export default function ProfileManager() {
 
   const referralCode = safeText(profileRow?.referral_code);
   const referralLink = referralCode
-    ? `${window.location.origin}/register?ref=${encodeURIComponent(referralCode)}`
+    ? `${window.location.origin}/auth?mode=signup&ref=${encodeURIComponent(referralCode)}`
     : "";
 
   const copyReferralLink = () => {

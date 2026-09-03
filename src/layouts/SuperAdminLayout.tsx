@@ -8,7 +8,6 @@ import {
   ChevronDown,
   ChevronRight,
   Users,
-  Store,
   Search,
   Bell,
   User,
@@ -37,6 +36,7 @@ export default function SuperAdminLayout() {
   const { permissions } = usePermissions();
   const [navQuery, setNavQuery] = useState("");
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const menuGroups = useMemo(
     () => getFilteredMenu("suadmin", role === "suadmin" ? permissions : null),
@@ -136,6 +136,7 @@ export default function SuperAdminLayout() {
             value={navQuery}
             onChange={(e) => setNavQuery(e.target.value)}
             placeholder="Search menu..."
+            aria-label="Filter super administration navigation"
             className="h-9 pl-8 rounded-xl bg-muted/40 text-sm"
           />
         </div>
@@ -231,6 +232,11 @@ export default function SuperAdminLayout() {
             </Collapsible>
           );
         })}
+        {filteredGroups.length === 0 && (
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+            No navigation items match “{navQuery.trim()}”.
+          </p>
+        )}
       </nav>
 
       {/* Sidebar footer */}
@@ -262,14 +268,14 @@ export default function SuperAdminLayout() {
             {/* Left: mobile menu + breadcrumb */}
             <div className="flex items-center gap-3">
               <div className="md:hidden">
-                <Sheet>
+                <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
                   <SheetTrigger asChild>
                     <Button variant="outline" size="icon" className="h-8 w-8">
                       <Menu className="h-4 w-4" />
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="left" className="w-64 p-0">
-                    <NavContent onNavigate={() => {}} />
+                    <NavContent onNavigate={() => setMobileNavOpen(false)} />
                   </SheetContent>
                 </Sheet>
               </div>
@@ -313,12 +319,6 @@ export default function SuperAdminLayout() {
                     <Link to="/staffadmin" className="flex items-center gap-2 cursor-pointer">
                       <Users className="h-3.5 w-3.5" />
                       Staff Admin
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/storeadmin" className="flex items-center gap-2 cursor-pointer">
-                      <Store className="h-3.5 w-3.5" />
-                      Store Admin
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>

@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { ModelPicker } from "@/components/admin/ModelPicker";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
+import { resolveStorePackageContext } from "@/lib/storePackageRuntime";
 
 export default function AccessoryManager() {
   const { user, role } = useAuth();
@@ -25,19 +27,15 @@ export default function AccessoryManager() {
   const [selectedAccessory, setSelectedAccessory] = useState<any>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { storeIds } = useStoreMembership(user?.id);
 
   // For store admins, find their store
   const { data: userStore } = useQuery({
-    queryKey: ["my-store-for-accessories", user?.id],
+    queryKey: ["my-store-for-accessories", user?.id, storeIds],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("stores")
-        .select("id")
-        .eq("owner_user_id", user?.id)
-        .maybeSingle();
-      return data;
+      return storeIds[0] ? { id: storeIds[0] } : null;
     },
-    enabled: !!user?.id && !isSuperAdmin
+    enabled: !!user?.id && !isSuperAdmin && storeIds.length > 0
   });
 
   const activeStoreId = isSuperAdmin ? storeId : userStore?.id;
@@ -47,7 +45,7 @@ export default function AccessoryManager() {
     queryFn: async () => {
       const { data } = await supabase
         .from("stores")
-        .select("id, name, package_id, store_packages(name, accessory_limit)")
+        .select("id, name, package_slug, subscription_status, subscription_end_date, package:store_packages(slug, product_limit, accessory_limit, staff_limit)")
         .eq("id", activeStoreId)
         .maybeSingle();
       return data;
@@ -78,13 +76,23 @@ export default function AccessoryManager() {
     enabled: isSuperAdmin || !!activeStoreId
   });
 
-  const accessoryLimit = (storeWithPackage?.store_packages as any)?.accessory_limit ?? -1;
+  const packageContext = resolveStorePackageContext(storeWithPackage ?? {});
+  const accessoryLimit = packageContext.entitlements.accessoryListingLimit;
   const currentAccessoryCount = accessories?.length || 0;
-  const isAtLimit = accessoryLimit >= 0 && currentAccessoryCount >= accessoryLimit;
+  const isAtLimit = currentAccessoryCount >= accessoryLimit;
 
   const createAccessory = useMutation({
     mutationFn: async (data: any) => {
       if (!activeStoreId) throw new Error("Please select or assign a store first.");
+      if (!packageContext.entitlements.canListAccessories) throw new Error("Accessories are not enabled for this store package.");
+      const { count, error: countError } = await supabase
+        .from("store_accessories")
+        .select("id", { count: "exact", head: true })
+        .eq("store_id", activeStoreId);
+      if (countError) throw countError;
+      if ((count ?? 0) >= accessoryLimit) {
+        throw new Error(`Accessory limit reached for the ${packageContext.effectivePackageSlug} package (${accessoryLimit}).`);
+      }
       const { error } = await supabase.from("store_accessories").insert({
         ...data,
         store_id: activeStoreId,

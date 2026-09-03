@@ -52,7 +52,8 @@ const PACKAGE_RANK: Record<StorePackageSlug, number> = {
 };
 
 export function normalizeStorePackage(value: string | null | undefined): StorePackageSlug {
-  if (value === "diamond" || value === "gold" || value === "silver") return value;
+  const slug = String(value ?? "").trim().toLowerCase();
+  if (slug === "diamond" || slug === "gold" || slug === "silver") return slug;
   return "free";
 }
 

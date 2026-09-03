@@ -139,7 +139,9 @@ export function Footer() {
                 Get product launches, price updates, trade-in opportunities, and repair tips in your inbox.
               </p>
               <form onSubmit={handleSubscribe} className="mx-auto flex max-w-md flex-col gap-3 sm:flex-row">
+                <label htmlFor="newsletter-email" className="sr-only">Email address</label>
                 <Input
+                  id="newsletter-email"
                   type="email"
                   placeholder="Enter your email"
                   value={email}
@@ -148,7 +150,7 @@ export function Footer() {
                   required
                 />
                 <Button type="submit" className="hero-gradient shrink-0 gap-2 hover:opacity-90" disabled={loading}>
-                  <Send className="h-4 w-4" />
+                  <Send className="h-4 w-4" aria-hidden="true" />
                   {loading ? "..." : "Subscribe"}
                 </Button>
               </form>
@@ -210,7 +212,8 @@ export function Footer() {
                     rel="noreferrer"
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
-                    <Facebook className="h-4 w-4" />
+                    <Facebook className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">Facebook</span>
                   </a>
                 ) : null}
                 {config.socialLinks.twitter && config.socialLinks.twitter !== "#" ? (
@@ -220,7 +223,8 @@ export function Footer() {
                     rel="noreferrer"
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
-                    <Twitter className="h-4 w-4" />
+                    <Twitter className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">Twitter</span>
                   </a>
                 ) : null}
                 {config.socialLinks.instagram && config.socialLinks.instagram !== "#" ? (
@@ -230,7 +234,8 @@ export function Footer() {
                     rel="noreferrer"
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
-                    <Instagram className="h-4 w-4" />
+                    <Instagram className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">Instagram</span>
                   </a>
                 ) : null}
                 {config.socialLinks.youtube && config.socialLinks.youtube !== "#" ? (
@@ -240,7 +245,8 @@ export function Footer() {
                     rel="noreferrer"
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
-                    <Youtube className="h-4 w-4" />
+                    <Youtube className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">YouTube</span>
                   </a>
                 ) : null}
                 {config.socialLinks.linkedin && config.socialLinks.linkedin !== "#" ? (
@@ -250,7 +256,8 @@ export function Footer() {
                     rel="noreferrer"
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-card/10 transition-colors hover:bg-primary hover:text-navy"
                   >
-                    <Linkedin className="h-4 w-4" />
+                    <Linkedin className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only">LinkedIn</span>
                   </a>
                 ) : null}
               </div>

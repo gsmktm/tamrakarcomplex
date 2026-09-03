@@ -15,10 +15,13 @@ const KNOWN_API_ROUTES = [
 
 function getDefinedRoutes() {
   const routes = new Set();
-  const routeFiles = fs.readdirSync(ROUTES_DIR).filter(f => f.endsWith('.tsx'));
+  const routeFiles = fs.readdirSync(ROUTES_DIR)
+    .filter(f => f.endsWith('.tsx'))
+    .map(file => path.join(ROUTES_DIR, file));
+  routeFiles.push(path.join(SRC_DIR, 'App.tsx'));
   
   routeFiles.forEach(file => {
-    const content = fs.readFileSync(path.join(ROUTES_DIR, file), 'utf8');
+    const content = fs.readFileSync(file, 'utf8');
     
     // Find parent route
     const parentMatch = content.match(/path="(\/[^"]+)"/);
@@ -68,10 +71,11 @@ function checkLinks(definedRoutes) {
     if (!file.endsWith('.tsx') && !file.endsWith('.ts')) return;
     
     const content = fs.readFileSync(file, 'utf8');
-    const linkMatches = content.matchAll(/to="([^"]+)"|href="([^"]+)"/g);
+    // Cover JSX props (`to="..."`) and navigation configuration (`href: "..."`).
+    const linkMatches = content.matchAll(/(?:to|href)\s*(?:=|:)\s*["']([^"']+)["']/g);
     
     for (const match of linkMatches) {
-      const link = match[1] || match[2];
+      const link = match[1];
       
       // Skip external links, dynamic links, anchors, and static files
       if (
@@ -80,6 +84,7 @@ function checkLinks(definedRoutes) {
         link.startsWith('#') ||
         link.startsWith('mailto:') ||
         link.startsWith('tel:') ||
+        !link.startsWith('/') ||
         link === '.' ||
         link.endsWith('.xml') ||
         link.endsWith('.txt')
@@ -95,7 +100,11 @@ function checkLinks(definedRoutes) {
       // Check if route exists (basic match, doesn't handle params like :id perfectly)
       let found = false;
       for (const route of definedRoutes) {
-        const routeRegex = new RegExp('^' + route.replace(/:[^\/]+/g, '[^/]+') + '$');
+        const routePattern = route
+          .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          .replace(/:[^/]+/g, '[^/]+')
+          .replace(/\\\/\\\*/g, '(?:/.*)?');
+        const routeRegex = new RegExp(`^${routePattern}$`);
         if (routeRegex.test(cleanLink)) {
           found = true;
           break;

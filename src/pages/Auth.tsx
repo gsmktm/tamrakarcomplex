@@ -68,9 +68,15 @@ export default function Auth() {
         ? `${locationState.from.pathname}${locationState.from.search ?? ""}${locationState.from.hash ?? ""}`
         : null;
   const queryRedirect = new URLSearchParams(location.search).get("redirect");
+  const authMode = new URLSearchParams(location.search).get("mode");
   const referralCodeFromUrl = new URLSearchParams(location.search).get("ref");
   const from = getSafeLocalRedirectPath(stateRedirect) ?? getSafeLocalRedirectPath(queryRedirect) ?? "/";
   const isRecoveryMode = location.hash.includes("type=recovery");
+
+  useEffect(() => {
+    setIsLogin(authMode !== "signup");
+    setIsResetRequestMode(false);
+  }, [authMode]);
 
   useEffect(() => {
     // Wait for BOTH user and role to be present before auto-redirecting from Auth page
@@ -523,7 +529,11 @@ export default function Auth() {
                 {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
                 <button
                   type="button"
-                  onClick={() => setIsLogin(!isLogin)}
+                  onClick={() => {
+                    const search = new URLSearchParams(location.search);
+                    search.set("mode", isLogin ? "signup" : "login");
+                    navigate(`/auth?${search.toString()}`, { replace: true });
+                  }}
                   className="text-primary font-medium hover:underline"
                 >
                   {isLogin ? "Sign Up" : "Sign In"}

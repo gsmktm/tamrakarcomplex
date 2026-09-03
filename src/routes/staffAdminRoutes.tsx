@@ -304,7 +304,7 @@ export const staffAdminRoutes = (
     <Route
       path="seo"
       element={
-        <RequireStaffAdmin module="seo_growth" action="edit">
+        <RequireStaffAdmin module="seo_growth" action="view">
           <Suspense fallback={<RouteFallback />}>
             <SeoManager />
           </Suspense>

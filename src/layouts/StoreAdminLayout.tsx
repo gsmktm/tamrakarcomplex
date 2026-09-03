@@ -1,20 +1,10 @@
-import type { ComponentType } from "react";
 import { useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Package,
-  CreditCard,
-  Wrench,
   Store,
   LogOut,
   Menu,
   ExternalLink,
-  Unlock,
-  Users,
-  Calendar,
-  Settings,
-  User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getFilteredMenu } from "@/lib/permissions";
@@ -22,26 +12,18 @@ import type { AppRole } from "@/lib/permissions";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { AdminGlobalSearch } from "@/components/admin/AdminGlobalSearch";
-
-type NavGroup = {
-  title: string;
-  items: Array<{
-    href: string;
-    icon: ComponentType<{ className?: string }>;
-    label: string;
-  }>;
-};
 
 export default function StoreAdminLayout() {
   const location = useLocation();
   const { signOut, role } = useAuth();
   const { permissions, storeAdminPermissions, storeAdminPermissionsLoaded } = usePermissions();
   const [navQuery, setNavQuery] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const panelRole: AppRole = location.pathname.startsWith("/staff") ? "staffadmin" : "storeadmin";
+  const panelRole: AppRole = "storeadmin";
   // Once grants are loaded, filter menu items by the granted module keys;
   // while loading, pass undefined so gated items stay visible (no flash).
   const effectiveStorePerms = panelRole === "storeadmin" && storeAdminPermissionsLoaded
@@ -81,6 +63,13 @@ export default function StoreAdminLayout() {
 
       <div className="p-4 border-b">
         <AdminGlobalSearch />
+        <Input
+          value={navQuery}
+          onChange={(event) => setNavQuery(event.target.value)}
+          placeholder="Filter navigation..."
+          aria-label="Filter store administration navigation"
+          className="mt-3 h-9 rounded-xl bg-muted/40"
+        />
       </div>
 
       <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-6 scrollbar-hide">
@@ -92,7 +81,7 @@ export default function StoreAdminLayout() {
             <ul className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname === item.href || (item.href !== "/storeadmin" && location.pathname.startsWith(item.href));
+                const isActive = location.pathname === item.href || (item.href !== "/storeadmin" && location.pathname.startsWith(`${item.href}/`));
                 return (
                   <li key={item.href}>
                     <Link
@@ -114,6 +103,11 @@ export default function StoreAdminLayout() {
             </ul>
           </div>
         ))}
+        {filteredGroups.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+            No navigation items match “{navQuery.trim()}”.
+          </p>
+        )}
       </nav>
 
       <div className="p-4 border-t">
@@ -138,14 +132,14 @@ export default function StoreAdminLayout() {
           <div className="flex items-center justify-between px-4 py-4 md:px-8">
             <div className="flex items-center gap-4">
               <div className="md:hidden">
-                <Sheet>
+                <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
                   <SheetTrigger asChild>
                     <Button variant="outline" size="icon">
                       <Menu className="h-5 w-5" />
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="left" className="w-72 p-0">
-                    <NavContent onNavigate={() => {}} />
+                    <NavContent onNavigate={() => setMobileNavOpen(false)} />
                   </SheetContent>
                 </Sheet>
               </div>

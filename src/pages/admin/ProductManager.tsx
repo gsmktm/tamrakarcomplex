@@ -24,8 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/useAuth";
 import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { isAdminRole } from "@/lib/roles";
-import { fetchStoreTierOverrides, resolveTierForStore } from "@/lib/storeTier";
-import { getStoreEntitlements } from "@/lib/storePackages";
+import { resolveStorePackageContext } from "@/lib/storePackageRuntime";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { ImageUploader } from "@/components/common/ImageUploader";
 import { SafeImage } from "@/components/common/SafeImage";
@@ -249,20 +248,18 @@ const ProductManager = () => {
       // ─── Package Limit Enforcement ───────────────────────────────────
       const targetStoreId = normalizeStoreId(values.store_id);
       if (isStoreAdmin && targetStoreId) {
+        if (!storeIds.includes(targetStoreId)) throw new Error("You do not have access to this store.");
         // Fetch store details to get package tier
         const { data: storeData } = await supabase
           .from("stores")
-          .select("*, store_subscriptions(packages(slug))")
+          .select("id, package_slug, subscription_status, subscription_end_date, package:store_packages(slug, product_limit, accessory_limit, staff_limit)")
           .eq("id", targetStoreId)
           .single();
         
         if (storeData) {
-          const overrides = await fetchStoreTierOverrides(supabase);
-          const sub = (storeData as any).store_subscriptions?.[0] || (storeData as any).store_subscriptions;
-          const joinedTier = sub?.packages?.slug as string | undefined;
-          const tier = resolveTierForStore({ ...storeData, subscription_tier: joinedTier }, overrides);
-          
-          const { productLimit } = getStoreEntitlements(tier);
+          const packageContext = resolveStorePackageContext(storeData);
+          const tier = packageContext.effectivePackageSlug;
+          const productLimit = packageContext.entitlements.productListingLimit;
           
           // Count existing products for this store
           const { count } = await supabase

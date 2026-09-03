@@ -18,6 +18,7 @@ interface StoreSubscriptionContext {
   rawPackageSlug: string | null;
   subscriptionStatus: string | null;
   subscriptionEndDate: string | null;
+  entitlements: ReturnType<typeof getStoreEntitlements>;
 }
 
 export function useSubscriptionLimits() {
@@ -37,7 +38,7 @@ export function useSubscriptionLimits() {
 
       let storeQuery = supabase
         .from("stores")
-        .select("id, package_slug, subscription_status, subscription_end_date, package:store_packages(slug)");
+        .select("id, package_slug, subscription_status, subscription_end_date, package:store_packages(slug, product_limit, accessory_limit, staff_limit)");
       storeQuery = membership?.store_id
         ? storeQuery.eq("id", membership.store_id)
         : storeQuery.or(`owner_id.eq.${user!.id},owner_user_id.eq.${user!.id}`).limit(1);
@@ -45,7 +46,8 @@ export function useSubscriptionLimits() {
 
       if (!store) return null;
 
-      const packageSlug = resolveStorePackageContext(store).effectivePackageSlug;
+      const packageContext = resolveStorePackageContext(store);
+      const packageSlug = packageContext.effectivePackageSlug;
 
       return {
         storeId: store.id,
@@ -53,20 +55,36 @@ export function useSubscriptionLimits() {
         rawPackageSlug: store.package_slug ?? null,
         subscriptionStatus: store.subscription_status ?? null,
         subscriptionEndDate: store.subscription_end_date ?? null,
+        entitlements: packageContext.entitlements,
       };
     },
   });
 
   const packageSlug = subscription?.packageSlug ?? "free";
-  const entitlements = getStoreEntitlements(packageSlug);
+  const entitlements = subscription?.entitlements ?? getStoreEntitlements(packageSlug);
 
   const checkLimit = (feature: Feature, currentUsage = 0): FeatureAccessResult => {
     const access = checkFeatureAccess(packageSlug, feature);
     if (!access.allowed) return access;
+    if (feature === "product" || feature === "accessory" || feature === "staff") {
+      const limit = feature === "product"
+        ? entitlements.productListingLimit
+        : feature === "accessory"
+          ? entitlements.accessoryListingLimit
+          : entitlements.staffMemberLimit;
+      return currentUsage < limit
+        ? { allowed: true, limit, currentUsage, packageSlug }
+        : { allowed: false, reason: packageSlug === "free" ? "free_limit" : "package_limit", limit, currentUsage, packageSlug };
+    }
     return checkPackageLimit(packageSlug, feature, currentUsage);
   };
 
-  const getLimitFor = (feature: Feature): number => getPackageLimit(packageSlug, feature as PackageLimitKey);
+  const getLimitFor = (feature: Feature): number => {
+    if (feature === "product") return entitlements.productListingLimit;
+    if (feature === "accessory") return entitlements.accessoryListingLimit;
+    if (feature === "staff") return entitlements.staffMemberLimit;
+    return getPackageLimit(packageSlug, feature as PackageLimitKey);
+  };
 
   return {
     checkLimit,

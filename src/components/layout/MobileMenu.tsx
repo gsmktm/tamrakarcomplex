@@ -37,8 +37,8 @@ export function MobileMenu({
   if (!isOpen) return null;
 
   return (
-    <nav className="animate-fade-in-up border-b border-border bg-background/96 backdrop-blur-md lg:hidden">
-      <div className="container space-y-4 py-4">
+    <nav id="mobile-primary-menu" aria-label="Mobile primary" className="animate-fade-in-up max-h-[calc(100dvh-3.5rem)] overflow-y-auto overscroll-contain border-b border-border bg-background/96 shadow-xl backdrop-blur-md lg:hidden">
+      <div className="container space-y-2 py-4">
         {user ? (
           <Link
             to="/user"
@@ -46,7 +46,7 @@ export function MobileMenu({
             onClick={onClose}
           >
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4" />
+              <User className="h-4 w-4" aria-hidden="true" />
               My Dashboard
             </div>
           </Link>
@@ -58,7 +58,7 @@ export function MobileMenu({
             onClick={onClose}
           >
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4" />
+              <User className="h-4 w-4" aria-hidden="true" />
               Sign In to Your Account
             </div>
           </Link>

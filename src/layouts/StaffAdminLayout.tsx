@@ -1,52 +1,25 @@
-import type { ComponentType } from "react";
 import { useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Package,
-  CreditCard,
-  ShoppingBag,
-  Wrench,
-  Store,
-  FileText,
-  MessageSquare,
-  Settings,
-  Users,
-  User as UserIcon,
-  Calendar,
   LogOut,
   Menu,
-  Database,
   ExternalLink,
-  BarChart3,
-  Unlock,
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getFilteredMenu } from "@/lib/permissions";
-import type { AppRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-
-type NavGroup = {
-  title: string;
-  items: Array<{
-    href: string;
-    icon: ComponentType<{ className?: string }>;
-    label: string;
-  }>;
-};
-
-
 
 export default function StaffAdminLayout() {
   const location = useLocation();
   const { role, signOut } = useAuth();
-  const { permissions, isLoading: permissionsLoading } = usePermissions();
+  const { permissions } = usePermissions();
   const [navQuery, setNavQuery] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const menuGroups = useMemo(
     () => getFilteredMenu("staffadmin", role === "staffadmin" ? permissions : null),
@@ -81,6 +54,7 @@ export default function StaffAdminLayout() {
           value={navQuery}
           onChange={(e) => setNavQuery(e.target.value)}
           placeholder="Search menu..."
+          aria-label="Filter staff administration navigation"
           className="h-10 rounded-xl bg-muted/40"
         />
       </div>
@@ -94,7 +68,7 @@ export default function StaffAdminLayout() {
             <ul className="space-y-1">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname === item.href || (item.href !== "/staffadmin" && location.pathname.startsWith(item.href));
+                const isActive = location.pathname === item.href || (item.href !== "/staffadmin" && location.pathname.startsWith(`${item.href}/`));
                 return (
                   <li key={item.href}>
                     <Link
@@ -116,6 +90,11 @@ export default function StaffAdminLayout() {
             </ul>
           </div>
         ))}
+        {filteredGroups.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+            No navigation items match “{navQuery.trim()}”.
+          </p>
+        )}
       </nav>
 
       <div className="p-4 border-t">
@@ -142,14 +121,14 @@ export default function StaffAdminLayout() {
           <div className="flex items-center justify-between px-4 py-4 md:px-8">
             <div className="flex items-center gap-4">
               <div className="md:hidden">
-                <Sheet>
+                <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
                   <SheetTrigger asChild>
                     <Button variant="outline" size="icon">
                       <Menu className="h-5 w-5" />
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="left" className="w-72 p-0">
-                    <NavContent onNavigate={() => {}} />
+                    <NavContent onNavigate={() => setMobileNavOpen(false)} />
                   </SheetContent>
                 </Sheet>
               </div>

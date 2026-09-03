@@ -23,10 +23,18 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { StoreRow, PackageRow, StoreSubscriptionRow } from "@/types/app";
+import { StoreRow, PackageRow } from "@/types/app";
+import { useStoreMembership } from "@/hooks/useStoreMembership";
+import { resolveStorePackageContext } from "@/lib/storePackageRuntime";
+import { STORE_THEME_OPTIONS, sanitizeThemeForPackage } from "@/lib/storeThemeBuilder";
 
 interface StoreWithSubscriptions extends StoreRow {
-  store_subscriptions?: (StoreSubscriptionRow & { packages?: PackageRow })[] | null;
+  package?: PackageRow | null;
+  package_slug?: string | null;
+  theme_slug?: string | null;
+  slug?: string | null;
+  status?: string | null;
+  marketplace_commission?: number | null;
 }
 import { SEO } from "@/components/common/SEO";
 import { cn, getErrorMessage } from "@/lib/utils";
@@ -86,10 +94,12 @@ import { Palette } from "lucide-react";
 
 export default function StoreManage({ storeId }: { storeId?: string }) {
   const { id: paramId } = useParams();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const location = useLocation();
+  const { storeIds, isLoading: membershipLoading } = useStoreMembership(user?.id);
+  const isPlatformAdmin = role === "suadmin" || role === "staffadmin";
 
   // If used in /storeadmin/profile, we might not have an ID in params
   const isPanel = location.pathname.startsWith("/storeadmin");
@@ -112,15 +122,16 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
     isError: isStoreError,
     error: storeError,
   } = useQuery<StoreWithSubscriptions>({
-    queryKey: ["store-manage", requestedStore],
+    queryKey: ["store-manage", requestedStore, user?.id, role, storeIds],
     queryFn: async () => {
       let query = supabase
         .from("stores")
-        .select("*, store_subscriptions(*, packages(*))");
+        .select("*, package:store_packages(*)");
 
       query = requestedStoreIsUuid
         ? query.eq("id", requestedStore!)
         : query.eq("slug", requestedStore!);
+      if (!isPlatformAdmin) query = query.in("id", storeIds);
 
       const { data, error } = await query.maybeSingle();
       if (error) throw error;
@@ -128,22 +139,24 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
       
       // Sync local state with fetched data
       if (data) {
+        const effectivePackage = resolveStorePackageContext(data).effectivePackageSlug;
         setMarketplaceValues({
           status: data.status || "active",
-          theme_slug: data.theme_slug || "default",
+          theme_slug: sanitizeThemeForPackage(effectivePackage, data.theme_slug),
         });
       }
       
       return data;
     },
-    enabled: !!requestedStore,
+    enabled: !!requestedStore && !!user?.id && (isPlatformAdmin || !membershipLoading),
     retry: 1,
   });
   const resolvedStoreId = store?.id;
+  const packageContext = resolveStorePackageContext(store ?? {});
   const publicStorePath = `/stores/${store?.slug || requestedStore || ""}`;
 
   useEffect(() => {
-    if (store && user && store.owner_id !== user.id) {
+    if (store && user && !isPlatformAdmin && !storeIds.includes(store.id)) {
       const checkAdmin = async () => {
         const { data } = await supabase
           .from("user_roles")
@@ -160,7 +173,7 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
 
       checkAdmin();
     }
-  }, [navigate, publicStorePath, store, user]);
+  }, [isPlatformAdmin, navigate, publicStorePath, store, storeIds, user]);
 
   const { data: pages } = useQuery<StorePageRow[]>({
     queryKey: ["store_pages", resolvedStoreId],
@@ -314,7 +327,10 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
 
   const handleUpdateMarketplace = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    updateStoreMutation.mutate(marketplaceValues);
+    updateStoreMutation.mutate({
+      ...marketplaceValues,
+      theme_slug: sanitizeThemeForPackage(packageContext.effectivePackageSlug, marketplaceValues.theme_slug),
+    } as StoreUpdate);
   };
 
   const handleSubmitPage = (e: React.FormEvent<HTMLFormElement>) => {
@@ -570,13 +586,12 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
                             <SelectValue placeholder="Select Theme" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="default">Default Dark</SelectItem>
-                            <SelectItem value="emerald">Emerald Teal</SelectItem>
-                            <SelectItem value="rose">Rose Pink</SelectItem>
-                            <SelectItem value="amber">Amber Gold</SelectItem>
+                            {STORE_THEME_OPTIONS.filter((theme) => packageContext.entitlements.availableThemes.includes(theme.slug)).map((theme) => (
+                              <SelectItem key={theme.slug} value={theme.slug}>{theme.label}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
-                        <p className="text-[10px] text-muted-foreground">Premium themes are for Diamond & Gold partners.</p>
+                        <p className="text-[10px] text-muted-foreground">Available themes follow the store's active package.</p>
                       </div>
                     </div>
                   </div>
@@ -593,7 +608,7 @@ export default function StoreManage({ storeId }: { storeId?: string }) {
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">Subscription Tier</Label>
-                        <div className="text-xl font-bold capitalize">{store.store_subscriptions?.[0]?.packages?.slug || 'Basic'}</div>
+                        <div className="text-xl font-bold capitalize">{packageContext.effectivePackageSlug === "free" ? "Basic" : packageContext.effectivePackageSlug}</div>
                         <Link to="/storeadmin/my-subscription" className="text-[10px] text-primary hover:underline">Change Plan</Link>
                       </div>
                     </div>

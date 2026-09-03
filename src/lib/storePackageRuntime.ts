@@ -11,6 +11,11 @@ export type StorePackageRecord = {
   staff_limit?: number | null;
 };
 
+function runtimeLimit(value: number | null | undefined, fallback: number): number {
+  if (value == null || !Number.isFinite(value)) return fallback;
+  return value < 0 ? Number.MAX_SAFE_INTEGER : Math.floor(value);
+}
+
 export type StoreSubscriptionRecord = {
   status?: string | null;
   is_enabled?: boolean | null;
@@ -52,6 +57,13 @@ export function resolveStorePackageContext(store: StorePackageSource) {
       })
     : "free";
 
+  const entitlements = buildEntitlements(effectivePackageSlug);
+  if (joinedPackage && effectivePackageSlug !== "free") {
+    entitlements.productListingLimit = runtimeLimit(joinedPackage.product_limit, entitlements.productListingLimit);
+    entitlements.accessoryListingLimit = runtimeLimit(joinedPackage.accessory_limit, entitlements.accessoryListingLimit);
+    entitlements.staffMemberLimit = runtimeLimit(joinedPackage.staff_limit, entitlements.staffMemberLimit);
+  }
+
   return {
     rawPackageSlug,
     effectivePackageSlug,
@@ -59,7 +71,7 @@ export function resolveStorePackageContext(store: StorePackageSource) {
     subscriptionStatus,
     subscriptionEndDate,
     billingCycle: legacySubscription?.billing_cycle ?? joinedPackage?.billing_cycle ?? "monthly",
-    entitlements: buildEntitlements(effectivePackageSlug),
+    entitlements,
     isActivePaid: effectivePackageSlug !== "free",
   };
 }

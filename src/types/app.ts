@@ -75,7 +75,17 @@ export type OrderInsert = TablesInsert<"orders">;
 export type OrderItemRow = Tables<"order_items">;
 export type OrderItemInsert = TablesInsert<"order_items">;
 
-export type PackageRow = Tables<"packages">;
+export type PackageRow = {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  billing_cycle: string;
+  product_limit: number;
+  accessory_limit: number;
+  staff_limit: number;
+  [key: string]: unknown;
+};
 export type StoreSubscriptionRow = Tables<"store_subscriptions">;
 export type SubscriptionPaymentRow = Tables<"subscription_payments">;
 export type SubscriptionLogRow = Tables<"subscription_logs">;

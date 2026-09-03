@@ -87,7 +87,7 @@ function hasActiveSubscription(subscriptionStatus?: string | null, subscriptionE
   if (String(subscriptionStatus ?? "").toLowerCase() !== "active") return false;
   if (!subscriptionEndDate) return true;
   const end = new Date(subscriptionEndDate);
-  if (Number.isNaN(end.getTime())) return true;
+  if (Number.isNaN(end.getTime())) return false;
   return end.getTime() > Date.now();
 }
 
@@ -127,6 +127,7 @@ export function canBeFeaturedThisCycle(input: {
   subscriptionStatus?: string | null;
   subscriptionEndDate?: string | null;
 }): boolean {
+  if (input.subscriptionStatus != null && !hasActiveSubscription(input.subscriptionStatus, input.subscriptionEndDate)) return false;
   // Cannot be featured on free package unless yearly
   if (input.packageSlug === "free" && !input.isYearly) return false;
   

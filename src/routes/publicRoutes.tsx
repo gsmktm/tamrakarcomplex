@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, useParams } from "react-router-dom";
+import { Navigate, Route, useLocation, useParams } from "react-router-dom";
 import { RequireAuth } from "@/routes/RequireAuth";
 import { ParamRouteRedirect } from "@/components/routing/ParamRouteRedirect";
 import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
@@ -89,10 +89,23 @@ function RedirectArticleToStores() {
   return <Navigate to={slug ? `/stores/article/${slug}` : "/stores/article"} replace />;
 }
 
+function RedirectAuthAlias({ mode }: { mode: "login" | "signup" }) {
+  const location = useLocation();
+  const search = new URLSearchParams(location.search);
+  search.set("mode", mode);
+  const query = search.toString();
+  return <Navigate to={`/auth${query ? `?${query}` : ""}${location.hash}`} replace />;
+}
+
 export const publicRoutes = (
   <>
     <Route path="/" element={<Index />} />
     <Route path="/auth" element={withSuspense(Auth)} />
+    <Route path="/login" element={<RedirectAuthAlias mode="login" />} />
+    <Route path="/sign-in" element={<RedirectAuthAlias mode="login" />} />
+    <Route path="/register" element={<RedirectAuthAlias mode="signup" />} />
+    <Route path="/signup" element={<RedirectAuthAlias mode="signup" />} />
+    <Route path="/sign-up" element={<RedirectAuthAlias mode="signup" />} />
     <Route path="/unauthorized" element={withSuspense(Unauthorized)} />
     <Route path="/checkout" element={<RequireAuth>{withSuspense(Checkout)}</RequireAuth>} />
     <Route path="/order-success" element={withSuspense(OrderSuccess)} />

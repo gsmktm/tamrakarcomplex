@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn, getErrorMessage } from "@/lib/utils";
-import { resolveEffectiveStorePackage } from "@/lib/storeEntitlements";
+import { resolveStorePackageContext, type StorePackageRecord } from "@/lib/storePackageRuntime";
 import { getPublicStorePath } from "@/lib/storeRoutes";
 import {
   OPENING_DAYS,
@@ -58,6 +58,7 @@ type BuilderStore = {
   package_slug: string | null;
   subscription_status: string | null;
   subscription_end_date: string | null;
+  package?: StorePackageRecord | null;
 };
 
 type ProductOption = {
@@ -120,7 +121,7 @@ export default function StoreThemeBuilder() {
         "logo_url", "cover_image_url", "services", "services_json", "opening_hours",
         "social_links_json", "featured_product_ids", "theme_slug", "theme_color",
         "banner_json", "custom_design_json", "package_slug", "subscription_status",
-        "subscription_end_date",
+        "subscription_end_date", "package:store_packages(slug, product_limit, accessory_limit, staff_limit)",
       ].join(",");
 
       if (platformMode && routeStoreId) {
@@ -145,19 +146,19 @@ export default function StoreThemeBuilder() {
   });
 
   const { data: products } = useQuery({
-    queryKey: ["store-theme-products", store?.owner_id, store?.id],
+    queryKey: ["store-theme-products", store?.id],
     queryFn: async () => {
-      if (!store?.owner_id) return [];
+      if (!store?.id) return [];
       const { data, error } = await supabase
         .from("sell_listings")
         .select("id, title, price, image_url")
-        .eq("user_id", store.owner_id)
+        .eq("store_id", store.id)
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) throw error;
       return (data ?? []) as ProductOption[];
     },
-    enabled: !!store?.owner_id,
+    enabled: !!store?.id,
   });
 
   const [form, setForm] = useState<Partial<BuilderStore> | null>(null);
@@ -165,7 +166,7 @@ export default function StoreThemeBuilder() {
 
   useEffect(() => {
     if (!store) return;
-    const packageSlug = resolveEffectiveStorePackage(store);
+    const packageSlug = resolveStorePackageContext(store).effectivePackageSlug;
     setForm({
       ...store,
       theme_slug: sanitizeThemeForPackage(packageSlug, store.theme_slug),
@@ -177,17 +178,14 @@ export default function StoreThemeBuilder() {
     });
   }, [store]);
 
-  const packageSlug = resolveEffectiveStorePackage({
-    package_slug: activeStore?.package_slug,
-    subscription_status: activeStore?.subscription_status,
-    subscription_end_date: activeStore?.subscription_end_date,
-  });
+  const packageContext = resolveStorePackageContext(activeStore ?? {});
+  const packageSlug = packageContext.effectivePackageSlug;
   const allowedThemes = useMemo(() => allowedStoreThemes(packageSlug), [packageSlug]);
   const selectedTheme = sanitizeThemeForPackage(packageSlug, activeStore?.theme_slug);
-  const canEditColor = packageSlug === "silver" || packageSlug === "gold" || packageSlug === "diamond";
-  const canEditLayout = packageSlug === "gold" || packageSlug === "diamond";
-  const canUseBanner = packageSlug === "gold" || packageSlug === "diamond";
-  const canFeatureProducts = packageSlug !== "free";
+  const canEditColor = packageContext.entitlements.canEditThemeColors;
+  const canEditLayout = packageContext.entitlements.canEditThemeLayout;
+  const canUseBanner = packageContext.entitlements.canCustomizeBanner;
+  const canFeatureProducts = packageContext.entitlements.canListProducts;
 
   const updateField = <K extends keyof BuilderStore>(key: K, value: BuilderStore[K]) => {
     setForm((current) => ({ ...(current ?? {}), [key]: value }));

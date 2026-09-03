@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ArrowRight, Phone } from "lucide-react";
 import {
   NavigationMenu,
@@ -42,8 +41,8 @@ export function NavigationBar({
   siteNavigationGroups,
   visibleQuickItems,
 }: NavigationBarProps) {
-  const navigate = useNavigate();
-  const [openMenu, setOpenMenu] = useState("");
+  const { pathname } = useLocation();
+  const isCurrent = (href: string) => href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <div
@@ -54,12 +53,12 @@ export function NavigationBar({
       }}
     >
       <div className="container flex h-12 items-center overflow-x-auto no-scrollbar">
-        <NavigationMenu value={openMenu} onValueChange={setOpenMenu} className="max-w-full">
+        <NavigationMenu className="max-w-full">
           <NavigationMenuList className="flex-nowrap gap-0">
             {/* Home */}
             <NavigationMenuItem>
               <NavigationMenuLink asChild>
-                <Link to={topLevelHomeItem.href} className={navLink}>
+                <Link to={topLevelHomeItem.href} className={navLink} aria-current={isCurrent(topLevelHomeItem.href) ? "page" : undefined}>
                   {topLevelHomeItem.name}
                 </Link>
               </NavigationMenuLink>
@@ -68,7 +67,7 @@ export function NavigationBar({
             {/* Stores */}
             <NavigationMenuItem>
               <NavigationMenuLink asChild>
-                <Link to="/stores" className={navLink}>
+                <Link to="/stores" className={navLink} aria-current={isCurrent("/stores") ? "page" : undefined}>
                   Stores
                 </Link>
               </NavigationMenuLink>
@@ -77,7 +76,7 @@ export function NavigationBar({
             {/* Marketplace */}
             <NavigationMenuItem>
               <NavigationMenuLink asChild>
-                <Link to="/marketplace" className={navLink}>
+                <Link to="/marketplace" className={navLink} aria-current={isCurrent("/marketplace") ? "page" : undefined}>
                   Marketplace
                 </Link>
               </NavigationMenuLink>
@@ -86,7 +85,7 @@ export function NavigationBar({
             {/* Repair */}
             <NavigationMenuItem>
               <NavigationMenuLink asChild>
-                <Link to="/repair" className={navLink}>
+                <Link to="/repair" className={navLink} aria-current={isCurrent("/repair") ? "page" : undefined}>
                   Repair
                 </Link>
               </NavigationMenuLink>
@@ -95,7 +94,7 @@ export function NavigationBar({
             {/* Unlocking */}
             <NavigationMenuItem>
               <NavigationMenuLink asChild>
-                <Link to="/unlocking" className={navLink}>
+                <Link to="/unlocking" className={navLink} aria-current={isCurrent("/unlocking") ? "page" : undefined}>
                   Unlocking
                 </Link>
               </NavigationMenuLink>
@@ -109,13 +108,11 @@ export function NavigationBar({
                     navTrigger,
                     "bg-transparent hover:bg-transparent data-[state=open]:bg-transparent",
                   )}
-                  onPointerEnter={() => setOpenMenu(group.name)}
-                  onPointerLeave={() => setOpenMenu("")}
-                  onClick={() => { navigate(group.href); setOpenMenu(""); }}
+                  aria-label={`${group.name} menu`}
                 >
                   {group.name}
                 </NavigationMenuTrigger>
-                <NavigationMenuContent onPointerEnter={() => setOpenMenu(group.name)} onPointerLeave={() => setOpenMenu("")}>
+                <NavigationMenuContent>
                   <div className="w-[540px] p-5">
                     <div className="mb-4 pb-3 border-b border-border">
                       <Link
@@ -161,7 +158,7 @@ export function NavigationBar({
             {visibleQuickItems.map((category) => (
               <NavigationMenuItem key={category.name}>
                 <NavigationMenuLink asChild>
-                  <Link to={category.href} className={navLink}>
+                  <Link to={category.href} className={navLink} aria-current={isCurrent(category.href.split("?")[0]) ? "page" : undefined}>
                     {category.name}
                   </Link>
                 </NavigationMenuLink>
@@ -176,7 +173,7 @@ export function NavigationBar({
           className="ml-auto hidden xl:flex items-center gap-1.5 text-xs font-medium transition-colors pressable hover:opacity-90"
           style={{ color: "oklch(78% 0.165 65 / 0.80)" }}
         >
-          <Phone className="h-3 w-3" style={{ color: "oklch(78% 0.165 65)" }} />
+          <Phone className="h-3 w-3" style={{ color: "oklch(78% 0.165 65)" }} aria-hidden="true" />
           +977-015351731
         </a>
       </div>

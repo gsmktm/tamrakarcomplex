@@ -95,6 +95,7 @@ app.get("/health", (req, res) => {
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://tvgmnjuexdgtgtqhrjok.supabase.co";
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_4-Yq_PD4j8sVEsn1ZM1-Mw_ZDPUAd5v";
 const BASE_URL = (process.env.SITE_URL || "https://tamrakarcomplex.com").replace(/\/$/, "");
+const SUPABASE_REQUEST_TIMEOUT_MS = 5000;
 
 const STATIC_URLS = [
   { loc: "/",                  changefreq: "daily",  priority: "1.0" },
@@ -130,7 +131,7 @@ async function supabaseFetch(table, select, filters) {
   let url = `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}`;
   if (filters) url += `&${filters}`;
   return new Promise((resolve) => {
-    https.get(url, {
+    const req = https.get(url, {
       headers: {
         apikey: SUPABASE_KEY,
         Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -141,9 +142,12 @@ async function supabaseFetch(table, select, filters) {
       let raw = "";
       res.on("data", (chunk) => { raw += chunk; });
       res.on("end", () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) return resolve([]);
         try { resolve(JSON.parse(raw)); } catch { resolve([]); }
       });
-    }).on("error", () => resolve([]));
+    });
+    req.setTimeout(SUPABASE_REQUEST_TIMEOUT_MS, () => req.destroy(new Error("Supabase request timed out")));
+    req.on("error", () => resolve([]));
   });
 }
 
@@ -176,6 +180,7 @@ async function supabaseRpcPage(functionName, from = 0, to = 999) {
         }
       });
     });
+    req.setTimeout(SUPABASE_REQUEST_TIMEOUT_MS, () => req.destroy(new Error("Supabase RPC timed out")));
     req.on("error", () => resolve([]));
     req.write("{}");
     req.end();

@@ -26,6 +26,7 @@ import { useVisitorTracking } from "@/hooks/useVisitorTracking";
 import { MaintenanceGate } from "@/components/system/MaintenanceGate";
 import { ErrorBoundary } from "@/components/system/ErrorBoundary";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
 
 import "@/styles/dynamic-theme.css";
 
@@ -79,7 +80,7 @@ const AppContent = () => {
             {staffAdminRoutes}
             {/* Redirect from legacy /admin to /staffadmin */}
             <Route path="/admin" element={<Navigate to="/staffadmin" replace />} />
-            <Route path="/admin/*" element={<Navigate to="/staffadmin" replace />} />
+            <Route path="/admin/*" element={<WildcardRedirect from="/admin" to="/staffadmin" />} />
             <Route
               path="/suadmin"
               element={

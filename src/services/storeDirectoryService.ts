@@ -3,8 +3,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { STORES } from "@/data/storeData";
 import { BASIC_TAMRAKAR_STORES } from "@/data/basicStoreData";
-import { getStoreEntitlements, getStoreSortOrder, validateStoreAgainstPackage } from "@/lib/storePackages";
-import { resolveEffectiveStorePackage } from "@/lib/storeEntitlements";
+import { getStoreSortOrder, validateStoreAgainstPackage } from "@/lib/storePackages";
+import { resolveStorePackageContext, type StorePackageRecord } from "@/lib/storePackageRuntime";
 import { slugify } from "@/lib/utils";
 
 export interface StoreDirectoryItem {
@@ -78,7 +78,7 @@ async function withStoreQueryTimeout<T>(promise: PromiseLike<T>, timeoutMs = 300
   ]);
 }
 
-function normalizeStore(store: Partial<StoreDirectoryItem> & { package?: { slug: string } | null }): StoreDirectoryItem & { sort_order: number } {
+export function normalizeStore(store: Partial<StoreDirectoryItem> & { package?: StorePackageRecord | null; store_packages?: StorePackageRecord | null }): StoreDirectoryItem & { sort_order: number } {
   const legacyStore = store as Partial<StoreDirectoryItem> & {
     plan_slug?: string;
     subscription_tier?: string;
@@ -86,12 +86,11 @@ function normalizeStore(store: Partial<StoreDirectoryItem> & { package?: { slug:
   };
   
   // Prefer package.slug from join (source of truth), fall back to package_slug column, then subscription_tier
-  const sourceSlug = store.package?.slug || store.package_slug || legacyStore.plan_slug || legacyStore.subscription_tier;
-  const packageSlug = resolveEffectiveStorePackage({
-    package_slug: sourceSlug,
-    subscription_status: store.subscription_status,
-    subscription_end_date: store.subscription_end_date,
+  const packageContext = resolveStorePackageContext({
+    ...store,
+    package_slug: store.package_slug || legacyStore.plan_slug || legacyStore.subscription_tier,
   });
+  const packageSlug = packageContext.effectivePackageSlug;
   const hasActivePackage = packageSlug !== "free";
   const normalizedName = String(store.name ?? "store").trim();
   const fallbackSlug = slugify(normalizedName) || String(store.id ?? "");
@@ -121,8 +120,8 @@ function normalizeStore(store: Partial<StoreDirectoryItem> & { package?: { slug:
     logo_url: store.logo_url,
     cover_image_url: store.banner_url || store.cover_image_url,
     banner_url: store.banner_url || store.cover_image_url,
-    is_verified: Boolean(store.is_verified),
-    is_featured: Boolean(store.is_featured),
+    is_verified: Boolean(store.is_verified) && packageContext.entitlements.canHaveVerifiedBadge,
+    is_featured: Boolean(store.is_featured) && packageContext.entitlements.canBeFeatured,
     package_slug: packageSlug,
     subscription_status: store.subscription_status || "inactive",
     subscription_tier: packageSlug,
@@ -133,9 +132,9 @@ function normalizeStore(store: Partial<StoreDirectoryItem> & { package?: { slug:
     services_json: Array.isArray(store.services_json) ? store.services_json : normalizeServices(store),
     opening_hours: store.opening_hours || {},
     social_links_json: store.social_links_json || {},
-    theme_slug: store.theme_slug || "basic",
+    theme_slug: packageContext.entitlements.availableThemes.includes(store.theme_slug || "basic") ? store.theme_slug || "basic" : "basic",
     status: store.status || "active",
-    entitlements: getStoreEntitlements(packageSlug),
+    entitlements: packageContext.entitlements,
     sort_order: getStoreSortOrder(packageSlug),
   };
 }
@@ -260,7 +259,7 @@ export const storeDirectoryService = {
       .from("stores")
       .select(`
         *,
-        package:store_packages(slug)
+        package:store_packages(slug, product_limit, accessory_limit, staff_limit)
       `)
       .eq("status", "active")
       .eq("public_status", "published")
@@ -268,8 +267,7 @@ export const storeDirectoryService = {
       .order("is_verified", { ascending: false });
 
     if (filters?.package_slug) {
-      // Filter by package slug using the joined package data, with fallback to package_slug column
-      query = query.or(`package.slug.eq.${filters.package_slug},package_slug.eq.${filters.package_slug}`);
+      query = query.eq("package_slug", filters.package_slug);
     }
     if (filters?.complex_zone) {
       query = query.eq("complex_zone", filters.complex_zone);
@@ -348,7 +346,7 @@ export const storeDirectoryService = {
       .single();
 
     if (error && !String(error.message || "").includes("Could not find a relationship")) throw error;
-    if (data) return { ...data, entitlements: getStoreEntitlements(resolveEffectiveStorePackage(data)) };
+    if (data) return normalizeStore({ ...data, package: (data as any).store_packages });
 
     const local = findLocalStoreFallback({ type: "slug", value: slug });
     if (local) return normalizeStore(local);
@@ -402,15 +400,14 @@ export const storeDirectoryService = {
       return local ? normalizeStore(local) : null;
     }
 
-    const normalized = normalizeStore(data);
-    return { ...normalized, entitlements: getStoreEntitlements(normalized.package_slug) };
+    return normalizeStore(data);
   },
 
   // Get store products (if allowed by package)
   async getStoreProducts(storeId: string) {
     const store = await this.getStoreByIdentifier({ type: 'id', value: storeId });
 
-    if (!store.entitlements.productListing) {
+    if (!store?.entitlements.canListProducts) {
       return [];
     }
 
@@ -430,7 +427,7 @@ export const storeDirectoryService = {
   async getStoreListings(storeId: string) {
     const store = await this.getStoreByIdentifier({ type: 'id', value: storeId });
 
-    if (!store.entitlements.marketplaceEnabled) {
+    if (!store?.entitlements.canEnableMarketplace) {
       return [];
     }
 
@@ -468,12 +465,19 @@ export const storeDirectoryService = {
   },
 
   async getStoreAdminProfile(userId: string) {
-    const { data, error } = await supabase
-      .from("stores")
-      .select("*, store_packages(*)")
-      .or(`owner_user_id.eq.${userId},owner_id.eq.${userId}`)
-      .limit(1)
-      .maybeSingle();
+    const { data: memberships, error: membershipError } = await supabase
+      .from("store_admins")
+      .select("store_id")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .limit(1);
+    if (membershipError) throw membershipError;
+
+    let query = supabase.from("stores").select("*, package:store_packages(*)");
+    query = memberships?.[0]?.store_id
+      ? query.eq("id", memberships[0].store_id)
+      : query.or(`owner_user_id.eq.${userId},owner_id.eq.${userId}`);
+    const { data, error } = await query.limit(1).maybeSingle();
     if (error) throw error;
     return data;
   },

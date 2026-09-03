@@ -159,6 +159,10 @@
     font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   }
 
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* Clear the fixed mobile BottomNav (h-14 = 56px) + safe area; desktop unaffected */
   @media (max-width: 767px) {
     body { padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)); }
@@ -192,6 +196,15 @@
   ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
   .dark ::-webkit-scrollbar-thumb { background: #475569; }
   .dark ::-webkit-scrollbar-thumb:hover { background: #64748B; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ── Entrance animations ── */

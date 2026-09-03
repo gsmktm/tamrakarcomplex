@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { STORE_APPLICATIONS_COLUMNS } from "@/lib/supabaseColumnMaps";
@@ -83,6 +83,10 @@ function isSchemaMissingError(error: unknown) {
 }
 
 export default function StoreApplicationManager() {
+  const location = useLocation();
+  const isStaffPanel = location.pathname.startsWith("/staffadmin");
+  const storeNetworkPath = isStaffPanel ? "/staffadmin/stores" : "/suadmin/store-network";
+  const subscriptionsPath = isStaffPanel ? "/staffadmin/subscriptions" : "/suadmin/subscriptions";
   const [selectedApp, setSelectedApp] = useState<StoreApplication | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [search, setSearch] = useState("");
@@ -273,7 +277,7 @@ export default function StoreApplicationManager() {
                     Retry
                   </Button>
                   <Button asChild size="sm">
-                    <Link to="/suadmin/store-network">Open Store Network Flow</Link>
+                    <Link to={storeNetworkPath}>Open Store Network Flow</Link>
                   </Button>
                 </div>
               </div>
@@ -557,7 +561,7 @@ export default function StoreApplicationManager() {
               </>
             )}
             {selectedApp?.status === 'approved' && (
-              <Button asChild variant="outline"><Link to="/suadmin/subscriptions"><CreditCard className="mr-2 h-4 w-4" />Review subscription/payment</Link></Button>
+              <Button asChild variant="outline"><Link to={subscriptionsPath}><CreditCard className="mr-2 h-4 w-4" />Review subscription/payment</Link></Button>
             )}
             <Button variant="ghost" onClick={() => setSelectedApp(null)}>
               Close

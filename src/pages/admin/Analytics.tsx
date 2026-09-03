@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { getPublicStorePath } from "@/lib/storeRoutes";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d"];
@@ -68,6 +68,10 @@ interface TopStoreItem {
 }
 
 export default function Analytics() {
+  const location = useLocation();
+  const ordersPath = location.pathname.startsWith("/staffadmin")
+    ? "/staffadmin/orders"
+    : "/suadmin/orders";
   const [visitorPeriod, setVisitorPeriod] = useState<"daily" | "weekly" | "monthly" | "yearly">("monthly");
   
   const { data: stats, isLoading, error: statsError } = useQuery({
@@ -396,7 +400,7 @@ export default function Analytics() {
                   <CardDescription>The latest transactions across all stores.</CardDescription>
                 </div>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/suadmin/orders">View All <ArrowRight className="ml-2 h-4 w-4" /></Link>
+                  <Link to={ordersPath}>View All <ArrowRight className="ml-2 h-4 w-4" /></Link>
                 </Button>
               </CardHeader>
               <CardContent>
