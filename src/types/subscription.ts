@@ -10,6 +10,7 @@ export interface Package {
   promo_slot_limit: number;
   features_json: string[];
   is_active: boolean;
+  is_popular?: boolean;
   sort_order: number;
 }
 

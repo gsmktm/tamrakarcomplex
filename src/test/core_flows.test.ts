@@ -269,13 +269,27 @@ describe("Core Business Logic Tests", () => {
 
     it("store admin edits only own store", async () => {
       const mockStore = { id: "1", name: "My Store", location: "Kathmandu" };
-      vi.mocked(supabase.from).mockReturnValue({
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockReturnThis(),
-        then: vi.fn((cb) => Promise.resolve(cb({ data: mockStore, error: null }))),
-      } as any);
+      vi.mocked(supabase.from).mockImplementation(((table: string) => {
+        if (table === "stores") {
+          // getStoreByIdentifier fetch (select chain -> maybeSingle)
+          return {
+            select: vi.fn().mockReturnThis(),
+            or: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn(() => Promise.resolve({ data: mockStore, error: null })),
+            update: vi.fn().mockReturnThis(),
+            single: vi.fn(() => Promise.resolve({ data: mockStore, error: null })),
+            then: vi.fn((cb: (v: unknown) => unknown) => Promise.resolve(cb({ data: mockStore, error: null }))),
+          } as any;
+        }
+        return {
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockReturnThis(),
+          then: vi.fn((cb: (v: unknown) => unknown) => Promise.resolve(cb({ data: mockStore, error: null }))),
+        } as any;
+      }) as any);
 
       const result = await storeDirectoryService.updateStore("1", { name: "Updated Store" });
       expect(result.name).toBe("My Store");

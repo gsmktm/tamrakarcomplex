@@ -448,6 +448,9 @@ export default function StoreDetail() {
     queryKey: ["store_products", store?.id],
     queryFn: async () => {
       if (!store?.id) return [];
+      // Local-seed stores carry slug-shaped ids; their uuid store_id tables
+      // would 400 on the eq filter, so skip the query entirely.
+      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(store.id)) return [];
 
       const { data, error } = await supabase
         .from("sell_listings")
@@ -487,6 +490,7 @@ export default function StoreDetail() {
     queryKey: ["store_reviews", store?.id],
     queryFn: async () => {
       if (!store?.id) return [];
+      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(store.id)) return [];
       const { data, error } = await supabase
         .from("store_reviews")
         .select("*")
@@ -545,6 +549,8 @@ export default function StoreDetail() {
   const { data: pages } = useQuery<StorePageRow[]>({
     queryKey: ["store_pages", store?.id],
     queryFn: async () => {
+      if (!store?.id) return [];
+      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(store?.id)) return [];
       const { data, error } = await supabase
         .from("store_pages")
         .select("*")

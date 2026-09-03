@@ -358,28 +358,38 @@ export const storeDirectoryService = {
 
   // Get store by various identifiers
   async getStoreByIdentifier(identifier: { type: 'id' | 'slug' | 'shop_no'; value: string; complex_zone?: string }) {
-    let query = supabase.from("stores");
-
+    // Build one flat filter string — reassigning the builder from .eq() breaks
+    // the chain in current supabase-js (filters like .or() no longer resolve
+    // on the narrowed type), so compose filters as text instead.
+    // NOTE: complex_zone is only a local-seed concept — the stores table has
+    // no such column, so it must never be applied to DB queries.
+    const filters: string[] = [];
     if (identifier.type === 'shop_no') {
-      query = query.eq("shop_no", identifier.value);
-      if (identifier.complex_zone) {
-        query = query.eq("complex_zone", identifier.complex_zone);
-      }
+      filters.push(`shop_no.eq.${identifier.value}`);
     } else if (identifier.type === 'slug') {
-      query = query.or(`seo_slug.eq.${identifier.value},slug.eq.${identifier.value}`);
-      if (identifier.complex_zone) {
-        query = query.eq("complex_zone", identifier.complex_zone);
-      }
+      filters.push(`or=(seo_slug.eq.${identifier.value},slug.eq.${identifier.value})`);
     } else {
-      query = query.eq("id", identifier.value);
+      filters.push(`id.eq.${identifier.value}`);
     }
 
-    const { data, error } = await query
-      .select(`
-        *,
-        package:store_packages(*)
-      `)
-      .single();
+    // Apply filters in order: the or-group first, remaining eq() filters after.
+    // Note: .or() adds its own parens around the expression.
+    const orFilter = filters.find((f) => f.startsWith('or=('));
+    const eqFilters = filters.filter((f) => !f.startsWith('or=('));
+
+    let builder = supabase
+      .from("stores")
+      .select(`*, package:store_packages(*)`);
+    if (orFilter) {
+      // orFilter = "or=(expr)" — skip the 4-char "or=(" prefix and drop the
+      // trailing ")" so .or() receives the bare expression (it re-wraps it).
+      builder = builder.or(orFilter.slice(4, -1));
+    }
+    for (const f of eqFilters) {
+      const [col, val] = f.split('.eq.');
+      builder = builder.eq(col, val);
+    }
+    const { data, error } = await builder.maybeSingle();
 
     if (error) {
       const local = findLocalStoreFallback(identifier);

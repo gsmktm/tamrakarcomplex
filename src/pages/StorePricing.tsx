@@ -43,6 +43,7 @@ export default function StorePricing() {
       monthly_price: live?.price ?? plan.monthly_price,
       yearly_price: Number(live?.yearly_price ?? plan.yearly_price),
       features_json: liveFeatures,
+      is_popular: live?.is_popular ?? plan.is_popular,
     };
   }), [databasePackages]);
 
@@ -95,7 +96,7 @@ export default function StorePricing() {
             {plans.map((plan) => {
               const meta = STORE_PACKAGE_META[plan.slug as keyof typeof STORE_PACKAGE_META];
               const price = yearly ? plan.yearly_price : plan.monthly_price;
-              const featured = (live as any)?.is_popular ?? plan.slug === "gold";
+              const featured = plan.is_popular ?? plan.slug === "gold";
 
               return (
                 <article
