@@ -968,7 +968,7 @@ function FeaturedSection({ products, isLoading }: { products: Product[]; isLoadi
       <div className="container">
         <SectionHeader eyebrow="Popular picks" title="Featured Gadgets" href="/buy" />
 
-        <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar" aria-label="Top brands">
+        <div className="mb-4 flex flex-wrap items-center justify-center gap-2" aria-label="Top brands">
           <span className="mr-1 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Top brands</span>
           {["All", ...topBrands].map((brand) => (
             <button
@@ -988,7 +988,7 @@ function FeaturedSection({ products, isLoading }: { products: Product[]; isLoadi
         </div>
 
         {/* Category tabs */}
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
           {categoryTabs.map(({ label, value, icon: Icon }) => (
             <button
               key={value}

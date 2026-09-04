@@ -115,7 +115,7 @@ export function FeaturedGadgetsSection() {
         </div>
 
         {/* Category Tabs */}
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
           {productCategories.map((category) => (
             <button
               key={category}
