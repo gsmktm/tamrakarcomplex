@@ -806,7 +806,7 @@ function PriceDesk({ allProducts }: { allProducts: Product[] }) {
         <SectionHeader eyebrow="Discover by brand or budget" title="Price Discovery" href="/mobile-price" />
 
         {/* Mode tabs */}
-        <div className="flex gap-2 mb-8 flex-wrap">
+        <div className="flex gap-2 mb-8 flex-wrap justify-center">
           {[
             { key: "phone" as const, label: "Smartphones", icon: Smartphone },
             { key: "laptop" as const, label: "Laptops", icon: Laptop },
@@ -829,26 +829,26 @@ function PriceDesk({ allProducts }: { allProducts: Product[] }) {
 
         {/* Brand selector or Budget selector */}
         {mode !== "budget" ? (
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-2 mb-8">
+          <div className="flex flex-wrap justify-center gap-x-1.5 gap-y-3 mb-8">
             {brands.map((brand) => (
               <button
                 key={brand.name}
                 onClick={() => setSelectedBrand(brand.name)}
                 className={cn(
-                  "flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all",
+                  "flex w-[76px] flex-col items-center gap-1.5 rounded-xl p-2 transition-all",
                   selectedBrand === brand.name ? "scale-105" : "hover:bg-secondary/60",
                 )}
               >
                 <div
                   className={cn(
-                    "h-11 w-11 rounded-full flex items-center justify-center text-xs font-black text-white bg-gradient-to-br transition-all",
+                    "h-12 w-12 rounded-full flex items-center justify-center text-xs font-black text-white bg-gradient-to-br transition-all",
                     brand.color,
                     selectedBrand === brand.name ? "ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg" : "",
                   )}
                 >
                   {brand.code}
                 </div>
-                <span className={cn("text-[10px] font-medium truncate w-full text-center", selectedBrand === brand.name ? "text-primary" : "text-muted-foreground")}>
+                <span className={cn("text-[11px] font-medium truncate w-full text-center", selectedBrand === brand.name ? "text-primary" : "text-muted-foreground")}>
                   {brand.name}
                 </span>
               </button>
