@@ -57,12 +57,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-
-        // 2. Fallback to table query
-        const { data: tableData, error: tableError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", authUser.id);
+        // Read the role assignment. A transient network/RLS failure must not
+        // silently demote an admin to "user" — retry once before giving up.
+        let tableData: { role: string }[] | null = null;
+        let tableError = null as unknown;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const res = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", authUser.id);
+          tableData = res.data as { role: string }[] | null;
+          tableError = res.error;
+          if (!res.error) break;
+          if (attempt === 0) await new Promise((r) => setTimeout(r, 600));
+        }
 
         if (!tableError && tableData && tableData.length > 0) {
           const roles = tableData.map((row) => normalizeRole(row.role));
@@ -79,7 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setRole(finalRole);
         if (!emailRole && !metadataRole && finalRole === "user") {
-          setRoleError("No role assigned. Using guest access.");
+          const reason = tableError
+            ? "Role lookup failed after retry. Please sign out and sign back in."
+            : "No role assigned. Using guest access.";
+          setRoleError(reason);
+          console.error("Auth: user_roles lookup failed:", tableError);
         }
       } catch (error) {
         console.error("Auth: Role resolution failed:", error);
