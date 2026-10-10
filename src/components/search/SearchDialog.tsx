@@ -179,22 +179,22 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       .catch(() => setAutoPage({ query: clean, result: null }));
   }, [open, debouncedQuery, location.pathname, location.search]);
 
-  const handleSelect = async (result: SearchResult) => {
+  const handleSelect = (result: SearchResult) => {
     onOpenChange(false);
     setQuery("");
 
-    // Log search event
+    // Analytics must never delay the selected destination or block navigation.
     if (result.type === "product" || result.type === "store") {
-      try {
-        await supabase.from("device_search_events").insert({
-          user_id: null, // anonymous for now
-          brand: result.type === "product" ? result.category : null,
-          model: result.title,
-          event_type: "click",
-        });
-      } catch (error) {
-        console.error("Failed to log search event:", error);
-      }
+      void Promise.resolve(supabase.from("device_search_events").insert({
+        user_id: null,
+        brand: result.type === "product" ? result.category : null,
+        model: result.title,
+        event_type: "click",
+      })).then(({ error }) => {
+        if (error) console.warn("Search event could not be logged");
+      }).catch(() => {
+        console.warn("Search event could not be logged");
+      });
     }
 
     // Model search results use /mobile/:slug; honor explicit destinations
