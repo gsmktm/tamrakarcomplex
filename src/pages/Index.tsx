@@ -7,8 +7,8 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <SEO
-        title="Tamrakar Complex - Nepal's Connected Gadget Homepage"
-        description="A premium Nepal-first gadget homepage for buying, selling, exchanging, repairing, comparing, and discovering trusted stores."
+        title="Tamrakar Complex - Nepal’s Digital Mobile Hub"
+        description="Explore phones, compare prices, find local shops, sell or exchange devices, and book repairs at Tamrakar Complex, New Road, Kathmandu."
         url="/"
         keywords={["gadget Nepal", "buy sell exchange repair", "mobile price Nepal", "Tamrakar Complex"]}
         structuredData={{
@@ -18,7 +18,7 @@ const Index = () => {
           url: "https://tamrakarcomplex.com/",
           potentialAction: {
             "@type": "SearchAction",
-            target: "https://tamrakarcomplex.com/buy?q={search_term_string}",
+            target: "https://tamrakarcomplex.com/cat/mobiles?tab=buy&q={search_term_string}",
             "query-input": "required name=search_term_string",
           },
         }}
