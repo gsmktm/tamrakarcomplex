@@ -66,6 +66,7 @@ import type { SectionConfig } from "@/types/app";
 import { formatDistanceToNow } from "date-fns";
 import { FlagshipShowcase } from "@/components/sections/FlagshipShowcase";
 import { Reveal } from "@/components/home/Reveal";
+import { HomeCommandHero } from "@/components/home/HomeCommandHero";
 
 type HomeStore = {
   id: string;
@@ -405,7 +406,7 @@ export function EcommerceHomeSection() {
     <div className="home-world pb-20">
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       {(enabledSections.hero || enabledSections.search_box) && (
-        <HeroSection products={products} />
+        <HomeCommandHero />
       )}
 
       {/* ── FLAGSHIP SHOWCASE (Apple + Samsung + Algorithm) ──────────────── */}

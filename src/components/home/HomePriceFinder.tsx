@@ -63,7 +63,7 @@ export const HomePriceFinder = () => {
     if (selectedBudget.max < 1000000) params.append("maxPrice", selectedBudget.max.toString());
     if (category !== "All Categories") params.append("category", category);
     
-    navigate(`/buy?${params.toString()}`);
+    navigate(`/cat/mobiles?tab=buy${params.toString() ? "&" + params.toString() : ""}`);
   };
 
   return (
