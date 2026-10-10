@@ -84,6 +84,13 @@ function RedirectModelToNew() {
   return <Navigate to={`/mobile/${slug ?? ''}`} replace />;
 }
 
+function RedirectBuyToCatalog() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.set("tab", "buy");
+  return <Navigate to={"/cat/mobiles?" + params.toString() + location.hash} replace />;
+}
+
 function RedirectArticleToStores() {
   const { slug } = useParams<{ slug?: string }>();
   return <Navigate to={slug ? `/stores/article/${slug}` : "/stores/article"} replace />;
@@ -163,8 +170,8 @@ export const publicRoutes = (
     <Route path="/repair/custom" element={withSuspense(CustomRepairRequest)} />
     <Route path="/news" element={<Navigate to="/stores/article" replace />} />
     <Route path="/reviews" element={withSuspense(Reviews)} />
-    <Route path="/buy" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
-    <Route path="/products" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
+    <Route path="/buy" element={<RedirectBuyToCatalog />} />
+    <Route path="/products" element={<RedirectBuyToCatalog />} />
     <Route path="/brands" element={withSuspense(Brands)} />
     <Route path="/cat/mobiles" element={withSuspense(MobileCategoryPage)} />
     <Route path="/cat/mobiles/:brand" element={withSuspense(MobileBrandPage)} />
@@ -219,8 +226,8 @@ export const publicRoutes = (
     <Route path="/sell" element={<Navigate to="/sell-your-phone" replace />} />
     <Route path="/exchange" element={<Navigate to="/sell-your-phone?mode=exchange" replace />} />
     <Route path="/repairs" element={<Navigate to="/repair" replace />} />
-    <Route path="/shop" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
-    <Route path="/explore" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
+    <Route path="/shop" element={<RedirectBuyToCatalog />} />
+    <Route path="/explore" element={<RedirectBuyToCatalog />} />
     <Route path="/prices" element={<Navigate to="/mobile-price" replace />} />
     <Route path="/newsroom" element={<Navigate to="/stores/article" replace />} />
     <Route path="/guides" element={<Navigate to="/mobile-guides" replace />} />
