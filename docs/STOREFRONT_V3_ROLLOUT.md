@@ -1,6 +1,6 @@
 # Tamrakar Complex — Storefront V3 Design & Rollout
 
-**Status:** Implementation branch; pending automated build, browser testing and review.
+**Status:** Draft PR #3; Vite build, unit tests and route checks passed in independent storefront regression workflow (run 38072213634). Strict TypeScript check remains a release blocker; see issue #4. Latest commits still require re-validation.
 **Scope:** First frontend redesign increment; not a whole-platform rewrite.
 **Primary site:** https://tamrakarcomplex.com/
 **Codebase:** React / Vite / TypeScript / Tailwind / Supabase.
@@ -12,15 +12,19 @@ A premium Nepal-based technology marketplace: midnight navy, restrained antique 
 ## Implemented in this branch
 
 - Redesigned homepage hero with improved hierarchy, product catalog search, category chips, and direct links to buy, sell, repair, and store pages.
+- Restored homepage section settings compatibility with flat and legacy nested CMS values; added regression tests. Previously unlisted configurable homepage sections now receive explicit defaults.
 - Added responsive category grid for popular product types and routes to the existing catalog/marketplace.
 - Added merchant onboarding and physical map entry points.
 - Introduced a scoped `src/styles/storefront-v3.css` visual layer with mobile and reduced-motion adjustments.
+- Removed a second homepage chat instance because App.tsx already mounts the global chat widget.
 - Brought desktop header and secondary navigation toward the same midnight/gold design language.
 - Changed mobile bottom navigation to include a repair shortcut.
 - Redesigned `ProductCard` with product/detail anchor separate from action buttons. Add-to-cart, buy-now, and compare are visible without hover and keyboard accessible.
 - Polished `ModelCard` for catalog consistency and keyboard focus visibility.
 - Converted price-finder product cards to semantic links for keyboard use.
 - Corrected the homepage / price-finder / legacy catalog search routes so filters survive redirects.
+- Fixed search modal model-result URLs and guarded against stale search responses and searches while closed.
+- Removed outdated React Router future flags that conflict with the installed router v7.
 - Updated WebSite SearchAction structured data to the canonical catalog route.
 
 ## Safety decisions
@@ -31,9 +35,13 @@ A premium Nepal-based technology marketplace: midnight navy, restrained antique 
 - Existing CMS-controlled homepage sections remain intact.
 - Existing admin, staff, store-admin and user panels retain their routes and data contracts.
 
+## Known release blocker
+
+GitHub Actions mandatory CI type-check failed on the first V3 branch commit with approximately **1,851 TypeScript errors across 152 files**. The primary categories include stale generated Supabase types versus newer schema migrations, missing RPC/column definitions, and role/test-type mismatches. Connected Supabase access does not include the Tamrakar project's database, so schema regeneration is not currently grounded. This is tracked in [issue #4](https://github.com/gsmktm/tamrakarcomplex/issues/4). Do not skip type-check or disable typing to obtain a green CI badge.
+
 ## Verification still required
 
-The connected GitHub editor does not provide a local installed dependency tree or a browser preview. Run from a checked-out copy:
+Independent GitHub Actions build and unit/route checks passed in run 38072213634. Security scans passed in run 38072213623. These do not supersede the mandatory failing strict TypeScript check, and end-to-end browser and production payment tests remain unverified. Run from a checked-out copy:
 
 ```bash
 npm ci
