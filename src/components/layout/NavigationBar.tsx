@@ -31,10 +31,10 @@ interface NavigationBarProps {
 
 /* Nav link — white on midnight, violet underline */
 const navLink =
-  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:after:scale-x-100 [color:oklch(65%_0_0_/_0.65)] hover:[color:oklch(85%_0_0)] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:[background:linear-gradient(90deg,oklch(62%_0.25_285),oklch(78%_0.165_65))] after:transition-transform after:duration-200 hover:after:scale-x-100";
+  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E4BD7D] focus-visible:after:scale-x-100 [color:oklch(65%_0_0_/_0.65)] hover:[color:oklch(85%_0_0)] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:[background:linear-gradient(90deg,oklch(75%_0.11_75),oklch(77%_0.12_75))] after:transition-transform after:duration-200 hover:after:scale-x-100";
 
 const navTrigger =
-  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors duration-150 focus:outline-none [color:oklch(65%_0_0_/_0.65)] hover:[color:oklch(85%_0_0)] data-[state=open]:[color:oklch(85%_0_0)] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:[background:linear-gradient(90deg,oklch(62%_0.25_285),oklch(78%_0.165_65))] after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=open]:after:scale-x-100";
+  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E4BD7D] [color:oklch(65%_0_0_/_0.65)] hover:[color:oklch(85%_0_0)] data-[state=open]:[color:oklch(85%_0_0)] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:[background:linear-gradient(90deg,oklch(75%_0.11_75),oklch(77%_0.12_75))] after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=open]:after:scale-x-100";
 
 export function NavigationBar({
   topLevelHomeItem,
@@ -48,8 +48,8 @@ export function NavigationBar({
     <div
       className="hidden lg:block border-b"
       style={{
-        background: "linear-gradient(180deg, oklch(12% 0.030 260) 0%, oklch(11% 0.028 258) 100%)",
-        borderColor: "oklch(62% 0.25 285 / 0.12)",
+        background: "linear-gradient(180deg, oklch(17% 0.029 255) 0%, oklch(15% 0.028 255) 100%)",
+        borderColor: "oklch(75% 0.11 75 / 0.18)",
       }}
     >
       <div className="container flex h-12 items-center overflow-x-auto no-scrollbar">
