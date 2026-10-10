@@ -698,6 +698,21 @@ function HeroSection({ products }: { products: Product[] }) {
               );
             })}
           </div>
+          <div className="mt-8 flex flex-col gap-5 rounded-2xl border border-[#dfd8cc] bg-white px-5 py-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between md:px-8">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.16em] text-[#a87c48]">For local merchants</p>
+              <h3 className="mt-1 font-display text-xl font-extrabold">Bring your New Road shop online.</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Create a store profile, list products, and connect with customers.</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/map" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <MapPin className="h-4 w-4" aria-hidden="true" /> Explore the map
+              </Link>
+              <Link to="/stores/apply" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#b62e43] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#98243a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                Join as a store <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
     </>
