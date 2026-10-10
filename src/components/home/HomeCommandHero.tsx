@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   ArrowUpRight,
-  BadgeIndianRupee,
+  Coins,
   ChevronRight,
   MapPin,
   Repeat2,
@@ -200,7 +200,7 @@ export function HomeCommandHero() {
         </div>
 
         <div className="tc-command-footerbar">
-          <div className="tc-command-footer-label"><BadgeIndianRupee size={16} aria-hidden="true" /> Prices in NPR</div>
+          <div className="tc-command-footer-label"><Coins size={16} aria-hidden="true" /> Prices in NPR</div>
           <span className="tc-command-footer-separator" aria-hidden="true" />
           <div>Independent stores. More choices. Clearer decisions.</div>
           <Link to="/map">Explore the complex <ArrowUpRight size={15} aria-hidden="true" /></Link>
