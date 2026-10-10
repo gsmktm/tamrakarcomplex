@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { JsonValue } from "@/types/common";
+import { DEFAULT_HOME_SECTIONS } from "@/lib/homepageSectionVisibility";
 
 export type HomepageSetting = {
   id: string;
@@ -9,25 +10,7 @@ export type HomepageSetting = {
   updated_at: string;
 };
 
-const DEFAULT_SETTINGS: Record<string, JsonValue> = {
-  hero: true,
-  search_box: true,
-  quick_actions: true,
-  offers: true,
-  price_finder: true,
-  serviceMatrix: true,
-  marketplace_feed: true,
-  phone_finder: false,
-  priceDesk: true,
-  featured: true,
-  compare_mini: false,
-  repair_form: true,
-  storesAndStories: true,
-  store_spotlight: true,
-  trust_stats: true,
-  poll: true,
-  chat: true,
-};
+const DEFAULT_SETTINGS: Record<string, JsonValue> = { ...DEFAULT_HOME_SECTIONS };
 
 export const useHomepageSettings = () => {
   return useQuery({
@@ -43,7 +26,7 @@ export const useHomepageSettings = () => {
           return data.reduce((acc: Record<string, JsonValue>, item: HomepageSetting) => {
             acc[item.key] = item.value;
             return acc;
-          }, {});
+          }, { ...DEFAULT_SETTINGS });
         }
 
         // Fall back to app_settings key "sections_control"
@@ -54,7 +37,7 @@ export const useHomepageSettings = () => {
           .maybeSingle();
 
         if (appData?.value && typeof appData.value === "object") {
-          return appData.value as Record<string, JsonValue>;
+          return { ...DEFAULT_SETTINGS, ...(appData.value as Record<string, JsonValue>) };
         }
 
         return DEFAULT_SETTINGS;

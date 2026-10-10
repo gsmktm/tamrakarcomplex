@@ -67,6 +67,7 @@ import { formatDistanceToNow } from "date-fns";
 import { FlagshipShowcase } from "@/components/sections/FlagshipShowcase";
 import { Reveal } from "@/components/home/Reveal";
 import { HomeCommandHero } from "@/components/home/HomeCommandHero";
+import { resolveHomepageSections } from "@/lib/homepageSectionVisibility";
 
 type HomeStore = {
   id: string;
@@ -325,17 +326,10 @@ export function EcommerceHomeSection() {
   const [sections, setSections] = useState(defaultSections);
   const { data: homeSettings, isLoading: settingsLoading } = useHomepageSettings();
   
-  const enabledSections = useMemo(() => {
-    // If we have database settings, use those primarily
-    if (homeSettings?.sections_control) {
-      return homeSettings.sections_control;
-    }
-    // Fallback to theme settings or defaults
-    return sections.reduce((acc: Record<string, boolean>, s) => {
-      acc[s.key] = s.enabled;
-      return acc;
-    }, {});
-  }, [sections, homeSettings]);
+  const enabledSections = useMemo(
+    () => resolveHomepageSections(homeSettings, sections),
+    [homeSettings, sections],
+  );
 
   useEffect(() => {
     const sync = () => {
