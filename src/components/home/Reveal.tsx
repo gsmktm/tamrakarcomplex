@@ -1,9 +1,8 @@
 /**
- * Reveal — scroll-triggered entrance wrapper.
- * Uses IntersectionObserver. No external animation library required.
- * Respects prefers-reduced-motion.
+ * Progressive enhancement: content is always visible without observers or animations.
+ * Scroll entrance effects must never block a page from being read.
  */
-import { useEffect, useRef, ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface RevealProps {
@@ -15,59 +14,35 @@ interface RevealProps {
   direction?: "up" | "left" | "right" | "scale";
 }
 
-const directionMap: Record<string, { hidden: string; visible: string }> = {
-  up:    { hidden: "opacity-0 translate-y-6",  visible: "opacity-100 translate-y-0" },
-  left:  { hidden: "opacity-0 -translate-x-6", visible: "opacity-100 translate-x-0" },
-  right: { hidden: "opacity-0 translate-x-6",  visible: "opacity-100 translate-x-0" },
-  scale: { hidden: "opacity-0 scale-95",      visible: "opacity-100 scale-10" },
-};
-
 export function Reveal({
-  children,
-  className,
-  delay = 0,
-  threshold = 0.1,
-  as: Tag = "div",
-  direction = "up",
+  children, className, delay = 0, threshold = 0.1,
+  as: Tag = "div", direction = "up",
 }: RevealProps) {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !("IntersectionObserver" in window)) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
 
-    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReduced) {
-      el.classList.remove(directionMap[direction].hidden);
-      el.classList.add(directionMap[direction].visible);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.classList.remove(directionMap[direction].hidden);
-          el.classList.add(directionMap[direction].visible);
-          observer.unobserve(el);
-        }
-      },
-      { threshold, rootMargin: "0px 0px -30px 0px" },
-    );
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        el.classList.add("tc-reveal-entered");
+        observer.unobserve(el);
+      }
+    }, { threshold: Math.min(threshold, 0.08), rootMargin: "0px 0px 40px 0px" });
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [threshold, direction]);
+  }, [threshold]);
 
   return (
-    // @ts-expect-error -- dynamic tag
+    // @ts-expect-error -- dynamic React element tag has a compatible ref at runtime
     <Tag
       ref={ref}
-      className={cn(
-        "transition-all duration-700 ease-out",
-        directionMap[direction].hidden,
-        className,
-      )}
-      style={{ transitionDelay: `${delay}ms` }}
+      className={cn("tc-reveal-ready", className)}
+      data-reveal-direction={direction}
+      style={{ "--tc-reveal-delay": Math.min(delay, 700) + "ms" } as React.CSSProperties}
     >
       {children}
     </Tag>
@@ -84,12 +59,8 @@ interface StaggerProps {
 }
 
 export function Stagger({
-  children,
-  className = "",
-  childClassName = "",
-  baseDelay = 0,
-  staggerMs = 80,
-  direction = "up",
+  children, className = "", childClassName = "",
+  baseDelay = 0, staggerMs = 80, direction = "up",
 }: StaggerProps) {
   return (
     <div className={className}>
