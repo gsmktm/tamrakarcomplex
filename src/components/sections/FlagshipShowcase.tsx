@@ -38,11 +38,11 @@ interface ProductCard {
 
 // ─── Hardcoded Fallbacks ───────────────────────────────────────────────────────
 const APPLE_PRODUCTS: ProductCard[] = [
-  { id: "a17pm", name: "iPhone 17 Pro Max", subtitle: "A19 Pro · 256GB", price: "NPR 2,48,999", priceValue: 248999, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
-  { id: "a17p", name: "iPhone 17 Pro", subtitle: "A19 Pro · 256GB", price: "NPR 2,28,999", priceValue: 228999, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
-  { id: "a17air", name: "iPhone 17 Air", subtitle: "Ultra-thin · 256GB", price: "NPR 1,83,999", priceValue: 183999, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
-  { id: "a17", name: "iPhone 17", subtitle: "A19 · 256GB", price: "NPR 1,67,999", priceValue: 167999, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
-  { id: "a17e", name: "iPhone 17e", subtitle: "A19 · 256GB", price: "NPR 1,27,799", priceValue: 127799, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17pm", name: "iPhone 17 Pro Max", subtitle: "A19 Pro · 256GB", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17p", name: "iPhone 17 Pro", subtitle: "A19 Pro · 256GB", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17air", name: "iPhone 17 Air", subtitle: "Ultra-thin · 256GB", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17", name: "iPhone 17", subtitle: "A19 · 256GB", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
+  { id: "a17e", name: "iPhone 17e", subtitle: "A19 · 256GB", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Apple" },
   { id: "aw11", name: "Apple Watch Series 11", subtitle: "S10 · watchOS", price: "Price on request", priceValue: 0, icon: <Watch className="w-6 h-6" />, brand: "Apple" },
 ];
 
@@ -102,35 +102,35 @@ function productThumbnail(product: ProductCard) {
 }
 
 const TRENDING_FALLBACK = [
-  { rank: 1, name: "Galaxy S25 Ultra", brand: "Samsung", price: "NPR 1,95,000" },
-  { rank: 2, name: "iPhone 16 Pro Max", brand: "Apple", price: "NPR 2,05,000" },
-  { rank: 3, name: "Galaxy Z Fold 6", brand: "Samsung", price: "NPR 3,20,000" },
-  { rank: 4, name: "iPhone 16", brand: "Apple", price: "NPR 1,45,000" },
-  { rank: 5, name: "MacBook Air M3", brand: "Apple", price: "NPR 1,85,000" },
+  { rank: 1, name: "Galaxy S25 Ultra", brand: "Samsung", price: "Price on request" },
+  { rank: 2, name: "iPhone 16 Pro Max", brand: "Apple", price: "Price on request" },
+  { rank: 3, name: "Galaxy Z Fold 6", brand: "Samsung", price: "Price on request" },
+  { rank: 4, name: "iPhone 16", brand: "Apple", price: "Price on request" },
+  { rank: 5, name: "MacBook Air M3", brand: "Apple", price: "Price on request" },
 ];
 
 const VALUE_FALLBACK: ProductCard[] = [
-  { id: "v1", name: "Redmi Note 13", subtitle: "108MP · 120Hz AMOLED", price: "NPR 24,999", priceValue: 24999, icon: <Smartphone className="w-6 h-6" />, brand: "Xiaomi" },
-  { id: "v2", name: "Realme 12x", subtitle: "50MP · 5000mAh", price: "NPR 19,999", priceValue: 19999, icon: <Smartphone className="w-6 h-6" />, brand: "Realme" },
-  { id: "v3", name: "Samsung Galaxy A35", subtitle: "50MP · Gorilla Glass", price: "NPR 29,999", priceValue: 29999, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
+  { id: "v1", name: "Redmi Note 13", subtitle: "108MP · 120Hz AMOLED", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Xiaomi" },
+  { id: "v2", name: "Realme 12x", subtitle: "50MP · 5000mAh", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Realme" },
+  { id: "v3", name: "Samsung Galaxy A35", subtitle: "50MP · Gorilla Glass", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Samsung" },
 ];
 
 const JUST_IN_FALLBACK: ProductCard[] = [
-  { id: "j1", name: "OnePlus 13R", subtitle: "Snapdragon 8s Gen 3", price: "NPR 89,000", priceValue: 89000, icon: <Smartphone className="w-6 h-6" />, brand: "OnePlus" },
-  { id: "j2", name: "Pixel 9 Pro", subtitle: "Google AI · Tensor G4", price: "NPR 1,55,000", priceValue: 155000, icon: <Smartphone className="w-6 h-6" />, brand: "Google" },
-  { id: "j3", name: "ASUS ROG Phone 8", subtitle: "Gaming · 165Hz", price: "NPR 1,25,000", priceValue: 125000, icon: <Smartphone className="w-6 h-6" />, brand: "ASUS" },
-  { id: "j4", name: "Vivo X200 Pro", subtitle: "Zeiss Camera · 5500mAh", price: "NPR 1,10,000", priceValue: 110000, icon: <Smartphone className="w-6 h-6" />, brand: "Vivo" },
+  { id: "j1", name: "OnePlus 13R", subtitle: "Snapdragon 8s Gen 3", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "OnePlus" },
+  { id: "j2", name: "Pixel 9 Pro", subtitle: "Google AI · Tensor G4", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Google" },
+  { id: "j3", name: "ASUS ROG Phone 8", subtitle: "Gaming · 165Hz", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "ASUS" },
+  { id: "j4", name: "Vivo X200 Pro", subtitle: "Zeiss Camera · 5500mAh", price: "Price on request", priceValue: 0, icon: <Smartphone className="w-6 h-6" />, brand: "Vivo" },
 ];
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 function TrustBar() {
   const items = [
-    { icon: <Shield className="w-4 h-4" />, text: "100% Authentic" },
-    { icon: <Zap className="w-4 h-4" />, text: "Fast Delivery" },
-    { icon: <BadgeCheck className="w-4 h-4" />, text: "Certified Repair" },
-    { icon: <DollarSign className="w-4 h-4" />, text: "Easy EMI" },
-    { icon: <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />, text: "4.9/5 Rating" },
+    { icon: <Shield className="w-4 h-4" />, text: "Explore store profiles" },
+    { icon: <Zap className="w-4 h-4" />, text: "Compare available choices" },
+    { icon: <BadgeCheck className="w-4 h-4" />, text: "Review listing terms" },
+    { icon: <DollarSign className="w-4 h-4" />, text: "Prices shown in NPR" },
+    { icon: <Star className="w-4 h-4" />, text: "Discover repair services" },
   ];
   return (
     <div className="w-full bg-secondary/60 backdrop-blur border-y border-border py-3 overflow-hidden">
@@ -287,7 +287,7 @@ function DualBrandHero() {
           <p className="flagship-duel-kicker">Think Different</p>
           <h3>Apple<span>iPhone 17 Pro Max.</span></h3>
           <p className="flagship-duel-tagline">The most personal Pro ever.</p>
-          <div className="flagship-duel-price"><small>From</small><strong>NPR 1,45,000</strong></div>
+          <div className="flagship-duel-price"><small>Pricing</small><strong>See store offers</strong></div>
           <Link to="/mobile/apple-iphone-17-pro-max" className="flagship-duel-link">
             View iPhone 17 Pro Max <ArrowRight className="h-4 w-4" />
           </Link>
@@ -310,7 +310,7 @@ function DualBrandHero() {
           <p className="flagship-duel-kicker">Epic Every Day</p>
           <h3>Samsung<span>Galaxy S26 Ultra.</span></h3>
           <p className="flagship-duel-tagline">Intelligence. Elevated.</p>
-          <div className="flagship-duel-price"><small>From</small><strong>NPR 1,45,000</strong></div>
+          <div className="flagship-duel-price"><small>Pricing</small><strong>See store offers</strong></div>
           <Link to="/mobile/samsung-galaxy-s26-ultra" className="flagship-duel-link">
             View Galaxy S26 Ultra <ArrowRight className="h-4 w-4" />
           </Link>
@@ -357,7 +357,7 @@ function AppleShowcaseStrip() {
         id: p.id,
         name: p.name,
         subtitle: p.subtitle ?? "",
-        price: `NPR ${Number(p.price_value).toLocaleString("en-IN")}`,
+        price: Number(p.price_value) > 0 ? `NPR ${Number(p.price_value).toLocaleString("en-IN")}` : "Price on request",
         priceValue: p.price_value,
         icon: <Smartphone className="w-6 h-6" />,
         brand: p.brand,
@@ -436,7 +436,7 @@ function SamsungFlagshipStrip() {
         id: p.id,
         name: p.name,
         subtitle: p.subtitle ?? "",
-        price: `NPR ${Number(p.price_value).toLocaleString("en-IN")}`,
+        price: Number(p.price_value) > 0 ? `NPR ${Number(p.price_value).toLocaleString("en-IN")}` : "Price on request",
         priceValue: p.price_value,
         icon: <Smartphone className="w-6 h-6" />,
         brand: p.brand,
@@ -511,7 +511,7 @@ function AlgorithmSection() {
         rank: i + 1,
         name: p.name,
         brand: p.brand,
-        price: `NPR ${Number(p.price_value).toLocaleString("en-IN")}`,
+        price: Number(p.price_value) > 0 ? `NPR ${Number(p.price_value).toLocaleString("en-IN")}` : "Price on request",
         slug: p.slug,
         image: p.image || (Array.isArray(p.images) ? p.images[0] : null),
       }))
@@ -538,7 +538,7 @@ function AlgorithmSection() {
         id: p.id,
         name: p.name,
         subtitle: p.subtitle ?? "",
-        price: `NPR ${Number(p.price_value).toLocaleString("en-IN")}`,
+        price: Number(p.price_value) > 0 ? `NPR ${Number(p.price_value).toLocaleString("en-IN")}` : "Price on request",
         priceValue: p.price_value,
         icon: <Smartphone className="w-6 h-6" />,
         brand: p.brand,
@@ -567,7 +567,7 @@ function AlgorithmSection() {
         id: p.id,
         name: p.name,
         subtitle: p.subtitle ?? "",
-        price: `NPR ${Number(p.price_value).toLocaleString("en-IN")}`,
+        price: Number(p.price_value) > 0 ? `NPR ${Number(p.price_value).toLocaleString("en-IN")}` : "Price on request",
         priceValue: p.price_value,
         icon: <Smartphone className="w-6 h-6" />,
         brand: p.brand,
@@ -588,7 +588,7 @@ function AlgorithmSection() {
           <h2 className="font-display text-3xl lg:text-4xl font-bold text-foreground mb-2">
             Picked For You
           </h2>
-          <p className="text-muted-foreground text-sm">Based on what Nepal is browsing right now</p>
+          <p className="text-muted-foreground text-sm">Browse useful device options across popular categories</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -677,7 +677,7 @@ function AlgorithmSection() {
               </div>
               <div>
                 <h3 className="text-foreground font-bold text-base">Just In</h3>
-                <p className="text-muted-foreground text-xs">Freshly added this week</p>
+                <p className="text-muted-foreground text-xs">Explore more devices</p>
               </div>
             </div>
             <p className="text-muted-foreground text-sm">
@@ -723,25 +723,22 @@ export function FlagshipShowcase() {
 
   return (
     <div className="w-full flex flex-col">
-      {/* 1. Dual Brand Hero */}
-      <DualBrandHero />
+      <section className="tc-curated-heading" aria-labelledby="tc-curated-title">
+        <div className="container tc-curated-heading-inner">
+          <div>
+            <span className="tc-curated-eyebrow">THE DEVICE EDIT / 2026</span>
+            <h2 id="tc-curated-title">Discover something <em>remarkable.</em></h2>
+            <p>Explore device collections and compare marketplace options before choosing your next upgrade.</p>
+          </div>
+          <Link to="/cat/mobiles" className="tc-curated-link">
+            Browse the catalog <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+        </div>
+      </section>
 
-      {/* Trust bar */}
-      <TrustBar />
-
-      {/* 2. Quick Decision Chips */}
       <DecisionChips active={activeChip} onChange={handleChipChange} />
-
-      {/* 3. Apple Showcase */}
       <AppleShowcaseStrip />
-
-      {/* Trust bar */}
-      <TrustBar />
-
-      {/* 4. Samsung Flagship */}
       <SamsungFlagshipStrip />
-
-      {/* 5. Algorithm Section */}
       <AlgorithmSection />
     </div>
   );
