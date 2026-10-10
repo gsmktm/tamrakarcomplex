@@ -66,6 +66,8 @@ import type { SectionConfig } from "@/types/app";
 import { formatDistanceToNow } from "date-fns";
 import { FlagshipShowcase } from "@/components/sections/FlagshipShowcase";
 import { Reveal } from "@/components/home/Reveal";
+import { HomeCommandHero } from "@/components/home/HomeCommandHero";
+import { resolveHomepageSections } from "@/lib/homepageSectionVisibility";
 
 type HomeStore = {
   id: string;
@@ -324,17 +326,10 @@ export function EcommerceHomeSection() {
   const [sections, setSections] = useState(defaultSections);
   const { data: homeSettings, isLoading: settingsLoading } = useHomepageSettings();
   
-  const enabledSections = useMemo(() => {
-    // If we have database settings, use those primarily
-    if (homeSettings?.sections_control) {
-      return homeSettings.sections_control;
-    }
-    // Fallback to theme settings or defaults
-    return sections.reduce((acc: Record<string, boolean>, s) => {
-      acc[s.key] = s.enabled;
-      return acc;
-    }, {});
-  }, [sections, homeSettings]);
+  const enabledSections = useMemo(
+    () => resolveHomepageSections(homeSettings, sections),
+    [homeSettings, sections],
+  );
 
   useEffect(() => {
     const sync = () => {
@@ -353,7 +348,7 @@ export function EcommerceHomeSection() {
   const { data: featuredProducts } = useFeaturedProducts();
   const { data: allProducts, isLoading: latestProductsLoading } = useProducts(100);
   const { data: latestArticles, isLoading: articlesLoading } = useArticlesList({ limit: 6 });
-  const { data: latestGuides } = useGuidesList({ limit: 4 });
+  const { data: latestGuides, isLoading: guidesLoading } = useGuidesList({ limit: 4 });
   const { data: featuredStores, isLoading: isStoresLoading } = useQuery({
     queryKey: ["featured-stores"],
     queryFn: async () => {
@@ -405,7 +400,7 @@ export function EcommerceHomeSection() {
     <div className="home-world pb-20">
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       {(enabledSections.hero || enabledSections.search_box) && (
-        <HeroSection products={products} />
+        <HomeCommandHero />
       )}
 
       {/* ── FLAGSHIP SHOWCASE (Apple + Samsung + Algorithm) ──────────────── */}
@@ -444,7 +439,7 @@ export function EcommerceHomeSection() {
       <DeviceAccessSection />
 
       {/* ── WHAT'S HOT — EDITORIAL ───────────────────────────────────────── */}
-      <EditorialSection articles={articles} guides={guides} isLoading={articlesLoading} />
+      <EditorialSection articles={articles} guides={guides} isLoading={articlesLoading} guidesLoading={guidesLoading} />
 
       {/* Store Spotlight — removed */}
 
@@ -889,7 +884,7 @@ function PriceDesk({ allProducts }: { allProducts: Product[] }) {
               </h3>
               <Link
                 to={mode === "budget"
-                  ? `/buy?minPrice=${selectedBudget.min}&maxPrice=${selectedBudget.max}`
+                  ? `/cat/mobiles?tab=buy&minPrice=${selectedBudget.min}&maxPrice=${selectedBudget.max}`
                   : `/brand/${selectedBrand.toLowerCase()}`}
                 className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
               >
@@ -1047,10 +1042,12 @@ function EditorialSection({
   articles,
   guides,
   isLoading,
+  guidesLoading,
 }: {
   articles: ReturnType<typeof useArticlesList>["data"] extends undefined ? never[] : NonNullable<ReturnType<typeof useArticlesList>["data"]>;
   guides: NonNullable<ReturnType<typeof useGuidesList>["data"]>;
   isLoading: boolean;
+  guidesLoading: boolean;
 }) {
   const featured = articles[0];
   const rest = articles.slice(1, 5);
@@ -1074,6 +1071,15 @@ function EditorialSection({
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : !featured ? (
+              <div className="rounded-2xl border border-border/70 bg-card px-7 py-9">
+                <BookOpen className="mb-4 h-8 w-8 text-primary" aria-hidden="true" />
+                <h3 className="font-display text-lg font-bold">Stories are being prepared</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">Explore mobile guides while the latest articles are updated.</p>
+                <Link to="/mobile-guides" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline">
+                  Explore guides <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
             ) : (
               <div className="space-y-4">
@@ -1124,7 +1130,7 @@ function EditorialSection({
           <div>
             <SectionHeader eyebrow="Buying advice" title="Guides" href="/mobile-guides" />
             <div className="space-y-3">
-              {guides.length === 0 ? (
+              {guidesLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="flex gap-3">
                     <Skeleton className="h-16 w-20 rounded-xl shrink-0" />
@@ -1134,6 +1140,15 @@ function EditorialSection({
                     </div>
                   </div>
                 ))
+              ) : guides.length === 0 ? (
+                <div className="rounded-2xl border border-border/70 bg-card p-6">
+                  <BookOpen className="mb-3 h-6 w-6 text-primary" aria-hidden="true" />
+                  <p className="font-semibold">Guides coming soon</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">Browse the product catalog to compare current devices.</p>
+                  <Link to="/cat/mobiles" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline">
+                    Compare devices <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
               ) : (
                 guides.map((guide) => (
                   <Link

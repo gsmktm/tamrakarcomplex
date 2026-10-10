@@ -10,7 +10,7 @@ const actions = [
   { number: "04", title: "Exchange", subtitle: "Upgrade Your Device", route: "/exchange-your-phone", tag: null, icon: Repeat2, size: "medium" as const, accent: "violet" },
   { number: "05", title: "Unlock", subtitle: "iCloud · Network", route: "/unlocking", tag: null, icon: Unlock, size: "medium" as const, accent: "sky" },
   { number: "06", title: "Diagnose", subtitle: "Hardware Check", route: "/repair#diagnostics-section", tag: null, icon: Activity, size: "medium" as const, accent: "rose" },
-  { number: "07", title: "Find Stores", subtitle: "250+ Shops in Nepal", route: "/stores", tag: "Verified Network", icon: Store, size: "wide" as const, accent: "primary" },
+  { number: "07", title: "Find Stores", subtitle: "Explore local shops", route: "/stores", tag: "Store Directory", icon: Store, size: "wide" as const, accent: "primary" },
 ];
 
 const accentMap: Record<string, { text: string; bg: string; gradient: string }> = {

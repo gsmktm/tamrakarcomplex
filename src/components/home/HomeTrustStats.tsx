@@ -1,51 +1,67 @@
-import { useHomepageSettings } from "@/hooks/useHomepageSettings";
+import { Link } from "react-router-dom";
+import { ArrowUpRight, Scale, ShieldCheck, Store, Wrench } from "lucide-react";
 import { Reveal } from "@/components/home/Reveal";
-import { Store, ArrowUpRight, Layers, Award } from "lucide-react";
 
-const statIcons = [Store, ArrowUpRight, Layers, Award];
+/** Capability-led trust content: no unverified counts, sales volumes or ratings. */
+const promises = [
+  {
+    icon: Scale,
+    number: "01",
+    title: "Compare choices",
+    description: "Review prices, model details and available listings before making a decision.",
+    href: "/cat/mobiles",
+  },
+  {
+    icon: Store,
+    number: "02",
+    title: "Know the seller",
+    description: "Explore shop profiles, locations and contact details in the store directory.",
+    href: "/stores",
+  },
+  {
+    icon: Wrench,
+    number: "03",
+    title: "Repair with clarity",
+    description: "Review options, book a repair and follow the tracking journey.",
+    href: "/repair",
+  },
+  {
+    icon: ShieldCheck,
+    number: "04",
+    title: "Understand the terms",
+    description: "Check conditions, payment information and marketplace disclosures.",
+    href: "/marketplace-disclosure",
+  },
+];
 
-export const HomeTrustStats = () => {
-  const { data: settings } = useHomepageSettings();
-  const raw = settings?.trust_stats;
-
-  const stats = [
-    { value: raw?.stores ?? "250+", label: "Verified stores", note: "across Nepal" },
-    { value: raw?.monthly_flow ?? "100K+", label: "Monthly transactions", note: "buy, sell, repair" },
-    { value: "7", label: "Services in one place", note: "buy · sell · repair · unlock · exchange · diagnose" },
-    { value: "NP#1", label: "Nepal's gadget hub", note: "Tamrakar Complex, Kathmandu" },
-  ];
-
+export function HomeTrustStats() {
   return (
-    <section className="py-16 lg:py-20 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-section pointer-events-none" />
-      <div className="container relative">
-        <Reveal className="text-center max-w-2xl mx-auto mb-12">
-          <p className="text-caption text-primary mb-3">Why Tamrakar</p>
-          <h2 className="text-display-lg mb-3">Trusted by thousands of gadget lovers.</h2>
-          <p className="text-body-lg">Nepal's most connected gadget exchange — one place to buy, sell, repair, and discover.</p>
+    <section className="relative border-y border-border/70 bg-muted/30 py-16 lg:py-20" aria-labelledby="home-trust-title">
+      <div className="container">
+        <Reveal className="mb-9 max-w-2xl">
+          <p className="text-caption text-primary mb-3">Built for informed decisions</p>
+          <h2 id="home-trust-title" className="text-display-lg mb-3">Clarity at every step.</h2>
+          <p className="text-body-lg">A connected marketplace should make your choices easier to understand.</p>
         </Reveal>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border/50 rounded-2xl overflow-hidden border border-border/50">
-          {stats.map((stat, i) => {
-            const Icon = statIcons[i];
-            return (
-              <Reveal key={stat.value} delay={i * 100} className="bg-background group">
-                <div className="p-6 lg:p-8 text-center h-full flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/15 transition-colors">
-                    <Icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <p className="font-display font-extrabold text-3xl md:text-4xl lg:text-5xl leading-none text-foreground mb-2 tracking-tight">
-                    {stat.value}
-                  </p>
-                  <p className="text-sm font-semibold text-foreground/80">{stat.label}</p>
-                  <p className="text-xs text-muted-foreground mt-1 text-pretty leading-snug">{stat.note}</p>
-                  <div className="mt-4 h-0.5 w-8 bg-primary/30 group-hover:w-14 transition-[width] duration-300" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {promises.map(({ icon: Icon, number, title, description, href }, index) => (
+            <Reveal key={number} delay={index * 65}>
+              <Link
+                to={href}
+                className="group flex h-full min-h-[220px] flex-col rounded-2xl border border-border/70 bg-card p-6 transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" aria-hidden="true" /></span>
+                  <span className="text-xs font-black text-muted-foreground/70">{number}</span>
                 </div>
-              </Reveal>
-            );
-          })}
+                <h3 className="mt-6 font-display text-lg font-extrabold">{title}</h3>
+                <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground">{description}</p>
+                <span className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-primary">Explore <ArrowUpRight size={16} aria-hidden="true" /></span>
+              </Link>
+            </Reveal>
+          ))}
         </div>
       </div>
     </section>
   );
-};
+}

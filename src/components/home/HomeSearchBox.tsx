@@ -11,7 +11,7 @@ export const HomeSearchBox = () => {
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (query.trim()) {
-      navigate(`/buy?q=${encodeURIComponent(query)}`);
+      navigate(`/cat/mobiles?tab=buy&q=${encodeURIComponent(query.trim())}`);
     }
   };
 

@@ -1370,44 +1370,14 @@ button:not(:disabled):not([data-no-press]):active,
 /* ── Service matrix - Professional ── */
 .home-world {
   position: relative;
-  background:
-    linear-gradient(90deg, transparent 0 49.94%, rgba(21,23,19,.035) 50%, transparent 50.06%),
-    #f2efe5;
+  background: var(--background);
 }
-.home-world section:not(.home-hero) {
-  position: relative;
-}
-.home-world section:not(.home-hero):nth-of-type(3n) {
-  background-color: #e8e3d6;
-}
-.home-world .rounded-3xl { border-radius: .45rem; }
-.home-world .rounded-2xl { border-radius: .35rem; }
-.home-world .rounded-xl  { border-radius: .25rem; }
+.home-world > section { position: relative; }
+/* Shapes now belong to the component design system, not global overrides. */
 
-/* Premium hover lift for all homepage cards & tiles */
-.home-world [class*="group"] {
-  transition: transform 250ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 250ms ease;
-}
-.home-world [class*="group"]:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 14px 36px -10px rgba(15, 23, 42, 0.14);
-}
-.dark .home-world [class*="group"]:hover {
-  box-shadow: 0 14px 36px -10px rgba(0, 0, 0, 0.5);
-}
-
-/* Smooth image zoom on homepage cards */
-.home-world img {
-  transition: transform 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.home-world [class*="group"]:hover img {
-  transform: scale(1.04);
-}
-.home-world .shadow-lg,
-.home-world .shadow-xl,
-.home-world .shadow-2xl {
-  box-shadow: 8px 8px 0 rgba(21,23,19,.12);
-}
+/* Hover motion is opt-in at the component level: moving every nested .group
+   and its image caused layout instability and navigation collisions. */
+/* Preserve the intended soft-depth shadow tokens on premium surfaces. */
 .home-service-card {
   position: relative;
   display: flex;
@@ -2027,4 +1997,12 @@ button:not(:disabled):not([data-no-press]):active,
 .dark .price-tier-compatible {
   background: rgba(245, 158, 11, 0.1);
   border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* Progressive reveal: default state always visible. */
+@keyframes tc-enter-rise { from { opacity: .92; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes tc-enter-scale { from { opacity: .92; transform: scale(.985); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: no-preference) {
+  .tc-reveal-ready.tc-reveal-entered { animation: tc-enter-rise 520ms ease-out both; animation-delay: var(--tc-reveal-delay, 0ms); }
+  .tc-reveal-ready.tc-reveal-entered[data-reveal-direction="scale"] { animation-name: tc-enter-scale; }
 }
