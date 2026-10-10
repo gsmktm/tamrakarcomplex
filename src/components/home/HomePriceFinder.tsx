@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,7 +63,8 @@ export const HomePriceFinder = () => {
     if (selectedBudget.max < 1000000) params.append("maxPrice", selectedBudget.max.toString());
     if (category !== "All Categories") params.append("category", category);
     
-    navigate(`/buy?${params.toString()}`);
+    params.set("tab", "buy");
+    navigate("/cat/mobiles?" + params.toString());
   };
 
   return (
@@ -134,10 +135,10 @@ export const HomePriceFinder = () => {
               ))
             ) : products && products.length > 0 ? (
               products.map((product: Product) => (
-                <div 
-                  key={product.id} 
-                  className="group cursor-pointer space-y-3"
-                  onClick={() => navigate(`/product/${product.slug}`)}
+                <Link
+                  key={product.id}
+                  to={"/product/" + product.slug}
+                  className="group block space-y-3 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <div className="relative aspect-square rounded-2xl overflow-hidden bg-muted">
                     <img 
@@ -157,7 +158,7 @@ export const HomePriceFinder = () => {
                     </h3>
                     <p className="text-primary font-bold">{product.price}</p>
                   </div>
-                </div>
+                </Link>
               ))
             ) : (
               <div className="col-span-full py-12 text-center text-muted-foreground">
