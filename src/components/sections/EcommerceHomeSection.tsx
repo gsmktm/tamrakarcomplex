@@ -43,7 +43,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCard } from "@/components/products/ProductCard";
 import { ArticleCard } from "@/components/articles/ArticleCard";
-import { ChatWidget } from "@/components/chat/ChatWidget";
 import { PollSection } from "@/components/sections/PollSection";
 import { HomeSearchBox } from "@/components/home/HomeSearchBox";
 import { HomePriceFinder } from "@/components/home/HomePriceFinder";
@@ -123,6 +122,13 @@ function DeviceFrame({ type, children, className }: { type: 'phone' | 'laptop', 
 const defaultSections: SectionConfig[] = [
   { key: "hero", label: "Hero", enabled: true, settings: {} },
   { key: "quick_actions", label: "Quick Actions", enabled: true, settings: {} },
+  { key: "offers", label: "Offers and Deals", enabled: true, settings: {} },
+  { key: "price_finder", label: "Price Finder", enabled: true, settings: {} },
+  { key: "marketplace_feed", label: "Marketplace Feed", enabled: true, settings: {} },
+  { key: "phone_finder", label: "Phone Finder Quiz", enabled: false, settings: {} },
+  { key: "compare_mini", label: "Quick Compare", enabled: false, settings: {} },
+  { key: "repair_form", label: "Repair Booking", enabled: true, settings: {} },
+  { key: "store_spotlight", label: "Store Spotlight", enabled: true, settings: {} },
   { key: "serviceMatrix", label: "Service Matrix", enabled: true, settings: {} },
   { key: "priceDesk", label: "Price Desk", enabled: true, settings: {} },
   { key: "featured", label: "Featured Products", enabled: true, settings: {} },
@@ -324,16 +330,24 @@ function SkeletonGrid({ count = 6, cols = "grid-cols-2 sm:grid-cols-3 lg:grid-co
 
 export function EcommerceHomeSection() {
   const [sections, setSections] = useState(defaultSections);
-  const { data: homeSettings, isLoading: settingsLoading } = useHomepageSettings();
+  const { data: homeSettings } = useHomepageSettings();
   
-  const enabledSections = useMemo(() => {
-    // If we have database settings, use those primarily
-    if (homeSettings?.sections_control) {
-      return homeSettings.sections_control;
-    }
-    // Fallback to theme settings or defaults
-    return sections.reduce((acc: Record<string, boolean>, s) => {
-      acc[s.key] = s.enabled;
+  const enabledSections = useMemo((): Record<string, boolean> => {
+    // useHomepageSettings returns a flat setting map, but earlier deployments
+    // stored section overrides inside a nested sections_control object.
+    // Respect both formats and preserve per-section defaults if a key is absent.
+    const values = homeSettings as Record<string, unknown> | undefined;
+    const nested = values?.sections_control;
+    const overrides: Record<string, unknown> =
+      nested && typeof nested === "object" && !Array.isArray(nested)
+        ? nested as Record<string, unknown>
+        : values ?? {};
+
+    return sections.reduce((acc: Record<string, boolean>, section) => {
+      acc[section.key] =
+        typeof overrides[section.key] === "boolean"
+          ? overrides[section.key] as boolean
+          : section.enabled;
       return acc;
     }, {});
   }, [sections, homeSettings]);
@@ -458,8 +472,7 @@ export function EcommerceHomeSection() {
 
       {/* Community Poll — removed */}
 
-      {/* ── CHAT WIDGET ──────────────────────────────────────────────────── */}
-      {enabledSections.chat && <ChatWidget />}
+      {/* ChatWidget is mounted globally by App.tsx; do not duplicate it here. */}
       {/* Global mobile bottom nav (BottomNav) replaces the old homepage-only sticky CTA */}
     </div>
   );
