@@ -1,3 +1,4 @@
+import "@/styles/storefront-v3.css";
 import { useEffect, useMemo, useState, useRef, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -15,6 +16,7 @@ import {
   Headphones,
   Laptop,
   Mail,
+  MapPin,
   MessageCircle,
   Phone,
   RefreshCw,
