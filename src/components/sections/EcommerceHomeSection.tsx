@@ -62,6 +62,7 @@ import { useHomepageSettings } from "@/hooks/useHomepageSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { readThemeSettings } from "@/lib/siteSettings";
+import { resolveHomepageVisibility } from "@/lib/resolveHomepageVisibility";
 import { getPublicStorePath } from "@/lib/storeRoutes";
 import type { SectionConfig } from "@/types/app";
 import { formatDistanceToNow } from "date-fns";
@@ -332,25 +333,10 @@ export function EcommerceHomeSection() {
   const [sections, setSections] = useState(defaultSections);
   const { data: homeSettings } = useHomepageSettings();
   
-  const enabledSections = useMemo((): Record<string, boolean> => {
-    // useHomepageSettings returns a flat setting map, but earlier deployments
-    // stored section overrides inside a nested sections_control object.
-    // Respect both formats and preserve per-section defaults if a key is absent.
-    const values = homeSettings as Record<string, unknown> | undefined;
-    const nested = values?.sections_control;
-    const overrides: Record<string, unknown> =
-      nested && typeof nested === "object" && !Array.isArray(nested)
-        ? nested as Record<string, unknown>
-        : values ?? {};
-
-    return sections.reduce((acc: Record<string, boolean>, section) => {
-      acc[section.key] =
-        typeof overrides[section.key] === "boolean"
-          ? overrides[section.key] as boolean
-          : section.enabled;
-      return acc;
-    }, {});
-  }, [sections, homeSettings]);
+  const enabledSections = useMemo(
+    () => resolveHomepageVisibility(sections, homeSettings),
+    [sections, homeSettings],
+  );
 
   useEffect(() => {
     const sync = () => {
