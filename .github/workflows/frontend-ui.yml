@@ -1,0 +1,39 @@
+name: Frontend UI Validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/commerce-command-hero-2026]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-ui-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-smoke:
+    name: "Homepage sections · Routing · Production build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Test homepage visibility and discovery routes
+        run: npx vitest run src/lib/homepageSectionVisibility.test.ts src/lib/homeDiscoveryRoutes.test.ts
+      - name: Validate route consistency
+        run: npm run check-routes
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_REQUIRE_SUBSCRIPTION: "true"
+          NODE_ENV: production
