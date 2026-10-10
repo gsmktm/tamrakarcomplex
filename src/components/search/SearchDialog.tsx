@@ -155,19 +155,20 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   }, [autoPage]);
 
   useEffect(() => {
-    searchContent(debouncedQuery);
-  }, [debouncedQuery, searchContent]);
+    if (!open) return;
+    void searchContent(debouncedQuery);
+  }, [open, debouncedQuery, searchContent]);
 
   useEffect(() => {
     const clean = debouncedQuery.trim();
-    if (clean.length < 2 || loggedQueries.current.has(clean.toLowerCase())) return;
+    if (!open || clean.length < 2 || loggedQueries.current.has(clean.toLowerCase())) return;
 
     loggedQueries.current.add(clean.toLowerCase());
     autoSearchPageService
       .logAndBuildPage(clean, `${location.pathname}${location.search}`)
       .then((result) => setAutoPage({ query: clean, result }))
       .catch(() => setAutoPage({ query: clean, result: null }));
-  }, [debouncedQuery, location.pathname, location.search]);
+  }, [open, debouncedQuery, location.pathname, location.search]);
 
   const handleSelect = async (result: SearchResult) => {
     onOpenChange(false);
@@ -187,7 +188,11 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       }
     }
 
-    if (result.type === "article") {
+    // Model search results use /mobile/:slug; honor explicit destinations
+    // before falling back to the generic product-detail route.
+    if (result.href) {
+      navigate(result.href);
+    } else if (result.type === "article") {
       navigate(`/stores/article/${result.slug}`);
     } else if (result.type === "product") {
       navigate(`/product/${result.slug}`);
@@ -195,8 +200,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       navigate(`/guide/${result.slug}`);
     } else if (result.type === "store") {
       navigate(`/stores/${result.slug}`);
-    } else if (result.href) {
-      navigate(result.href);
     }
   };
 
