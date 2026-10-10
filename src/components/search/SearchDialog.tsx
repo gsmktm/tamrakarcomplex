@@ -34,10 +34,13 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const loggedQueries = useRef(new Set<string>());
+  const latestSearch = useRef(0);
 
   const searchContent = useCallback(async (searchQuery: string) => {
+    const searchId = ++latestSearch.current;
     if (!searchQuery.trim()) {
       setResults([]);
+      setIsLoading(false);
       return;
     }
 
@@ -146,16 +149,22 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
           }]
         : [];
 
-      setResults([...generatedPage, ...models, ...articles, ...products, ...guides, ...stores, ...services].slice(0, 15));
+      if (searchId === latestSearch.current) {
+        setResults([...generatedPage, ...models, ...articles, ...products, ...guides, ...stores, ...services].slice(0, 15));
+      }
     } catch (error) {
       console.error("Search error:", error);
+      if (searchId === latestSearch.current) setResults([]);
     } finally {
-      setIsLoading(false);
+      if (searchId === latestSearch.current) setIsLoading(false);
     }
   }, [autoPage]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      latestSearch.current += 1;
+      return;
+    }
     void searchContent(debouncedQuery);
   }, [open, debouncedQuery, searchContent]);
 
