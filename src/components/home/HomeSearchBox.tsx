@@ -11,7 +11,7 @@ export const HomeSearchBox = () => {
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (query.trim()) {
-      navigate(`/buy?q=${encodeURIComponent(query)}`);
+      navigate("/cat/mobiles?tab=buy&q=" + encodeURIComponent(query.trim()));
     }
   };
 
@@ -26,12 +26,13 @@ export const HomeSearchBox = () => {
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
-      <form onSubmit={handleSearch} className="relative group">
+      <form onSubmit={handleSearch} role="search" className="relative group">
         <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
           <Search className="h-6 w-6 text-muted-foreground group-focus-within:text-primary transition-colors" />
         </div>
         <Input
-          type="text"
+          type="search"
+          aria-label="Search the product catalog"
           placeholder="Search iPhone, Samsung, repair, store, used phone..."
           className="w-full h-16 pl-14 pr-32 text-lg rounded-2xl border-2 border-primary/20 focus:border-primary shadow-xl bg-background/95 backdrop-blur-sm"
           value={query}
