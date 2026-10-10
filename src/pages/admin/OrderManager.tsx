@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { getErrorMessage } from "@/lib/utils";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
+import { PAGINATION } from "@/lib/supabaseColumnMaps";
 import {
   Pagination,
   PaginationContent,
@@ -74,7 +75,6 @@ export default function OrderManager() {
     queryKey: ["orders", filters, user?.id, role, orderPage],
     queryFn: async () => {
       try {
-        const { PAGINATION } = await import("@/lib/supabaseColumnMaps");
         const from = orderPage * PAGINATION.PAGE_SIZE_SMALL;
         const to = from + PAGINATION.PAGE_SIZE_SMALL - 1;
 
@@ -418,28 +418,28 @@ export default function OrderManager() {
           </CardContent>
         </Card>
 
-        {orders && orders.length === 20 && (
+        {orders && orders.length === PAGINATION.PAGE_SIZE_SMALL && (
           <div className="flex justify-center mt-4">
             <nav aria-label="Order pagination">
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
                     <PaginationPrevious
-                      href="#"
-                      isActive={orderPage === 0}
+                      aria-disabled={orderPage === 0}
+                      tabIndex={orderPage === 0 ? -1 : undefined}
                       onClick={() => orderPage > 0 && setOrderPage(orderPage - 1)}
                     />
                   </PaginationItem>
                   <PaginationItem>
-                    <PaginationLink href="#" isActive>
+                    <PaginationLink isActive aria-label={`Current page, page ${orderPage + 1}`}>
                       Page {orderPage + 1}
                     </PaginationLink>
                   </PaginationItem>
                   <PaginationItem>
                     <PaginationNext
-                      href="#"
-                      isActive
-                      onClick={() => setOrderPage(orderPage + 1)}
+                      aria-disabled={orders.length < PAGINATION.PAGE_SIZE_SMALL}
+                      tabIndex={orders.length < PAGINATION.PAGE_SIZE_SMALL ? -1 : undefined}
+                      onClick={() => orders.length === PAGINATION.PAGE_SIZE_SMALL && setOrderPage(orderPage + 1)}
                     />
                   </PaginationItem>
                 </PaginationContent>

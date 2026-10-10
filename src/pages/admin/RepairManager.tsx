@@ -376,21 +376,21 @@ const RepairManager = () => {
                     <PaginationContent>
                       <PaginationItem>
                         <PaginationPrevious
-                          href="#"
-                          isActive={page === 0}
+                          aria-disabled={page === 0}
+                          tabIndex={page === 0 ? -1 : undefined}
                           onClick={() => page > 0 && setPage(page - 1)}
                         />
                       </PaginationItem>
                       <PaginationItem>
-                        <PaginationLink href="#" isActive>
+                        <PaginationLink isActive aria-label={`Current page, page ${page + 1}`}>
                           Page {page + 1}
                         </PaginationLink>
                       </PaginationItem>
                       <PaginationItem>
                         <PaginationNext
-                          href="#"
-                          isActive
-                          onClick={() => setPage(page + 1)}
+                          aria-disabled={filteredRepairs.length < PAGINATION.PAGE_SIZE_SMALL}
+                          tabIndex={filteredRepairs.length < PAGINATION.PAGE_SIZE_SMALL ? -1 : undefined}
+                          onClick={() => filteredRepairs.length === PAGINATION.PAGE_SIZE_SMALL && setPage(page + 1)}
                         />
                       </PaginationItem>
                     </PaginationContent>

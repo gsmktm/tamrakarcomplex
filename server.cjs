@@ -76,26 +76,54 @@ app.use((req, res, next) => {
   next();
 });
 
-// 2. Security headers (applied to ALL responses)
+// 2. Health check (cPanel/monitoring probe) — before auth/security so probes work
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || "unknown",
+  });
+});
+
+// 3. Constants
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://tvgmnjuexdgtgtqhrjok.supabase.co";
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_4-Yq_PD4j8sVEsn1ZM1-Mw_ZDPUAd5v";
+const BASE_URL = (process.env.SITE_URL || "https://tamrakarcomplex.com").replace(/\/$/, "");
+const SUPABASE_REQUEST_TIMEOUT_MS = 5000;
+
+// 4. Security headers (applied to ALL responses)
 app.use((req, res, next) => {
+  const supabaseHost = new URL(SUPABASE_URL).hostname;
+
+  // Content Security Policy — strict but compatible with the SPA's resource graph
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' https://fonts.gstatic.com",
+    `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://*.supabase.co wss://*.supabase.co https://*.supabase.in`,
+    "media-src 'self' https:",
+    "worker-src 'self' blob:",
+    "frame-src 'self' https://*.supabase.co https://*.esewa.com https://*.khalti.com",
+    "form-action 'self' https://*.esewa.com https://*.khalti.com",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+    "upgrade-insecure-requests",
+  ].join("; ");
+  res.setHeader("Content-Security-Policy", csp);
+  res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   next();
 });
-
-// 3. Health check (cPanel/monitoring probe)
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
-// 4a. Dynamic sitemap — fetches products + device catalog from Supabase
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://tvgmnjuexdgtgtqhrjok.supabase.co";
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_4-Yq_PD4j8sVEsn1ZM1-Mw_ZDPUAd5v";
-const BASE_URL = (process.env.SITE_URL || "https://tamrakarcomplex.com").replace(/\/$/, "");
-const SUPABASE_REQUEST_TIMEOUT_MS = 5000;
 
 const STATIC_URLS = [
   { loc: "/",                  changefreq: "daily",  priority: "1.0" },

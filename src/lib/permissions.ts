@@ -94,45 +94,37 @@ const DEFAULT_PERMISSIONS: Record<AppRole, StaffPermissions | null> = {
 export async function getStaffPermissions(userId: string): Promise<StaffPermissions | null> {
   if (!userId) return null;
 
-  try {
-    const { data, error } = await supabase
-      .from("staffadmin_permissions")
-      .select("module_key, can_view, can_create, can_edit, can_delete, can_approve, can_assign, can_export")
-      .eq("user_id", userId);
+  const { data, error } = await supabase
+    .from("staffadmin_permissions")
+    .select("module_key, can_view, can_create, can_edit, can_delete, can_approve, can_assign, can_export")
+    .eq("user_id", userId);
 
-    if (error) {
-      console.error("Error fetching staff permissions:", error);
-      return createPermissionSet();
-    }
+  // An unavailable permission source must stay distinguishable from a user with
+  // no grants. React Query surfaces this error so protected routes fail closed.
+  if (error) throw error;
 
-    if (!data || data.length === 0) {
-      return createPermissionSet();
-    }
-
-    // Initialize all modules with default false
-    const permissions = createPermissionSet();
-
-    // Map the array of rows to the StaffPermissions object structure
-    data.forEach((row) => {
-      const key = row.module_key as keyof StaffPermissions;
-      if (permissions[key]) {
-        permissions[key] = {
-          view: row.can_view || false,
-          create: row.can_create || false,
-          edit: row.can_edit || false,
-          delete: row.can_delete || false,
-          approve: row.can_approve || false,
-          assign: row.can_assign || false,
-          export: row.can_export || false,
-        };
-      }
-    });
-
-    return permissions;
-  } catch (err) {
-    console.error("Unexpected error in getStaffPermissions:", err);
+  if (!data || data.length === 0) {
     return createPermissionSet();
   }
+
+  const permissions = createPermissionSet();
+
+  data.forEach((row) => {
+    const key = row.module_key as keyof StaffPermissions;
+    if (permissions[key]) {
+      permissions[key] = {
+        view: row.can_view || false,
+        create: row.can_create || false,
+        edit: row.can_edit || false,
+        delete: row.can_delete || false,
+        approve: row.can_approve || false,
+        assign: row.can_assign || false,
+        export: row.can_export || false,
+      };
+    }
+  });
+
+  return permissions;
 }
 
 // Module keys suadmin can grant to store admins (store_admins.permissions).
@@ -151,27 +143,21 @@ export type StoreAdminPermissionModule = (typeof STORE_ADMIN_PERMISSION_MODULES)
 export async function getStoreAdminPermissions(userId: string): Promise<string[]> {
   if (!userId) return [];
 
-  try {
-    const { data, error } = await supabase
-      .from("store_admins")
-      .select("permissions")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .limit(1);
+  const { data, error } = await supabase
+    .from("store_admins")
+    .select("permissions")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .limit(1);
 
-    if (error) {
-      console.error("Error fetching store admin permissions:", error);
-      return [];
-    }
+  // Keep database outages distinct from a valid empty grant set. The route gate
+  // can then show recovery guidance instead of pretending the module is denied.
+  if (error) throw error;
 
-    const first = data?.[0] as { permissions?: string[] } | undefined;
-    if (!first || !Array.isArray(first.permissions)) return [];
+  const first = data?.[0] as { permissions?: string[] } | undefined;
+  if (!first || !Array.isArray(first.permissions)) return [];
 
-    return first.permissions.filter((p): p is string => typeof p === "string");
-  } catch (err) {
-    console.error("Unexpected error in getStoreAdminPermissions:", err);
-    return [];
-  }
+  return first.permissions.filter((p): p is string => typeof p === "string");
 }
 
 export function canAccessModule(role: AppRole, moduleKey: string, permissions?: StaffPermissions | null, action: StaffPermissionAction = "view", storeAdminPermissions?: string[]): boolean {

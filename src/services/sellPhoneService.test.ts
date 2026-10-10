@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { supabase } from "@/integrations/supabase/client";
 import {
   calculateFallbackValuation,
+  inspectionPriceFactor,
   isDatabaseCatalogId,
   sellPhoneService,
 } from "./sellPhoneService";
@@ -40,10 +41,113 @@ describe("sell phone valuation flow", () => {
       condition: "used",
       defects: [],
       age_months: 12,
-    })).resolves.toBe(13_600);
+    })).resolves.toMatchObject({ estimated_price: 13_600, base_price: 13_600, source: "floor_fallback" });
 
     expect(rpc).not.toHaveBeenCalled();
     rpc.mockRestore();
+  });
+
+  it("applies the full inspection model to the valuation outcome", async () => {
+    const rpc = vi.spyOn(supabase, "rpc");
+
+    const baseline = await sellPhoneService.calculateValuation({
+      catalog_product_id: "samsung-galaxy-f06-5g",
+      storage: "128GB",
+      condition: "used",
+      defects: [],
+      age_months: 12,
+    });
+
+    const damaged = await sellPhoneService.calculateValuation({
+      catalog_product_id: "samsung-galaxy-f06-5g",
+      storage: "128GB",
+      condition: "used",
+      defects: [],
+      age_months: 12,
+      inspection: {
+        battery_health: 60,
+        display_condition: "cracked",
+        camera_condition: "faulty",
+        biometric_status: "not_working",
+        water_damage: true,
+        is_repaired: true,
+      },
+    });
+
+    const wellKept = await sellPhoneService.calculateValuation({
+      catalog_product_id: "samsung-galaxy-f06-5g",
+      storage: "128GB",
+      condition: "used",
+      defects: [],
+      age_months: 12,
+      inspection: {
+        battery_health: 98,
+        display_condition: "perfect",
+        camera_condition: "perfect",
+        biometric_status: "working",
+        box_available: true,
+        bill_available: true,
+        warranty_available: true,
+        accessories_available: true,
+      },
+    });
+
+    const exchange = await sellPhoneService.calculateValuation({
+      catalog_product_id: "samsung-galaxy-f06-5g",
+      storage: "128GB",
+      condition: "used",
+      defects: [],
+      age_months: 12,
+      mode: "exchange",
+    });
+
+    expect(damaged.estimated_price).toBeLessThan(baseline.estimated_price);
+    expect(wellKept.estimated_price).toBeGreaterThan(baseline.estimated_price);
+    expect(exchange.estimated_price).toBeGreaterThan(baseline.estimated_price);
+    expect(exchange.inspection_factor).toBe(1);
+    expect(exchange.exchange_bonus).toBeCloseTo(1.05);
+
+    expect(rpc).not.toHaveBeenCalled();
+    rpc.mockRestore();
+  });
+
+  it("keeps the inspection price factor within a safe clamp", () => {
+    expect(inspectionPriceFactor(undefined)).toBe(1);
+    expect(inspectionPriceFactor({ water_damage: true, is_repaired: true, battery_health: 40, display_condition: "cracked", camera_condition: "faulty", biometric_status: "not_working" }))
+      .toBe(0.75);
+    expect(inspectionPriceFactor({ battery_health: 100, box_available: true, bill_available: true, warranty_available: true, accessories_available: true }))
+      .toBeCloseTo(1.04);
+  });
+
+  it("does not request a returned row for anonymous lead inserts", async () => {
+    const authGetUser = vi.spyOn(supabase.auth, "getUser").mockResolvedValue({ data: { user: null }, error: null } as never);
+    const insertResult = Object.assign(Promise.resolve({ data: null, error: null }), {
+      select: vi.fn(() => ({ single: vi.fn() })),
+    });
+    const insert = vi.fn(() => insertResult);
+    const from = vi.spyOn(supabase, "from").mockImplementation((table: string) => {
+      if (table === "sell_phone_leads") return { insert } as never;
+      return { insert: vi.fn().mockResolvedValue({ data: null, error: null }) } as never;
+    });
+
+    await expect(sellPhoneService.saveLead({
+      brand: "Apple",
+      model: "iPhone 13",
+      storage: "128GB",
+      condition: "used",
+      defects: [],
+      age_months: 12,
+      quoted_value: 30000,
+      customer_name: "Test User",
+      customer_phone: "9812345678",
+      customer_email: "test@example.com",
+      submission_key: "anonymous-submit-test",
+    })).resolves.toBeNull();
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert.mock.results[0]?.value?.select).not.toHaveBeenCalled();
+    authGetUser.mockRestore();
+    from.mockRestore();
   });
 
   it("keeps phones, tablets, and watches in separate catalog flows", () => {

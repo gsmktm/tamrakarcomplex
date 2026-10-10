@@ -29,6 +29,9 @@ tsconfig.tsbuildinfo
 .jetro/
 supabase/.temp/
 
+# Deployment bundles (generated, not source)
+cpanel-deploy-ready/
+
 # Local agent workspace artifacts (not part of the product)
 deer-flow/
 graphify-out/
@@ -37,6 +40,17 @@ workspace.json
 .kilo/
 .playwright-mcp/
 .claude/
+
+# Secrets and credentials (defense in depth)
+pem
+*.key
+*.p12
+credentials.json
+seed.sql
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # Accidental shell scratch files
  export SAFE_RM_ALLOWED_PATH=*

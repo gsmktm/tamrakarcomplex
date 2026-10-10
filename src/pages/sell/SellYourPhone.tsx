@@ -48,12 +48,9 @@ interface CatalogDeviceWithJoins {
 
 interface ValuationResult {
   estimated_price: number;
+  base_price: number;
+  inspection_adjustment: number;
   currency: string;
-  breakdown: {
-    base_price: number;
-    condition_adjustment: number;
-    storage_adjustment: number;
-  };
   valid_until: string;
 }
 
@@ -140,9 +137,13 @@ export default function SellYourPhone() {
   const [deviceImei, setDeviceImei] = useState("");
 
   const [sourceStore, setSourceStore] = useState<StoreDirectoryItem | null>(null);
+  const storeChoiceLockedRef = useRef(false);
+  const submissionKeyRef = useRef<string>("");
 
-  // Keep submissionTargetStoreId in sync if URL ?store= changes
+  // Keep submissionTargetStoreId in sync if URL ?store= changes — but never
+  // override a store the user explicitly picked in the store picker.
   useEffect(() => {
+    if (storeChoiceLockedRef.current) return;
     const storeParam = searchParams.get("store") || undefined;
     if (storeParam !== submissionTargetStoreId) {
       setSubmissionTargetStoreId(storeParam);
@@ -182,6 +183,18 @@ export default function SellYourPhone() {
         defects,
         ageMonths,
         deviceImei,
+        batteryHealth,
+        displayCondition,
+        cameraCondition,
+        faceIdStatus,
+        boxAvailable,
+        billAvailable,
+        warrantyAvailable,
+        isRepaired,
+        waterDamage,
+        accessoriesAvailable,
+        customerLocation,
+        submissionTargetStoreId,
       }));
     }
     navigate(`/auth?redirect=${encodeURIComponent("/sell-your-phone")}`);
@@ -208,6 +221,18 @@ export default function SellYourPhone() {
         defects?: string[];
         ageMonths?: number;
         deviceImei?: string;
+        batteryHealth?: number;
+        displayCondition?: string;
+        cameraCondition?: string;
+        faceIdStatus?: string;
+        boxAvailable?: boolean;
+        billAvailable?: boolean;
+        warrantyAvailable?: boolean;
+        isRepaired?: boolean;
+        waterDamage?: boolean;
+        accessoriesAvailable?: boolean;
+        customerLocation?: string;
+        submissionTargetStoreId?: string;
       };
 
       setStep(Math.min(Math.max(draft.step || 4, 1), 5));
@@ -224,6 +249,21 @@ export default function SellYourPhone() {
       setDefects(Array.isArray(draft.defects) ? draft.defects : []);
       setAgeMonths(typeof draft.ageMonths === "number" ? draft.ageMonths : 12);
       setDeviceImei(draft.deviceImei || "");
+      if (typeof draft.batteryHealth === "number") setBatteryHealth(draft.batteryHealth);
+      if (draft.displayCondition) setDisplayCondition(draft.displayCondition);
+      if (draft.cameraCondition) setCameraCondition(draft.cameraCondition);
+      if (draft.faceIdStatus) setFaceIdStatus(draft.faceIdStatus);
+      if (typeof draft.boxAvailable === "boolean") setBoxAvailable(draft.boxAvailable);
+      if (typeof draft.billAvailable === "boolean") setBillAvailable(draft.billAvailable);
+      if (typeof draft.warrantyAvailable === "boolean") setWarrantyAvailable(draft.warrantyAvailable);
+      if (typeof draft.isRepaired === "boolean") setIsRepaired(draft.isRepaired);
+      if (typeof draft.waterDamage === "boolean") setWaterDamage(draft.waterDamage);
+      if (typeof draft.accessoriesAvailable === "boolean") setAccessoriesAvailable(draft.accessoriesAvailable);
+      if (draft.customerLocation) setCustomerLocation(draft.customerLocation);
+      if (draft.submissionTargetStoreId) {
+        storeChoiceLockedRef.current = true;
+        setSubmissionTargetStoreId(draft.submissionTargetStoreId);
+      }
       window.sessionStorage.removeItem(SELL_PHONE_DRAFT_KEY);
     } catch {
       window.sessionStorage.removeItem(SELL_PHONE_DRAFT_KEY);
@@ -358,6 +398,12 @@ export default function SellYourPhone() {
 
   const selectedStore = (sellStores || []).find((store) => store.id === selectedStoreId);
 
+  // The store the confirm dialog will actually submit to: an explicitly picked
+  // store, or the store resolved from a store-specific link/draft.
+  const dialogTargetStore = submissionTargetStoreId
+    ? (selectedStore?.id === submissionTargetStoreId ? selectedStore : sourceStore?.id === submissionTargetStoreId ? sourceStore : selectedStore ?? sourceStore)
+    : null;
+
   useEffect(() => {
     if (routePrefillRef.current || !brands?.length) return;
 
@@ -396,22 +442,21 @@ export default function SellYourPhone() {
     mutationFn: async () => {
       if (!selectedCatalogProductId) throw new Error("Please select a device model first");
       if (!storage) throw new Error("Please select a storage capacity");
-      const estimatedPrice = await sellPhoneService.calculateValuation({
+      const outcome = await sellPhoneService.calculateValuation({
         catalog_product_id: selectedCatalogProductId,
         storage,
         condition,
         defects,
         age_months: ageMonths,
+        inspection: inspectionSnapshot,
+        mode: isExchangeMode ? "exchange" : "cash",
       });
 
       return {
-        estimated_price: estimatedPrice,
+        estimated_price: outcome.estimated_price,
+        base_price: outcome.base_price,
+        inspection_adjustment: outcome.estimated_price - outcome.base_price,
         currency: "Rs.",
-        breakdown: {
-          base_price: estimatedPrice, // Simplified breakdown
-          condition_adjustment: 0,
-          storage_adjustment: 0,
-        },
         valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       };
     },
@@ -442,12 +487,15 @@ export default function SellYourPhone() {
         customer_email: contactEmail,
         imei: deviceImei,
         assigned_store_id: storeId,
-        source: "sell_your_phone"
+        source: "sell_your_phone",
+        inspection: inspectionSnapshot,
+        exchange_mode: isExchangeMode,
+        submission_key: submissionKeyRef.current || undefined,
       }, userId);
     },
     onSuccess: () => {
       const targetStore = submissionTargetStoreId
-        ? (sellStores || []).find((store) => store.id === submissionTargetStoreId)
+        ? (sourceStore?.id === submissionTargetStoreId ? sourceStore : (sellStores || []).find((store) => store.id === submissionTargetStoreId) ?? sourceStore)
         : null;
       toast.success(
         targetStore
@@ -508,15 +556,36 @@ export default function SellYourPhone() {
   const viboDemand = viboScore >= 80 ? "High" : viboScore >= 60 ? "Medium" : "Low";
   const viboRecommendation = viboScore >= 80 ? "Best Cash Value" : viboScore >= 60 ? "Sell for Best Price" : "Sell for Quick Cash";
 
+  // Shared inspection snapshot used by valuation, lead persistence, and the UI.
+  const inspectionSnapshot = useMemo(() => ({
+    battery_health: batteryHealth,
+    display_condition: displayCondition,
+    camera_condition: cameraCondition,
+    biometric_status: faceIdStatus,
+    box_available: boxAvailable,
+    bill_available: billAvailable,
+    warranty_available: warrantyAvailable,
+    is_repaired: isRepaired,
+    water_damage: waterDamage,
+    accessories_available: accessoriesAvailable,
+    location: customerLocation.trim() || undefined,
+    vibo_score: viboScore,
+  }), [batteryHealth, displayCondition, cameraCondition, faceIdStatus, boxAvailable, billAvailable, warrantyAvailable, isRepaired, waterDamage, accessoriesAvailable, customerLocation, viboScore]);
+
   const openPlatformSubmit = () => {
-    setSubmissionTargetStoreId(undefined);
+    // Keep the current store target (e.g. a store-specific ?store= link) — the
+    // CTA label already says "Sell at {store}". Clearing it here would send a
+    // store-sourced lead to the platform team instead.
+    submissionKeyRef.current = crypto.randomUUID();
     setSellDialogOpen(true);
   };
 
   const openStoreSubmit = (store: StoreDirectoryItem) => {
+    storeChoiceLockedRef.current = true;
     setSelectedStoreId(store.id);
     setSubmissionTargetStoreId(store.id);
     setStorePickerOpen(false);
+    submissionKeyRef.current = crypto.randomUUID();
     setSellDialogOpen(true);
   };
 
@@ -1215,9 +1284,9 @@ export default function SellYourPhone() {
                 <p className="text-2xl font-black text-emerald-300">{valuation.currency} {Math.floor(valuation.estimated_price * 0.93).toLocaleString()}</p>
               </div>
               <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-4 text-center">
-                <p className="text-xs text-amber-300/80 uppercase tracking-widest mb-1">Best Store Offer</p>
+                <p className="text-xs text-amber-300/80 uppercase tracking-widest mb-1">Best Store Offer Est.</p>
                 <p className="text-2xl font-black text-amber-200">{valuation.currency} {Math.floor(valuation.estimated_price * 1.02).toLocaleString()}</p>
-                <p className="text-[10px] text-amber-400/60 mt-1">Subject to store acceptance</p>
+                <p className="text-[10px] text-amber-400/60 mt-1">Illustrative — stores set final offers</p>
               </div>
             </div>
 
@@ -1454,7 +1523,7 @@ export default function SellYourPhone() {
                     <div className="text-muted-foreground">Storage: {storage || "N/A"} · Condition: {condition}</div>
                     <div className="text-muted-foreground font-medium text-primary">Quote: {valuation.currency} {valuation.estimated_price.toLocaleString()}</div>
                     <div className="mt-2 rounded-md bg-background/70 px-2 py-1 text-xs">
-                      Request goes to: <span className="font-semibold">{selectedStore && submissionTargetStoreId ? selectedStore.name : "Tamrakar Complex Admin Team"}</span>
+                      Request goes to: <span className="font-semibold">{dialogTargetStore ? dialogTargetStore.name : "Tamrakar Complex Admin Team"}</span>
                     </div>
                   </div>
 
@@ -1580,10 +1649,13 @@ export default function SellYourPhone() {
                           authenticatedUserId = authData.user.id;
                           toast.success("Account created! Submitting your request...");
                         } else if (signUpData?.user?.id) {
-                          // Supabase returned a user but session not started — email confirmation required
-                          // Still save the lead; user can log in later to track it
-                          authenticatedUserId = signUpData.user.id;
-                          toast.info("Check your email to confirm your account. Your sell request will be saved and linked once confirmed.", { duration: 8000 });
+                          // Email confirmation is required, so there is no
+                          // authenticated JWT yet. Submit as a guest lead;
+                          // passing the unconfirmed user ID would violate the
+                          // sell_phone_leads RLS policy (user_id must be null
+                          // or equal auth.uid()). The user can track it after
+                          // confirming and signing in.
+                          toast.info("Check your email to confirm your account. Your sell request will be saved and linked once you sign in.", { duration: 8000 });
                         } else {
                           // Complete guest — save lead without user_id
                           toast.info("Sell request submitted. Please check your email to create your tracking account.");

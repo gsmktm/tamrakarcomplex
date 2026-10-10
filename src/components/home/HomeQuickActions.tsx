@@ -1,112 +1,67 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ShoppingBag, Banknote, Wrench, Repeat2, Unlock, Activity, Store, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Reveal } from "@/components/home/Reveal";
 
 const actions = [
-  {
-    number: "01",
-    title: "Buy New",
-    subtitle: "Phones & Laptops",
-    description: "Latest devices with warranty from 250+ verified stores",
-    route: "/buy",
-    tag: "Most Popular",
-    size: "large",
-  },
-  {
-    number: "02",
-    title: "Sell Used",
-    subtitle: "Get Instant Cash",
-    description: "Best price for your old device, paid same day",
-    route: "/sell-your-phone",
-    tag: "Fast Payout",
-    size: "large",
-  },
-  {
-    number: "03",
-    title: "Repair",
-    subtitle: "Screen · Battery · Software",
-    description: "Expert service at trusted shops in your area",
-    route: "/repair",
-    tag: null,
-    size: "medium",
-  },
-  {
-    number: "04",
-    title: "Exchange",
-    subtitle: "Upgrade Your Device",
-    description: "Trade in your old phone toward a new one",
-    route: "/exchange-your-phone",
-    tag: null,
-    size: "medium",
-  },
-  {
-    number: "05",
-    title: "Unlock",
-    subtitle: "iCloud · Network · OS",
-    description: "Software & carrier unlock services",
-    route: "/unlocking",
-    tag: null,
-    size: "medium",
-  },
-  {
-    number: "06",
-    title: "Diagnose",
-    subtitle: "Hardware & Software Check",
-    description: "Know what's wrong before you spend",
-    route: "/repair#diagnostics-section",
-    tag: null,
-    size: "medium",
-  },
-  {
-    number: "07",
-    title: "Find Stores",
-    subtitle: "250+ Shops in Nepal",
-    description: "Locate verified gadget stores near you",
-    route: "/stores",
-    tag: "Verified Network",
-    size: "wide",
-  },
-] as const;
+  { number: "01", title: "Buy New", subtitle: "Phones & Laptops", route: "/buy", tag: "Most Popular", icon: ShoppingBag, size: "large" as const, accent: "blue" },
+  { number: "02", title: "Sell Used", subtitle: "Get Instant Cash", route: "/sell-your-phone", tag: "Fast Payout", icon: Banknote, size: "large" as const, accent: "emerald" },
+  { number: "03", title: "Repair", subtitle: "Screen · Battery", route: "/repair", tag: null, icon: Wrench, size: "medium" as const, accent: "amber" },
+  { number: "04", title: "Exchange", subtitle: "Upgrade Your Device", route: "/exchange-your-phone", tag: null, icon: Repeat2, size: "medium" as const, accent: "violet" },
+  { number: "05", title: "Unlock", subtitle: "iCloud · Network", route: "/unlocking", tag: null, icon: Unlock, size: "medium" as const, accent: "sky" },
+  { number: "06", title: "Diagnose", subtitle: "Hardware Check", route: "/repair#diagnostics-section", tag: null, icon: Activity, size: "medium" as const, accent: "rose" },
+  { number: "07", title: "Find Stores", subtitle: "250+ Shops in Nepal", route: "/stores", tag: "Verified Network", icon: Store, size: "wide" as const, accent: "primary" },
+];
+
+const accentMap: Record<string, { text: string; bg: string; gradient: string }> = {
+  blue:    { text: "text-blue-600",   bg: "bg-blue-600/10",   gradient: "from-blue-600/10 via-transparent to-blue-600/5" },
+  emerald: { text: "text-emerald-600", bg: "bg-emerald-600/10", gradient: "from-emerald-600/10 via-transparent to-emerald-600/5" },
+  amber:   { text: "text-amber-600",   bg: "bg-amber-600/10",   gradient: "from-amber-600/10 via-transparent to-amber-600/5" },
+  violet:  { text: "text-violet-600",  bg: "bg-violet-600/10",  gradient: "from-violet-600/10 via-transparent to-violet-600/5" },
+  sky:     { text: "text-sky-600",     bg: "bg-sky-600/10",     gradient: "from-sky-600/10 via-transparent to-sky-600/5" },
+  rose:    { text: "text-rose-600",    bg: "bg-rose-600/10",    gradient: "from-rose-600/10 via-transparent to-rose-600/5" },
+  primary: { text: "text-primary",     bg: "bg-primary/10",     gradient: "from-primary/10 via-transparent to-primary/5" },
+};
 
 export const HomeQuickActions = () => {
   const navigate = useNavigate();
-
   const large  = actions.filter((a) => a.size === "large");
   const medium = actions.filter((a) => a.size === "medium");
   const wide   = actions.filter((a) => a.size === "wide");
 
   return (
-    <section className="py-16 border-y border-border">
-      <div className="container mx-auto px-4 max-w-6xl">
-        {/* Header */}
-        <div className="mb-10 animate-fade-up delay-0">
-          <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground mb-2">
-            Services
+    <section className="py-16 lg:py-20 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-section pointer-events-none" />
+      <div className="container relative">
+        <Reveal className="max-w-2xl mb-10">
+          <p className="text-caption text-primary mb-3">What would you like to do?</p>
+          <h2 className="text-display-lg mb-3">One platform, every gadget need.</h2>
+          <p className="text-body-lg">
+            From browsing the latest iPhones to selling your old device — everything flows through one connected exchange.
           </p>
-          <h2 className="font-syne text-3xl md:text-4xl font-bold text-foreground">
-            What do you need today?
-          </h2>
-        </div>
+        </Reveal>
 
-        {/* Large 2-col primary actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-border mb-px border border-border animate-fade-up delay-100">
-          {large.map((action) => (
-            <ActionTile key={action.number} action={action} onNavigate={navigate} variant="large" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {large.map((action, i) => (
+            <Reveal key={action.title} delay={i * 100}>
+              <ActionTile action={action} onNavigate={navigate} variant="large" />
+            </Reveal>
+          ))}
+          {medium.map((action, i) => (
+            <Reveal key={action.title} delay={200 + i * 80}>
+              <ActionTile action={action} onNavigate={navigate} variant="medium" />
+            </Reveal>
+          ))}
+          {wide.map((action, i) => (
+            <Reveal key={action.title} delay={500 + i * 100}>
+              <ActionTile action={action} onNavigate={navigate} variant="wide" />
+            </Reveal>
           ))}
         </div>
-
-        {/* Medium 4-col secondary */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border mb-px border border-border animate-fade-up delay-200">
-          {medium.map((action) => (
-            <ActionTile key={action.number} action={action} onNavigate={navigate} variant="medium" />
-          ))}
-        </div>
-
       </div>
     </section>
   );
 };
-
-// ─── Tile ─────────────────────────────────────────────────────────────────────
 
 type TileVariant = "large" | "medium" | "wide";
 
@@ -120,79 +75,48 @@ function ActionTile({
   variant: TileVariant;
 }) {
   const isLarge  = variant === "large";
-  const isWide   = variant === "wide";
   const isMedium = variant === "medium";
+  const isWide   = variant === "wide";
+  const Icon = action.icon;
+  const accent = accentMap[action.accent];
 
   return (
     <button
       onClick={() => onNavigate(action.route)}
-      className={[
-        "group relative bg-background flex items-start gap-4 text-left",
-        "transition-colors duration-200 hover:bg-secondary/40",
-        "pressable",
-        isLarge  ? "p-8 md:p-10"                              : "",
-        isMedium ? "p-6"                                       : "",
-        isWide   ? "p-6 md:p-8 flex-row items-center"         : "",
-      ].join(" ")}
+      className={cn(
+        "card-premium group relative w-full text-left overflow-hidden",
+        isLarge ? "p-6 lg:p-7 flex flex-col justify-between min-h-[220px]" : "",
+        isMedium ? "p-5 flex flex-col min-h-[140px]" : "",
+        isWide ? "p-5 flex flex-col justify-center min-h-[180px] md:col-span-2" : "",
+      )}
     >
-      {/* Number index */}
-      <span
-        className={[
-          "font-syne font-bold leading-none text-primary/20 select-none shrink-0",
-          "group-hover:text-primary/40 transition-colors duration-200",
-          isLarge ? "text-5xl" : "text-3xl",
-        ].join(" ")}
-      >
-        {action.number}
-      </span>
+      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none", accent.gradient)} />
 
-      {/* Content */}
-      <div className={["flex-1 min-w-0", isWide ? "flex items-center gap-8" : ""].join(" ")}>
-        <div className={isWide ? "flex-1" : ""}>
-          {action.tag && (
-            <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-primary border border-primary/30 rounded-sm px-2 py-0.5 mb-3">
-              {action.tag}
-            </span>
-          )}
-          <h3
-            className={[
-              "font-syne font-bold text-foreground leading-tight",
-              isLarge ? "text-2xl md:text-3xl" : "text-xl",
-            ].join(" ")}
-          >
-            {action.title}
-          </h3>
-          <p className="text-sm font-medium text-primary mt-0.5">{action.subtitle}</p>
-          {(isLarge || isWide) && (
-            <p className="text-sm text-muted-foreground mt-2 text-pretty">{action.description}</p>
-          )}
-        </div>
-
-        {isWide && (
-          <span className="text-sm font-semibold text-foreground hidden md:flex items-center gap-1.5 shrink-0">
-            Browse all stores
-            <ArrowRight
-              className="h-4 w-4 translate-x-0 group-hover:translate-x-1.5 transition-transform duration-200"
-              style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
-            />
+      <div className="relative">
+        {action.tag && (
+          <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-4", accent.bg, accent.text)}>
+            <Sparkles className="h-3 w-3" />
+            {action.tag}
           </span>
+        )}
+        <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110", accent.bg)}>
+          <Icon className={cn("h-5 w-5", accent.text)} />
+        </div>
+        <p className="text-xs font-bold text-muted-foreground/50 tracking-wider mb-1">{action.number}</p>
+        <h3 className={cn("font-display font-bold text-foreground leading-tight", isLarge ? "text-xl lg:text-2xl" : "text-base")}>
+          {action.title}
+        </h3>
+        <p className="text-sm text-muted-foreground mt-1">{action.subtitle}</p>
+        {(isLarge || isWide) && (
+          <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+            Get started <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+          </div>
         )}
       </div>
 
-      {/* Arrow for large tiles */}
       {isLarge && (
-        <ArrowRight
-          className="h-5 w-5 text-muted-foreground shrink-0 mt-1 translate-x-0 group-hover:translate-x-1.5 transition-transform duration-200 self-start"
-          style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
-        />
+        <ArrowRight className="absolute top-6 right-6 h-5 w-5 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
       )}
-
-      {/* Saffron sweep on hover */}
-      <span
-        aria-hidden="true"
-        className="absolute bottom-0 left-0 h-0.5 w-0 bg-primary group-hover:w-full transition-[width] duration-300"
-        style={{ transitionTimingFunction: "var(--ease-out-quart)" }}
-      />
     </button>
   );
 }

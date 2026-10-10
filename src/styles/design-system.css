@@ -1,0 +1,268 @@
+/* ============================================================
+   TAMRAKAR COMPLEX — Premium Design System
+   "Nepal's Connected Gadget Hub"
+   ============================================================ */
+
+/* ── Premium Surface Treatments ───────────────────────────── */
+.surface-elevated {
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  box-shadow:
+    0 1px 2px 0 rgba(15, 23, 42, 0.04),
+    0 4px 12px -4px rgba(15, 23, 42, 0.06),
+    0 12px 24px -8px rgba(15, 23, 42, 0.08);
+}
+.dark .surface-elevated {
+  background: var(--card);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  box-shadow:
+    0 1px 2px 0 rgba(0, 0, 0, 0.3),
+    0 4px 12px -4px rgba(0, 0, 0, 0.4),
+    0 12px 24px -8px rgba(0, 0, 0, 0.5);
+}
+
+.surface-glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+.dark .surface-glass {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(51, 65, 85, 0.4);
+}
+
+.surface-mesh {
+  background-image:
+    radial-gradient(at 20% 20%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 80%, rgba(217, 255, 62, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(245, 158, 11, 0.04) 0px, transparent 50%);
+}
+
+/* ── Gradient Backgrounds ─────────────────────────────────── */
+.bg-gradient-hero {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(217, 255, 62, 0.06) 0%, transparent 50%),
+    var(--background);
+}
+
+.bg-gradient-section {
+  background: linear-gradient(180deg, transparent 0%, rgba(59, 130, 246, 0.02) 50%, transparent 100%);
+}
+
+.bg-gradient-cta {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 40%, #3347FF 100%);
+}
+
+.bg-gradient-premium {
+  background: linear-gradient(135deg, #3347FF 0%, #3B82F6 50%, #60A5FA 100%);
+}
+
+/* ── Typography Scales ────────────────────────────────────── */
+.text-display-xl {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.25rem, 5vw + 1rem, 4rem);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+
+.text-display-lg {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(1.75rem, 3vw + 0.5rem, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.text-heading {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.text-body-lg {
+  font-size: 1.125rem;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+
+.text-caption {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ── Premium Shadows ──────────────────────────────────────── */
+.shadow-soft {
+  box-shadow:
+    0 2px 8px -2px rgba(15, 23, 42, 0.08),
+    0 8px 24px -4px rgba(15, 23, 42, 0.10);
+}
+.dark .shadow-soft {
+  box-shadow:
+    0 2px 8px -2px rgba(0, 0, 0, 0.4),
+    0 8px 24px -4px rgba(0, 0, 0, 0.5);
+}
+
+.shadow-glow-blue {
+  box-shadow:
+    0 4px 16px -4px rgba(59, 130, 246, 0.3),
+    0 12px 32px -8px rgba(59, 130, 246, 0.2);
+}
+
+.shadow-glow-amber {
+  box-shadow:
+    0 4px 16px -4px rgba(245, 158, 11, 0.3),
+    0 12px 32px -8px rgba(245, 158, 11, 0.2);
+}
+
+/* ── Animated Elements ────────────────────────────────────── */
+.animate-float {
+  animation: float-up 4s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    110deg,
+    var(--muted) 35%,
+    color-mix(in srgb, var(--muted-foreground) 8%, var(--muted)) 50%,
+    var(--muted) 65%
+  );
+  background-size: 200% 100%;
+  animation: tk-shimmer 2.5s linear infinite;
+}
+
+.animate-ticker {
+  animation: ticker-scroll 30s linear infinite;
+}
+
+.animate-pulse-ring {
+  animation: tk-pulse-cobalt 2s ease-in-out infinite;
+}
+
+/* ── Interactive States ───────────────────────────────────── */
+.hover-lift {
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms ease;
+}
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 8px 24px -8px rgba(15, 23, 42, 0.12),
+    0 16px 48px -12px rgba(15, 23, 42, 0.16);
+}
+.dark .hover-lift:hover {
+  box-shadow:
+    0 8px 24px -8px rgba(0, 0, 0, 0.5),
+    0 16px 48px -12px rgba(0, 0, 0, 0.6);
+}
+
+.hover-glow {
+  transition: box-shadow 200ms ease;
+}
+.hover-glow:hover {
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.3),
+    0 8px 32px -8px rgba(59, 130, 246, 0.25);
+}
+
+.hover-scale {
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.hover-scale:hover { transform: scale(1.02); }
+.hover-scale:active { transform: scale(0.98); }
+
+/* ── Premium Cards ────────────────────────────────────────── */
+.card-premium {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition: all 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.card-premium::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(59, 130, 246, 0.04) 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.card-premium:hover::before { opacity: 1; }
+.card-premium:hover {
+  border-color: rgba(59, 130, 246, 0.2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.card-interactive {
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.card-interactive:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-elevated);
+}
+.card-interactive:active { transform: translateY(-1px); }
+
+/* ── Section Dividers ─────────────────────────────────────── */
+.divider-gradient {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+}
+
+.divider-accent {
+  height: 3px;
+  width: 48px;
+  border-radius: 9999px;
+  background: var(--primary);
+}
+
+/* ── Badge Variants ───────────────────────────────────────── */
+.badge-soft {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.badge-success {
+  background: color-mix(in srgb, #10B981 10%, transparent);
+  color: #10B981;
+  border: 1px solid color-mix(in srgb, #10B981 20%, transparent);
+}
+
+.badge-warning {
+  background: color-mix(in srgb, #F59E0B 10%, transparent);
+  color: #B45309;
+  border: 1px solid color-mix(in srgb, #F59E0B 20%, transparent);
+}
+
+.badge-danger {
+  background: color-mix(in srgb, #EF4444 10%, transparent);
+  color: #DC2626;
+  border: 1px solid color-mix(in srgb, #EF4444 20%, transparent);
+}
+
+/* ── Scroll-triggered Reveal ──────────────────────────────── */
+.reveal-init {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 600ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

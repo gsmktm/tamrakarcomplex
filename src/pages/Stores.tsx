@@ -115,7 +115,7 @@ function ServiceTag({ svc }: { svc: string }) {
       isRepair ? "bg-red-500/10 text-red-500 border-red-500/20" :
       isExchange ? "bg-green-500/10 text-green-500 border-green-500/20" :
       isSales ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
-      "bg-muted0/10 text-muted-foreground border-slate-500/20"
+      "bg-muted/10 text-muted-foreground border-slate-500/20"
     )}>
       {svc}
     </span>

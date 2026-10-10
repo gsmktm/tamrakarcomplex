@@ -59,6 +59,7 @@
     --cobalt-light: #60A5FA;
     --amber: #F59E0B;
     --amber-hover: #D97706;
+    --gold: #F59E0B;
     --success: #10B981;
     --white: #FFFFFF;
     --gray-50: #F9FAFB;
@@ -80,6 +81,12 @@
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     --shadow-cobalt: 0 0 20px rgba(59, 130, 246, 0.15);
     --shadow-amber: 0 0 20px rgba(245, 158, 11, 0.15);
+
+    /* Component shadows referenced by tailwind.config.ts boxShadow map */
+    --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 8px 24px -8px rgba(15, 23, 42, 0.10);
+    --shadow-elevated: 0 12px 40px -8px rgba(15, 23, 42, 0.16), 0 2px 8px -2px rgba(15, 23, 42, 0.06);
+    --shadow-glow: 0 8px 32px -6px rgba(51, 71, 255, 0.30);
+    --shadow-gold: 0 10px 32px -8px rgba(245, 158, 11, 0.35);
 
     /* Category palette */
     --category-mobile: #3B82F6;
@@ -326,6 +333,44 @@
   .gradient-light {
     background: linear-gradient(180deg, #FFFFFF 0%, #F9FAFB 100%);
   }
+  .dark .gradient-light {
+    background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+  }
+
+  /* Signature hero gradient — used by primary CTAs, active tab pill,
+     section accent bars, and hero call-to-action buttons.
+     Stops intentionally use the fixed brand navy/cobalt so the gradient
+     renders identically in light and dark mode, and `color` is forced so
+     Shadcn dark-mode color swaps can never turn CTA text unreadable. */
+  .hero-gradient {
+    background-image: linear-gradient(
+      135deg,
+      var(--navy, #0F172A) 0%,
+      #3347FF 45%,
+      var(--cobalt, #3B82F6) 100%
+    );
+    color: #FFFFFF !important;
+  }
+  .hero-gradient:hover {
+    filter: brightness(1.1);
+  }
+  .hero-gradient:active {
+    filter: brightness(0.95);
+  }
+
+  /* Gold glow for premium sell/elevated CTAs */
+  .shadow-gold {
+    box-shadow: var(--shadow-gold);
+  }
+
+  /* Apple-style clipped gradient text for premium highlighted phrases */
+  .gradient-text-apple {
+    background-image: linear-gradient(135deg, #3347FF 0%, #60A5FA 50%, #3B82F6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
 
   /* Press feedback */
   .pressable { transition: transform 120ms ease-out; }
@@ -555,6 +600,12 @@ button:not(:disabled):not([data-no-press]):active,
   min-height: 100%;
   border: 1px solid var(--access-border);
   box-shadow: 0 24px 70px rgba(28, 24, 15, .09);
+  transition: box-shadow 300ms ease, transform 300ms ease, border-color 300ms ease;
+}
+.home-device-access-card:hover {
+  box-shadow: 0 32px 80px rgba(28, 24, 15, .14);
+  transform: translateY(-2px);
+  border-color: rgba(59, 130, 246, 0.2);
 }
 .home-device-access-card--booking {
   background: linear-gradient(155deg, rgba(255, 255, 255, .94), rgba(250, 249, 241, .86));
@@ -566,8 +617,36 @@ button:not(:disabled):not([data-no-press]):active,
 .dark .home-device-access-card--emi {
   background: linear-gradient(155deg, rgba(255, 255, 255, .075), rgba(255, 255, 255, .035));
 }
-.home-device-access-form { background: rgba(255, 255, 255, .76); }
+.home-device-access-form { background: rgba(255, 255, 255, .76); backdrop-filter: blur(8px); }
 .dark .home-device-access-form { background: rgba(0, 0, 0, .2); }
+
+/* Premium service + product cards on homepage */
+.home-world [class*="card"],
+.home-world [class*="product-card"],
+.home-world [class*="service-card"] {
+  transition: box-shadow 250ms ease, transform 250ms ease, border-color 250ms ease;
+}
+.home-world [class*="card"]:hover,
+.home-world [class*="product-card"]:hover,
+.home-world [class*="service-card"]:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.15);
+  border-color: rgba(59, 130, 246, 0.25);
+}
+.dark .home-world [class*="card"]:hover,
+.dark .home-world [class*="product-card"]:hover,
+.dark .home-world [class*="service-card"]:hover {
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Smooth image zoom on cards */
+.home-world img {
+  transition: transform 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.home-world [class*="card"]:hover img,
+.home-world [class*="product-card"]:hover img {
+  transform: scale(1.04);
+}
 
 .home-emi-section {
   --emi-bg: #f6f3e9;
@@ -1301,14 +1380,28 @@ button:not(:disabled):not([data-no-press]):active,
 .home-world section:not(.home-hero):nth-of-type(3n) {
   background-color: #e8e3d6;
 }
-.home-world .rounded-3xl {
-  border-radius: .45rem;
+.home-world .rounded-3xl { border-radius: .45rem; }
+.home-world .rounded-2xl { border-radius: .35rem; }
+.home-world .rounded-xl  { border-radius: .25rem; }
+
+/* Premium hover lift for all homepage cards & tiles */
+.home-world [class*="group"] {
+  transition: transform 250ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 250ms ease;
 }
-.home-world .rounded-2xl {
-  border-radius: .35rem;
+.home-world [class*="group"]:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 36px -10px rgba(15, 23, 42, 0.14);
 }
-.home-world .rounded-xl {
-  border-radius: .25rem;
+.dark .home-world [class*="group"]:hover {
+  box-shadow: 0 14px 36px -10px rgba(0, 0, 0, 0.5);
+}
+
+/* Smooth image zoom on homepage cards */
+.home-world img {
+  transition: transform 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.home-world [class*="group"]:hover img {
+  transform: scale(1.04);
 }
 .home-world .shadow-lg,
 .home-world .shadow-xl,

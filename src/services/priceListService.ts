@@ -52,7 +52,7 @@ export const priceListService = {
       .from("catalog_products")
       .select(`
         *,
-        brand:brands(id, name, logo_url),
+        brand:brands(id, name, logo),
         model:device_models(id, name),
         variant:device_variants(id, storage, ram, color)
       `, { count: "exact" })
@@ -145,16 +145,20 @@ export const priceListService = {
     return data;
   },
 
-  // Get brands for filter
+  // Get brands for filter.
+  // Real brands schema: logo (not logo_url) and string status (not active/is_active).
   async getBrands() {
     const { data, error } = await supabase
       .from("brands")
-      .select("id, name, slug, logo_url")
-      .eq("active", true)
+      .select("id, name, slug, logo, status")
+      .eq("status", "active")
       .order("name");
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map((brand: Record<string, unknown>) => ({
+      ...brand,
+      logo_url: brand.logo ?? undefined,
+    }));
   },
 
   // Get public price list (active, verified items)
@@ -163,7 +167,7 @@ export const priceListService = {
       .from("catalog_products")
       .select(`
         *,
-        brand:brands(id, name, logo_url),
+        brand:brands(id, name, logo),
         model:device_models(id, name),
         variant:device_variants(id, storage, ram, color)
       `, { count: "exact" })

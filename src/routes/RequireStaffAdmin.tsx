@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Navigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { StaffPermissionAction } from "@/lib/permissions";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -16,7 +16,7 @@ interface RequireStaffAdminProps {
 export function RequireStaffAdmin({ children, module, action = "view" }: RequireStaffAdminProps) {
   const { role, loading, user } = useAuth();
   const location = useLocation();
-  const { hasPermission, isLoading: permissionsLoading } = usePermissions();
+  const { hasPermission, isLoading: permissionsLoading, error: permissionsError, refetch } = usePermissions();
   const [authTimedOut, setAuthTimedOut] = useState(false);
   const isResolvingAuth = loading || (!!user && !role);
 
@@ -40,6 +40,21 @@ export function RequireStaffAdmin({ children, module, action = "view" }: Require
 
   if (!user) {
     return <Navigate to={getAuthPathForLocation(location)} replace />;
+  }
+
+  if (module && permissionsError) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-6 text-center">
+        <RefreshCw className="h-10 w-10 text-destructive" />
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Permissions unavailable</h2>
+          <p className="mt-2 max-w-md text-muted-foreground">We could not verify staff access. Protected data remains locked.</p>
+        </div>
+        <Button variant="outline" onClick={() => void refetch()}>
+          <RefreshCw className="mr-2 h-4 w-4" /> Retry access check
+        </Button>
+      </div>
+    );
   }
 
   const isStaffOrSu = role === "staffadmin" || role === "suadmin";

@@ -86,14 +86,80 @@ export type PackageRow = {
   staff_limit: number;
   [key: string]: unknown;
 };
-export type StoreSubscriptionRow = Tables<"store_subscriptions">;
-export type SubscriptionPaymentRow = Tables<"subscription_payments">;
-export type SubscriptionLogRow = Tables<"subscription_logs">;
+// The following tables are not present in the generated Supabase types (stale
+// generation). Model each explicitly from its canonical migration so consumers
+// keep typed access without regenerating the schema.
+
+export interface StoreSubscriptionRow {
+  id: string;
+  store_id: string;
+  package_id: string;
+  status: string;
+  is_enabled: boolean | null;
+  start_date: string;
+  end_date: string;
+  next_billing_date: string | null;
+  auto_renew: boolean | null;
+  scheduled_package_id: string | null;
+  scheduled_change_date: string | null;
+  cancelled_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface SubscriptionPaymentRow {
+  id: string;
+  subscription_id: string;
+  invoice_no: string;
+  amount: number;
+  payment_method: string;
+  payment_status: string;
+  paid_at: string | null;
+  transaction_ref: string | null;
+  meta_json: Json | null;
+  created_at: string | null;
+}
+
+// subscription_logs is not present in the generated Supabase types (stale
+// generation). Model it explicitly from the canonical migration so consumers
+// keep typed access without regenerating the schema.
+export interface SubscriptionLogRow {
+  id: string;
+  store_id: string;
+  actor_id: string | null;
+  action: string;
+  old_value_json: Json | null;
+  new_value_json: Json | null;
+  created_at: string | null;
+}
 
 export type SellListingRow = Tables<"sell_listings">;
 export type UserRoleRow = Tables<"user_roles">;
 
-export type LeadQuoteRow = Tables<"leads_quotes">;
+// leads_quotes is not present in the generated Supabase types (stale
+// generation). Model it explicitly from the canonical migration. The quotes
+// feed is heterogeneous (sell_listings / sell_phone_leads projections), so an
+// index signature keeps every real field access type-safe.
+export interface LeadQuoteRow {
+  id: string;
+  user_id: string | null;
+  name: string;
+  phone: string;
+  email: string | null;
+  device_brand: string | null;
+  device_model: string | null;
+  condition: string | null;
+  quote_amount: number | null;
+  quoted_value?: number;
+  status: string;
+  type?: string;
+  assigned_store: string | null;
+  assigned_store_id?: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  [key: string]: unknown;
+}
 export type RepairRequestRow = Tables<"repair_requests">;
 
 export type ContactInfo = {

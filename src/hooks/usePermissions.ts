@@ -3,7 +3,6 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   getStaffPermissions,
   getStoreAdminPermissions,
-  type StaffPermissions,
   type StaffPermissionAction,
   type StaffPermissionModule,
 } from "@/lib/permissions";
@@ -11,40 +10,46 @@ import {
 export function usePermissions() {
   const { user, role } = useAuth();
 
-  const { data: permissions, isLoading } = useQuery({
+  const staffPermissionsEnabled = !!user?.id && role === "staffadmin";
+  const storePermissionsEnabled = !!user?.id && role === "storeadmin";
+
+  const staffQuery = useQuery({
     queryKey: ["staff-permissions", user?.id],
     queryFn: () => getStaffPermissions(user!.id),
-    enabled: !!user?.id && role === "staffadmin",
+    enabled: staffPermissionsEnabled,
+    retry: 1,
   });
 
-  const { data: storeAdminPermissions, isLoading: storeAdminPermissionsLoading } = useQuery({
+  const storeQuery = useQuery({
     queryKey: ["store-admin-permissions", user?.id],
     queryFn: () => getStoreAdminPermissions(user!.id),
-    enabled: !!user?.id && role === "storeadmin",
+    enabled: storePermissionsEnabled,
     staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 
   const checkPermission = (module: string, action: StaffPermissionAction = "view") => {
     if (role === "suadmin") return true;
     if (role === "staffadmin") {
-      if (!permissions) return false;
-      const modulePerms = permissions[module as StaffPermissionModule];
+      if (!staffQuery.data) return false;
+      const modulePerms = staffQuery.data[module as StaffPermissionModule];
       if (!modulePerms) return false;
       return modulePerms[action] === true;
     }
     if (role === "storeadmin") {
-      // While grants load, allow (menu stays usable); once loaded, gate.
-      if (storeAdminPermissions === undefined) return true;
-      return storeAdminPermissions.includes(module);
+      if (storeQuery.data === undefined) return false;
+      return storeQuery.data.includes(module);
     }
     return false;
   };
 
   return {
-    permissions,
-    storeAdminPermissions: storeAdminPermissions ?? [],
-    storeAdminPermissionsLoaded: !storeAdminPermissionsLoading && storeAdminPermissions !== undefined,
-    isLoading: isLoading || storeAdminPermissionsLoading,
+    permissions: staffQuery.data,
+    storeAdminPermissions: storeQuery.data ?? [],
+    storeAdminPermissionsLoaded: !storePermissionsEnabled || (!storeQuery.isPending && !storeQuery.isError && storeQuery.data !== undefined),
+    isLoading: (staffPermissionsEnabled && staffQuery.isPending) || (storePermissionsEnabled && storeQuery.isPending),
+    error: staffQuery.error ?? storeQuery.error ?? null,
+    refetch: () => Promise.all([staffQuery.refetch(), storeQuery.refetch()]),
     canAccessModule: checkPermission,
     hasPermission: checkPermission,
   };

@@ -50,8 +50,8 @@ A full-stack web platform for Tamrakar Complex, featuring an e-commerce storefro
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Build | ✅ 0 errors | TypeScript strict, 0 errors |
-| Tests | ✅ 41/41 passing | Full test coverage |
-| Linting | ⚠️ warnings | Non-blocking, mostly `any` types |
+| Tests | ✅ 170/170 passing | Full Vitest suite |
+| Linting | ⚠️ warnings | 171 existing Fast Refresh warnings; no errors |
 | Database | ✅ 168+ migrations | Includes mobile catalog seed |
 | Mobile Catalog | ✅ 18 brands, ~290 variants | Prices in NPR, exchange values seeded |
 | Edge Functions | ✅ 7 functions | All deployed |
@@ -107,6 +107,21 @@ npm run supabase:stop    # Stop local Supabase
 npm run supabase:reset   # Reset local database
 npm run supabase:functions # Run edge functions locally
 ```
+
+## Validation
+
+The current release checks are documented in [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md). At minimum, run:
+
+```bash
+npm run build
+npm test -- --run
+npm run lint
+npm run check-routes
+npm run check:migrations
+npm run chrome:check
+```
+
+`npm run chrome:check` validates representative routes over HTTP and requires Chrome to render the app. Missing browser output or an empty app root fails the check; an HTTP app shell alone does not count as browser validation.
 
 ## 🔐 Admin Roles & Login
 

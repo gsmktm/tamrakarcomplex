@@ -35,50 +35,60 @@ async function waitForServer(url, timeoutMs = 20000) {
   return false;
 }
 
-async function fetchStatus(url, attempts = 3) {
+async function fetchRoute(url, attempts = 3) {
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      return { status: response.status, error: "" };
+      return {
+        status: response.status,
+        body: await response.text(),
+        error: "",
+      };
     } catch (error) {
       lastError = error;
       await sleep(300);
     }
   }
-  return { status: 0, error: lastError?.message || "fetch failed" };
+  return { status: 0, body: "", error: lastError?.message || "fetch failed" };
 }
 
 function dumpDom(url) {
   const profileDir = mkdtempSync(join(tmpdir(), "tamrakar-chrome-"));
   try {
     try {
-      return execFileSync(
-        chromePath,
-        [
-          "--headless=new",
-          "--disable-gpu",
-          "--no-first-run",
-          "--no-default-browser-check",
-          `--user-data-dir=${profileDir}`,
-          "--virtual-time-budget=5000",
-          "--dump-dom",
-          url,
-        ],
-        {
-          encoding: "utf8",
-          maxBuffer: 1024 * 1024 * 4,
-          stdio: ["ignore", "pipe", "ignore"],
-          timeout: 15000,
-        },
-      );
+      return {
+        dom: execFileSync(
+          chromePath,
+          [
+            "--headless=new",
+            "--disable-gpu",
+            "--no-first-run",
+            "--no-default-browser-check",
+            `--user-data-dir=${profileDir}`,
+            "--virtual-time-budget=5000",
+            "--dump-dom",
+            url,
+          ],
+          {
+            encoding: "utf8",
+            maxBuffer: 1024 * 1024 * 4,
+            stdio: ["ignore", "pipe", "pipe"],
+            timeout: 15000,
+          },
+        ),
+        error: "",
+      };
     } catch (error) {
-      // Chrome can keep a background connection open after printing the fully
-      // rendered DOM. Treat that captured DOM as the test result.
-      if (typeof error.stdout === "string" && error.stdout.includes('id="root"')) {
-        return error.stdout;
+      const capturedDom = typeof error.stdout === "string" ? error.stdout : "";
+      const stderr = typeof error.stderr === "string" ? error.stderr.trim() : "";
+      if (capturedDom.includes('id="root"')) {
+        return { dom: capturedDom, error: stderr };
       }
-      throw error;
+      return {
+        dom: "",
+        error: [error.message, stderr].filter(Boolean).join(" | "),
+      };
     }
   } finally {
     rmSync(profileDir, { recursive: true, force: true });
@@ -99,42 +109,56 @@ async function main() {
     const report = [];
     for (const route of routes) {
       const url = `${baseUrl}${route}`;
-      let status = 0;
-      let fetchError = "";
-      const fetchResult = await fetchStatus(url);
-      status = fetchResult.status;
-      fetchError = fetchResult.error;
+      const response = await fetchRoute(url);
+      const chrome = dumpDom(url);
+      const dom = chrome.dom;
+      const html = dom;
+      const hasRoot = html.includes('id="root"');
+      const renderedRoot = /<[^>]+id="root"[^>]*>\s*<[a-z]/i.test(dom);
+      const hasNotFound = /Store Not Found|Page Not Found|\b404\b/i.test(html);
+      const appShellFallback = /<script[^>]+type=["']module["'][^>]+src=/i.test(response.body);
+      const httpOk = response.status >= 200 && response.status < 400;
+      const chromeUnavailable = !dom && Boolean(chrome.error);
+      const confirmedAppFailure = !httpOk || !hasRoot || !renderedRoot || chromeUnavailable;
 
-      let dom = "";
-      let chromeError = "";
-      try {
-        dom = dumpDom(url);
-      } catch (error) {
-        chromeError = error.message;
-      }
-
-      const hasRoot = dom.includes('id="root"');
-      const hasNotFound = /Store Not Found|Page Not Found|404/i.test(dom);
       report.push({
         route,
-        status,
-        chrome_dom_loaded: hasRoot,
+        status: response.status,
+        http_ok: httpOk,
+        chrome_dom_loaded: hasRoot && renderedRoot,
+        app_shell_fallback: appShellFallback,
         app_not_found_text: hasNotFound,
-        fetch_error: fetchError,
-        chrome_error: chromeError,
+        chrome_error: chrome.error,
+        chrome_unavailable: chromeUnavailable,
+        confirmed_app_failure: confirmedAppFailure,
+        fetch_error: response.error,
       });
     }
 
     console.log("\nChrome dev route check");
     console.log("----------------------");
     for (const item of report) {
-      console.log(
-        `${item.route}: status=${item.status}, chrome_dom_loaded=${item.chrome_dom_loaded}, not_found_text=${item.app_not_found_text}${item.fetch_error ? `, fetch_error=${item.fetch_error}` : ""}${item.chrome_error ? ", chrome_error=yes" : ""}`,
-      );
+      const diagnostics = [
+        `status=${item.status}`,
+        `http_ok=${item.http_ok}`,
+        `chrome_dom_loaded=${item.chrome_dom_loaded}`,
+        `app_shell_fallback=${item.app_shell_fallback}`,
+        `not_found_text=${item.app_not_found_text}`,
+      ];
+      if (item.chrome_unavailable) diagnostics.push(`chrome_unavailable=${item.chrome_error}`);
+      if (item.fetch_error) diagnostics.push(`fetch_error=${item.fetch_error}`);
+      console.log(`${item.route}: ${diagnostics.join(", ")}`);
     }
 
-    const failed = report.filter((item) => (item.status >= 400 && !item.chrome_dom_loaded) || !item.chrome_dom_loaded);
-    if (failed.length > 0) process.exit(1);
+    const failed = report.filter((item) => item.confirmed_app_failure || item.app_not_found_text);
+    if (failed.length > 0) {
+      process.exitCode = 1;
+      return;
+    }
+
+    if (report.some((item) => item.chrome_unavailable)) {
+      console.log("\nChrome DOM capture was unavailable; browser validation did not pass.");
+    }
   } finally {
     preview.kill("SIGTERM");
   }

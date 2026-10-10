@@ -8,12 +8,37 @@ import { SAMSUNG_DEVICE_CATALOG } from "@/data/samsungDeviceCatalog";
 import { SAMSUNG_DEVICE_CATALOG_2022_2023 } from "@/data/samsungDeviceCatalog2022";
 import { APPLE_DEVICE_CATALOG } from "@/data/appleDeviceCatalog";
 
+export interface DeviceInspection {
+  battery_health?: number;
+  display_condition?: string;
+  camera_condition?: string;
+  biometric_status?: string;
+  box_available?: boolean;
+  bill_available?: boolean;
+  warranty_available?: boolean;
+  is_repaired?: boolean;
+  water_damage?: boolean;
+  accessories_available?: boolean;
+  location?: string;
+  vibo_score?: number;
+}
+
 export interface ValuationRequest {
   catalog_product_id: string;
   storage: string;
   condition: string;
   defects: string[];
   age_months: number;
+  inspection?: DeviceInspection;
+  mode?: "cash" | "exchange";
+}
+
+export interface ValuationOutcome {
+  estimated_price: number;
+  base_price: number;
+  inspection_factor: number;
+  exchange_bonus: number;
+  source: "database_rpc" | "catalog_fallback" | "floor_fallback";
 }
 
 export interface LeadData {
@@ -31,6 +56,56 @@ export interface LeadData {
   imei?: string;
   assigned_store_id?: string;
   source?: string;
+  inspection?: DeviceInspection;
+  exchange_mode?: boolean;
+  submission_key?: string;
+}
+
+const EXCHANGE_MODE_BONUS_FACTOR = 1.05;
+
+/**
+ * Deterministic inspection adjustment applied uniformly on top of the database
+ * RPC price and the local fallback price, so both paths stay comparable.
+ * Clamped to [0.75, 1.06] so a single bad input cannot swing the quote wildly.
+ */
+export function inspectionPriceFactor(inspection?: DeviceInspection): number {
+  if (!inspection) return 1;
+
+  let factor = 1;
+
+  const battery = inspection.battery_health;
+  if (typeof battery === "number") {
+    if (battery >= 95) factor *= 1.0;
+    else if (battery >= 85) factor *= 0.98;
+    else if (battery >= 75) factor *= 0.95;
+    else factor *= 0.9;
+  }
+
+  switch (inspection.display_condition) {
+    case "minor": factor *= 0.97; break;
+    case "cracked": factor *= 0.92; break;
+    case "perfect": break;
+  }
+
+  switch (inspection.camera_condition) {
+    case "minor": factor *= 0.98; break;
+    case "faulty": factor *= 0.94; break;
+    case "perfect": break;
+  }
+
+  if (inspection.biometric_status === "not_working") factor *= 0.96;
+
+  if (inspection.water_damage) factor *= 0.85;
+  if (inspection.is_repaired) factor *= 0.95;
+
+  let docBonus = 0;
+  if (inspection.box_available) docBonus += 0.01;
+  if (inspection.bill_available) docBonus += 0.01;
+  if (inspection.warranty_available) docBonus += 0.01;
+  if (inspection.accessories_available) docBonus += 0.01;
+  factor *= 1 + docBonus;
+
+  return Math.max(0.75, Math.min(1.06, factor));
 }
 
 function isMissingColumnError(error: { message?: string; code?: string } | null) {
@@ -153,43 +228,65 @@ async function mirrorLeadQuote(leadData: LeadData, phone: string, email: string,
     imei: leadData.imei ? sanitizeText(leadData.imei, 15) : undefined,
     catalog_product_id: leadData.catalog_product_id,
     age_months: leadData.age_months,
+    inspection: leadData.inspection
+      ? {
+          ...leadData.inspection,
+          exchange_mode: leadData.exchange_mode ?? false,
+        }
+      : undefined,
   };
 
-  const richPayload = {
-    user_id: currentUserId,
-    type: "cash",
-    device,
-    condition: device.condition,
-    defects: device.defects,
-    quoted_value: leadData.quoted_value,
-    quote_amount: leadData.quoted_value,
+  // `leads_quotes` is a compatibility/history table. Its live contract is
+  // intentionally kept to the restored columns; the full inspection snapshot
+  // is preserved in notes instead of sending columns that do not exist there.
+  const mirrorPayload = {
+    user_id: currentUserId ?? null,
     name: sanitizeText(leadData.customer_name, 120),
     phone,
     email,
     device_brand: device.brand,
     device_model: device.model,
+    condition: device.condition,
+    quote_amount: leadData.quoted_value,
     assigned_store: leadData.assigned_store_id || null,
-    partner_store_id: leadData.assigned_store_id || null,
     status: "new",
-    notes: `Source: ${sanitizeText(leadData.source ?? "website", 60)}`,
+    notes: JSON.stringify({
+      source: sanitizeText(leadData.source ?? "website", 60),
+      storage: device.storage,
+      defects: device.defects,
+      age_months: device.age_months,
+      imei: device.imei,
+      catalog_product_id: device.catalog_product_id,
+      inspection: device.inspection,
+      exchange_mode: leadData.exchange_mode ?? false,
+      submission_key: leadData.submission_key,
+    }),
   };
 
   try {
-    const first = await supabase.from("leads_quotes").insert(richPayload);
-    if (!first.error || !isCompatibilityInsertError(first.error)) return;
+    const result = await supabase.from("leads_quotes").insert(mirrorPayload);
+    if (!result.error) return;
 
-    await supabase.from("leads_quotes").insert({
-      user_id: currentUserId,
-      type: "cash",
-      device,
-      condition: device.condition,
-      defects: device.defects,
-      quoted_value: leadData.quoted_value,
-      partner_store_id: leadData.assigned_store_id || null,
-      status: "new",
-    });
+    // Older deployments may have a stricter or partially restored history
+    // schema. Retry only with the stable required columns; never let a mirror
+    // failure turn a successfully persisted canonical lead into a UI failure.
+    if (isCompatibilityInsertError(result.error)) {
+      await supabase.from("leads_quotes").insert({
+        user_id: currentUserId ?? null,
+        name: mirrorPayload.name,
+        phone: mirrorPayload.phone,
+        email: mirrorPayload.email,
+        device_brand: mirrorPayload.device_brand,
+        device_model: mirrorPayload.device_model,
+        condition: mirrorPayload.condition,
+        quote_amount: mirrorPayload.quote_amount,
+        assigned_store: mirrorPayload.assigned_store,
+        status: mirrorPayload.status,
+      });
+    }
   } catch {
-    // The canonical sell_phone_leads write already succeeded; this mirror is for admin compatibility.
+    // The canonical sell_phone_leads write already succeeded; this mirror is
+    // for history/admin compatibility and must not block the customer flow.
   }
 }
 
@@ -936,18 +1033,30 @@ export const sellPhoneService = {
     return fallbackDevices;
   },
 
-  // Get all brands with fallback to arkostoreData
+  // Get all brands with fallback to arkostoreData.
+  // Real brands schema: logo (not logo_url) and string status (not is_active).
   async getBrands() {
     const { data, error } = await supabase
       .from("brands")
-      .select("id, name, slug, logo_url, sort_order")
-      .eq("is_active", true)
+      .select("id, name, slug, logo, sort_order, status")
+      .eq("status", "active")
       .order("sort_order", { ascending: true })
       .abortSignal(sellCatalogRequestSignal());
 
     // If DB fails or returns empty, use fallback
     if (!error && data && data.length > 0) {
-      return sortSellBrands(data as BrandData[]);
+      return sortSellBrands(
+        (data as Array<{ id: string; name: string; slug: string; logo?: string | null; sort_order?: number }>).map(
+          (brand) => ({
+            id: brand.id,
+            name: brand.name,
+            slug: brand.slug,
+            logo_url: brand.logo ?? undefined,
+            active: true,
+            sort_order: brand.sort_order,
+          }) as BrandData,
+        ),
+      );
     }
 
     // Fallback: Generate from arkostoreData
@@ -959,7 +1068,7 @@ export const sellPhoneService = {
     const { data, error } = await supabase
       .from("catalog_products")
       .select(`
-        id, name, slug, image_url, brand:brands(name, logo_url), model:device_models(name),
+        id, name, slug, image_url, brand:brands(name, logo), model:device_models(name),
         admin_pinned, popularity_score, search_count, click_count
       `)
       .eq("is_active", true)
@@ -972,7 +1081,10 @@ export const sellPhoneService = {
 
     // If DB has data, use it
     if (!error && data && data.length > 0) {
-      return data;
+      return (data as Array<Record<string, any>>).map((item) => ({
+        ...item,
+        brand: item.brand ? { name: item.brand.name, logo_url: item.brand.logo ?? undefined } : item.brand,
+      }));
     }
 
     // Fallback: Return top devices from arkostoreData
@@ -1048,7 +1160,7 @@ export const sellPhoneService = {
   },
 
   // Calculate valuation using database rules with fallback to arkostoreData
-  async calculateValuation(request: ValuationRequest) {
+  async calculateValuation(request: ValuationRequest): Promise<ValuationOutcome> {
     // Only canonical database UUIDs may be passed to the typed RPC. Offline
     // catalog IDs are handled locally and must never trigger a UUID error.
     if (isDatabaseCatalogId(request.catalog_product_id)) {
@@ -1063,7 +1175,9 @@ export const sellPhoneService = {
           })
           .abortSignal(sellCatalogRequestSignal());
 
-        if (!error && Number(data) > 0) return Math.round(Number(data));
+        if (!error && Number(data) > 0) {
+          return this.finalizeValuationOutcome(Math.round(Number(data)), request, "database_rpc");
+        }
       } catch {
         // Continue to the deterministic local fallback.
       }
@@ -1071,15 +1185,36 @@ export const sellPhoneService = {
 
     // Get fallback price from catalog
     const basePrice = await getFallbackCatalogPrice(request.catalog_product_id);
-    
+
     // If we have a catalog price, use it
     if (basePrice > 0) {
-      return calculateFallbackValuation(basePrice, request);
+      return this.finalizeValuationOutcome(calculateFallbackValuation(basePrice, {
+        storage: request.storage,
+        condition: request.condition,
+        defects: request.defects,
+        age_months: request.age_months,
+      }), request, "catalog_fallback");
     }
 
     // Final fallback: use arkostoreData with local estimation
     // This shouldn't happen often but ensures wizard works even with no data
-    return Math.max(5000, Math.round(20000 * getConditionFactor(request.condition)));
+    const floorPrice = Math.max(5000, Math.round(20000 * getConditionFactor(request.condition)));
+    return this.finalizeValuationOutcome(floorPrice, request, "floor_fallback");
+  },
+
+  // Apply the shared inspection/exchange adjustments to a base valuation so
+  // RPC-backed and locally-estimated quotes respond to the same inputs.
+  finalizeValuationOutcome(basePrice: number, request: Pick<ValuationRequest, "inspection" | "mode">, source: ValuationOutcome["source"]): ValuationOutcome {
+    const inspectionFactor = inspectionPriceFactor(request.inspection);
+    const exchangeBonus = request.mode === "exchange" ? EXCHANGE_MODE_BONUS_FACTOR : 1;
+    const estimated = Math.max(5000, Math.round(basePrice * inspectionFactor * exchangeBonus));
+    return {
+      estimated_price: estimated,
+      base_price: basePrice,
+      inspection_factor: inspectionFactor,
+      exchange_bonus: exchangeBonus,
+      source,
+    };
   },
 
   // Save lead
@@ -1098,7 +1233,16 @@ export const sellPhoneService = {
     if (!isValidNepalPhone(phone)) throw new Error("Invalid Nepal mobile number");
     if (leadData.imei && !isValidImei(leadData.imei)) throw new Error("Invalid IMEI");
 
-    const canonicalPayload = {
+    const inspectionDetails: Record<string, unknown> | undefined = leadData.inspection
+      ? {
+          ...leadData.inspection,
+          exchange_mode: leadData.exchange_mode ?? false,
+        }
+      : leadData.exchange_mode
+        ? { exchange_mode: true }
+        : undefined;
+
+    const canonicalPayload: Record<string, unknown> = {
       user_id: currentUserId,
       assigned_store_id: leadData.assigned_store_id || null,
       brand: sanitizeText(leadData.brand, 80),
@@ -1115,18 +1259,71 @@ export const sellPhoneService = {
       source: sanitizeText(leadData.source ?? "website", 60),
     };
 
-    let { data, error } = await supabase
+    // Optional newer columns — retried without them when the live table lags
+    // behind the latest migration.
+    if (inspectionDetails) canonicalPayload.inspection_details = inspectionDetails;
+    if (leadData.submission_key) canonicalPayload.submission_key = leadData.submission_key;
+
+    const insertQuery = supabase
       .from("sell_phone_leads")
-      .insert([canonicalPayload])
-      .select()
-      .single();
+      .insert([canonicalPayload]);
+
+    // Anonymous RLS permits INSERT but not SELECT. Avoid RETURNING for guests;
+    // authenticated users can still receive the created row for history links.
+    let data: Record<string, unknown> | null = null;
+    let error: { message?: string; code?: string } | null = null;
+    if (currentUserId) {
+      const result = await insertQuery.select().single();
+      data = result.data;
+      error = result.error;
+    } else {
+      const result = await insertQuery;
+      data = result.data;
+      error = result.error;
+    }
+
+    // Table without the new optional columns yet — retry the canonical insert
+    // without them before degrading to the legacy shape.
+    if (error && isMissingColumnError(error) && (inspectionDetails || leadData.submission_key)) {
+      const reducedPayload = { ...canonicalPayload };
+      delete reducedPayload.inspection_details;
+      delete reducedPayload.submission_key;
+      const reducedQuery = supabase
+        .from("sell_phone_leads")
+        .insert([reducedPayload]);
+      const reduced = currentUserId
+        ? await reducedQuery.select().single()
+        : { data: null, error: await reducedQuery };
+      data = reduced.data;
+      error = reduced.error;
+    }
+
+    // Anonymous clients may insert but cannot SELECT rows. A unique-key
+    // conflict therefore means a previous attempt already persisted this lead;
+    // acknowledge it without an unauthorized lookup.
+    if (error?.code === "23505" && leadData.submission_key && !currentUserId) {
+      await mirrorLeadQuote(leadData, phone, email, currentUserId);
+      return { ...canonicalPayload, idempotent: true };
+    }
+
+    // Idempotent resubmission for authenticated users: return the existing
+    // lead row so the caller can continue normally after a retry.
+    if (error?.code === "23505" && leadData.submission_key) {
+      const existing = await supabase
+        .from("sell_phone_leads")
+        .select()
+        .eq("submission_key", leadData.submission_key)
+        .maybeSingle();
+      if (existing.data) return existing.data;
+    }
 
     if (error?.code === "23514") {
-      const constraintResult = await supabase
+      const constraintQuery = supabase
         .from("sell_phone_leads")
-        .insert([{ ...canonicalPayload, condition: normalizeLegacyCondition(canonicalPayload.condition) }])
-        .select()
-        .single();
+        .insert([{ ...canonicalPayload, condition: normalizeLegacyCondition(canonicalPayload.condition) }]);
+      const constraintResult = currentUserId
+        ? await constraintQuery.select().single()
+        : { data: null, error: await constraintQuery };
 
       data = constraintResult.data;
       error = constraintResult.error;
@@ -1148,11 +1345,12 @@ export const sellPhoneService = {
         Object.assign(legacyPayload, canonicalPayload);
       }
 
-      const legacyResult = await supabase
+      const legacyQuery = supabase
         .from("sell_phone_leads")
-        .insert([legacyPayload])
-        .select()
-        .single();
+        .insert([legacyPayload]);
+      const legacyResult = currentUserId
+        ? await legacyQuery.select().single()
+        : { data: null, error: await legacyQuery };
 
       data = legacyResult.data;
       error = legacyResult.error;

@@ -337,8 +337,15 @@ export default function SuperAdminLayout() {
                 </Link>
               </Button>
 
-              {/* Notifications placeholder */}
-              <Button variant="ghost" size="icon" className="h-8 w-8 relative">
+              {/* Notifications are not connected to a backend feed yet; keep the affordance truthful. */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 relative"
+                aria-label="Notifications unavailable"
+                disabled
+                title="Notifications are not configured"
+              >
                 <Bell className="h-4 w-4" />
               </Button>
 

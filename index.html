@@ -4,20 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <script>
-      (() => {
-        try {
-          const saved = localStorage.getItem("theme");
-          const theme = saved === "light" || saved === "dark"
-            ? saved
-            : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-          document.documentElement.classList.add(theme);
-          document.documentElement.style.colorScheme = theme;
-        } catch {
-          document.documentElement.classList.add("light");
-        }
-      })();
-    </script>
+    <meta name="theme-color" content="#3347FF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Tamrakar" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.simpleicons.org" />
+    <link rel="preconnect" href="https://supabase.co" />
+    <script src="/theme-init.js"></script>
     <title>Tamrakar Complex - Tech News, Reviews & Gadget Prices in Nepal</title>
     <meta name="description" content="Your trusted source for the latest tech news, smartphone reviews, laptop prices, and gadget comparisons in Nepal. Stay updated with Tamrakar Complex." />
     <meta name="author" content="Tamrakar Complex" />
@@ -40,6 +37,33 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": "https://tamrakarcomplex.com/#organization",
+        "name": "Tamrakar Complex",
+        "url": "https://tamrakarcomplex.com",
+        "logo": "https://tamrakarcomplex.com/favicon.png",
+        "image": "https://tamrakarcomplex.com/og-image.png",
+        "description": "Nepal-first gadget hub for buying, selling, exchanging, repairing, comparing and discovering trusted stores.",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Pako, New Road",
+          "addressLocality": "Kathmandu",
+          "addressCountry": "NP"
+        },
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "telephone": "+977-015351731",
+          "contactType": "customer service",
+          "areaServed": "NP",
+          "availableLanguage": ["Nepali", "English"]
+        },
+        "areaServed": "Nepal"
+      }
+    </script>
   </head>
 
   <body>

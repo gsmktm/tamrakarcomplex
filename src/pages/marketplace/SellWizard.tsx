@@ -86,6 +86,18 @@ const CATEGORY_OPTIONS = [
   { value: "other" as const, label: "Electronics, TVs, & More" },
 ];
 
+/**
+ * Map a store_products.product_type back into a SellWizard form category.
+ * Phone types collapse to "mobile"; store "accessory" aligns with the form's
+ * "accessories" option; laptop/tablet/audio/watch/gaming/other pass through.
+ */
+function storeProductTypeToFormCategory(productType: string | null | undefined): string {
+  const value = productType || "new_phone";
+  if (["new_phone", "used_phone", "phone"].includes(value)) return "mobile";
+  if (value === "accessory") return "accessories";
+  return value;
+}
+
 const SUBCATEGORY_OPTIONS: Record<string, string[]> = {
   mobile: ["Smartphone", "Feature Phone", "Accessories Bundle"],
   laptop: ["MacBook", "Windows Laptop", "Gaming Laptop", "Ultrabook"],
@@ -163,6 +175,7 @@ export default function SellWizard() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(!!id);
+  const [editSource, setEditSource] = useState<"user_listing" | "store_product">("user_listing");
   const [estimate, setEstimate] = useState<number | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [profileCompletion, setProfileCompletion] = useState<{ pct: number; missing: string[] } | null>(null);
@@ -219,68 +232,112 @@ export default function SellWizard() {
     if (id) {
       const fetchListing = async () => {
         try {
-          const { data, error } = await supabase
+          // Unified marketplace rows can live in sell_listings (personal) or
+          // store_products (store inventory). Try the personal table first.
+          let rawData: Record<string, any> | null = null;
+          let source: "user_listing" | "store_product" = "user_listing";
+
+          const userResult = await supabase
             .from("sell_listings")
             .select("*")
             .eq("id", id)
-            .single();
+            .maybeSingle();
+          if (userResult.error) throw userResult.error;
 
-          if (error) throw error;
-
-          if (data) {
-            const decoded = decodeListingDescription(data.description);
-            const meta = decoded.meta;
-            const specs = meta?.specs ?? {};
-             // Check if user is listing owner, store owner, or platform admin.
-             let canEdit = Boolean(isAdmin || (session && data.user_id === session.user.id));
-             if (!canEdit && session && data.store_id) {
-               const { data: storeOwner } = await supabase
-                 .from("stores")
-                 .select("owner_id")
-                 .eq("id", data.store_id)
-                 .maybeSingle();
-               canEdit = storeOwner?.owner_id === session.user.id;
-             }
-             if (session && !canEdit) {
-               toast({
-                 title: "Access denied",
-                 description: "You do not have permission to edit this listing.",
-                 variant: "destructive",
-               });
-               navigate("/marketplace");
-               return;
-             }
-
-            form.reset({
-              listing_type: data.listing_type || "sell",
-              title: data.title,
-              description: decoded.text || "",
-              price: Number(data.price),
-              condition: (data.condition as "new" | "like_new" | "used" | "fair") || "used",
-              category: (data.category as z.infer<typeof formSchema>["category"]) || "mobile",
-              subcategory: meta?.subcategory || "",
-              brand: data.brand || "",
-              model: data.model || "",
-              location: data.location || "",
-              hide_precise_location: Boolean(meta?.hide_precise_location),
-              location_radius_km: typeof meta?.location_radius_km === "number" ? meta.location_radius_km : 3,
-              delivery_meetup: Boolean(meta?.delivery?.meetup ?? true),
-              delivery_home_delivery: Boolean(meta?.delivery?.home_delivery ?? false),
-              delivery_courier: Boolean(meta?.delivery?.courier ?? false),
-              delivery_notes: meta?.delivery?.notes || "",
-              available_date: meta?.available_date ? new Date(meta.available_date) : undefined,
-              item_details: meta?.item_details || "",
-              specs_storage: specs.Storage || "",
-              specs_ram: specs.RAM || "",
-              specs_color: specs.Color || "",
-              specs_battery: specs["Battery / Health"] || "",
-              specs_cpu: specs.Processor || "",
-              specs_gpu: specs.Graphics || "",
-              specs_screen: specs.Screen || "",
-              contact_info: data.contact_info || "",
-              images: data.images || [],
-            });
+          if (userResult.data) {
+            rawData = userResult.data;
+          } else {
+            const storeResult = await supabase
+              .from("store_products")
+              .select("*, store:stores(id, name, owner_id, owner_user_id)")
+              .eq("id", id)
+              .maybeSingle();
+            if (storeResult.error) throw storeResult.error;
+            if (!storeResult.data) throw new Error("Listing not found");
+            rawData = storeResult.data;
+            source = "store_product";
           }
+
+          const data = rawData;
+          const decoded = decodeListingDescription(data.description);
+          const meta = decoded.meta;
+          const specs = meta?.specs ?? {};
+
+          // Check if user is listing owner, store owner/members, or platform admin.
+          let canEdit = Boolean(isAdmin || (session && data.user_id === session.user.id));
+          if (!canEdit && session && data.store_id) {
+            const { data: storeOwner } = await supabase
+              .from("stores")
+              .select("owner_id, owner_user_id")
+              .eq("id", data.store_id)
+              .maybeSingle();
+            canEdit = Boolean(
+              storeOwner &&
+                (storeOwner.owner_id === session.user.id || storeOwner.owner_user_id === session.user.id),
+            );
+            if (!canEdit) {
+              const [{ data: adminRow }, { data: staffRow }] = await Promise.all([
+                supabase
+                  .from("store_admins")
+                  .select("store_id")
+                  .eq("store_id", data.store_id)
+                  .eq("user_id", session.user.id)
+                  .eq("status", "active")
+                  .maybeSingle(),
+                (supabase as any).from("store_staff").select("store_id").eq("store_id", data.store_id).eq("user_id", session.user.id).eq("status", "active").maybeSingle(),
+              ]);
+              canEdit = Boolean(adminRow || staffRow);
+            }
+          }
+          if (session && !canEdit) {
+            toast({
+              title: "Access denied",
+              description: "You do not have permission to edit this listing.",
+              variant: "destructive",
+            });
+            navigate("/marketplace");
+            return;
+          }
+          if (!session) {
+            navigate("/auth?redirect=" + encodeURIComponent(`/marketplace/edit/${id}`));
+            return;
+          }
+
+          setEditSource(source);
+
+          const categoryValue = source === "store_product"
+            ? storeProductTypeToFormCategory(data.product_type)
+            : (data.category as z.infer<typeof formSchema>["category"]) || "mobile";
+
+          form.reset({
+            listing_type: data.listing_type || "sell",
+            title: data.title,
+            description: decoded.text || "",
+            price: Number(data.price),
+            condition: (data.condition as "new" | "like_new" | "used" | "fair") || "used",
+            category: categoryValue,
+            subcategory: meta?.subcategory || "",
+            brand: data.brand || "",
+            model: data.model || "",
+            location: data.location || "",
+            hide_precise_location: Boolean(meta?.hide_precise_location),
+            location_radius_km: typeof meta?.location_radius_km === "number" ? meta.location_radius_km : 3,
+            delivery_meetup: Boolean(meta?.delivery?.meetup ?? true),
+            delivery_home_delivery: Boolean(meta?.delivery?.home_delivery ?? false),
+            delivery_courier: Boolean(meta?.delivery?.courier ?? false),
+            delivery_notes: meta?.delivery?.notes || "",
+            available_date: meta?.available_date ? new Date(meta.available_date) : undefined,
+            item_details: meta?.item_details || "",
+            specs_storage: specs.Storage || "",
+            specs_ram: specs.RAM || "",
+            specs_color: specs.Color || "",
+            specs_battery: specs["Battery / Health"] || "",
+            specs_cpu: specs.Processor || "",
+            specs_gpu: specs.Graphics || "",
+            specs_screen: specs.Screen || "",
+            contact_info: data.contact_info || "",
+            images: data.images || [],
+          });
         } catch (error: unknown) {
           toast({
             title: "Error fetching listing",
@@ -397,9 +454,10 @@ export default function SellWizard() {
       const safeLocation = values.hide_precise_location ? toCoarseLocation(values.location) : values.location;
 
       if (id) {
-        // Update existing listing
+        // Update existing listing — routed to the correct table by source
         const updated = await updateListingMutation.mutateAsync({
           id,
+          sourceType: editSource,
           data: {
             title: values.title,
             description: descriptionWithMeta,

@@ -29,6 +29,7 @@ import { ChatWidget } from "@/components/chat/ChatWidget";
 import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
 
 import "@/styles/dynamic-theme.css";
+import "@/styles/design-system.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +52,42 @@ const VisitorTracker = () => {
   return null;
 };
 
+/**
+ * Skip-to-content link for keyboard & screen-reader users.
+ * Works on every route regardless of whether the page author added
+ * `id="main-content"` to its <main> element.
+ */
+const SkipToContent = () => {
+  return (
+    <a
+      href="#main-content"
+      onClick={(event) => {
+        // Prefer the real <main> landmark when the page has one; fall back
+        // to a global anchor so focus always lands in viewport content.
+        event.preventDefault();
+        const main = document.querySelector("main");
+        if (main) {
+          const el = main as HTMLElement;
+          if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+          el.focus({ preventScroll: true });
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+        const anchor = document.getElementById("main-content");
+        if (anchor) {
+          const el = anchor as HTMLElement;
+          if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+          el.focus({ preventScroll: true });
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }}
+      className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[9999] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-primary-foreground focus:shadow-lg"
+    >
+      Skip to content
+    </a>
+  );
+};
+
 const AppContent = () => {
   const [enableLiveEditor, setEnableLiveEditor] = useState(false);
 
@@ -66,6 +103,7 @@ const AppContent = () => {
 
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <SkipToContent />
       <VisitorTracker />
       <SiteSettingsHydrator />
       <DynamicFavicon />

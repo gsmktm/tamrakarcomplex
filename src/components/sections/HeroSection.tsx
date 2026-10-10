@@ -1,72 +1,66 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Clock, User, ChevronLeft, ChevronRight, TrendingUp } from "lucide-react";
+import { ArrowRight, ChevronRight, Star, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useFeaturedArticles, useArticles } from "@/hooks/useArticles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
+import { Reveal, Stagger } from "@/components/home/Reveal";
 
 const categoryColorMap: Record<string, string> = {
-  mobile: "category-mobile",
-  laptop: "category-laptop",
-  tablet: "category-tablet",
-  audio: "category-audio",
-  watch: "category-watch",
-  gaming: "category-gaming",
-  news: "category-mobile",
-  review: "category-laptop",
-  comparison: "category-tablet",
-  guide: "category-audio",
-  price: "category-watch",
+  mobile: "bg-blue-500",
+  laptop: "bg-purple-500",
+  tablet: "bg-emerald-500",
+  audio: "bg-amber-500",
+  watch: "bg-pink-500",
+  gaming: "bg-red-500",
+  news: "bg-blue-500",
+  review: "bg-purple-500",
+  comparison: "bg-emerald-500",
+  guide: "bg-amber-500",
+  price: "bg-pink-500",
 };
 
+const highlights = [
+  { icon: Zap, label: "Instant Sell", value: "Get quote in 60s", href: "/sell-your-phone" },
+  { icon: Star, label: "Verified Stores", value: "250+ trusted", href: "/stores" },
+  { icon: TrendingUp, label: "Best Prices", value: "Nepal-wide", href: "/cat/mobiles" },
+];
+
 interface HeroSectionProps {
-    settings?: {
-        autoplay?: boolean;
-        interval?: number;
-        showTrending?: boolean;
-    };
+  settings?: {
+    autoplay?: boolean;
+    interval?: number;
+    showTrending?: boolean;
+  };
 }
 
 export function HeroSection({ settings = {} }: HeroSectionProps) {
-  const { autoplay = true, interval: slideInterval = 5000, showTrending = true } = settings;
+  const { autoplay = true, interval: slideInterval = 6000, showTrending = true } = settings;
   const [currentSlide, setCurrentSlide] = useState(0);
   const { data: featuredArticles, isLoading: featuredLoading } = useFeaturedArticles();
   const { data: trendingArticles, isLoading: trendingLoading } = useArticles(5);
 
+  const slides = useMemo(() => featuredArticles || [], [featuredArticles]);
+
   useEffect(() => {
-    if (!featuredArticles || featuredArticles.length === 0 || !autoplay) return;
-    
-    const intervalId = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % featuredArticles.length);
-    }, slideInterval);
-    return () => clearInterval(intervalId);
-  }, [featuredArticles, autoplay, slideInterval]);
+    if (slides.length <= 1 || !autoplay) return;
+    const id = setInterval(() => setCurrentSlide((p) => (p + 1) % slides.length), slideInterval);
+    return () => clearInterval(id);
+  }, [slides.length, autoplay, slideInterval]);
 
-  const nextSlide = () => {
-    if (featuredArticles) {
-      setCurrentSlide((prev) => (prev + 1) % featuredArticles.length);
-    }
-  };
-
-  const prevSlide = () => {
-    if (featuredArticles) {
-      setCurrentSlide((prev) => (prev - 1 + featuredArticles.length) % featuredArticles.length);
-    }
-  };
+  const goTo = (i: number) => setCurrentSlide((i + slides.length) % slides.length);
+  const current = slides[currentSlide];
 
   if (featuredLoading) {
     return (
-      <section className="py-6 lg:py-10">
+      <section className="pt-4 pb-8 lg:pt-8 lg:pb-12">
         <div className="container">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <Skeleton className="aspect-[16/10] rounded-xl" />
-            </div>
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-16" />
-              ))}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-8"><Skeleton className="aspect-[16/10] rounded-3xl" /></div>
+            <div className="lg:col-span-4 space-y-3">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}
             </div>
           </div>
         </div>
@@ -75,134 +69,143 @@ export function HeroSection({ settings = {} }: HeroSectionProps) {
   }
 
   return (
-    <section className="py-6 lg:py-10">
-      <div className="container">
-        <div className={`grid grid-cols-1 ${showTrending ? 'lg:grid-cols-12' : 'lg:grid-cols-1'} gap-6`}>
-          {/* Main Featured Slider */}
-          <div className={`${showTrending ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
-            <div className="relative rounded-3xl overflow-hidden group border border-border/60 bg-card shadow-elevated">
-              {featuredArticles && featuredArticles.length > 0 && (
-                <>
-                  <Link to={`/stores/article/${featuredArticles[currentSlide].slug}`}>
-                    <div className="relative aspect-[16/10]">
+    <section className="relative pt-4 pb-8 lg:pt-8 lg:pb-12 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-hero pointer-events-none" />
+      <div className="container relative">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <div className="lg:col-span-8">
+            <Reveal>
+              <div className="relative group rounded-3xl overflow-hidden bg-card shadow-soft">
+                {current && (
+                  <>
+                    <div className="relative aspect-[16/10] overflow-hidden">
                       <img
-                        src={featuredArticles[currentSlide].image || "/placeholder.svg"}
-                        alt={featuredArticles[currentSlide].title}
-                        className="w-full h-full object-cover transition-transform duration-700"
+                        src={current.image_url || current.thumbnail || current.image || "/og-image.png"}
+                        alt={current.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                        loading="eager"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-transparent" />
-                      
-                      <div className="absolute bottom-0 left-0 right-0 p-6 lg:p-8">
-                        <div className="flex items-center gap-3 mb-4">
-                          <span
-                            className={`category-badge ${categoryColorMap[featuredArticles[currentSlide].category] || "category-mobile"}`}
-                          >
-                          {featuredArticles[currentSlide].category_label || featuredArticles[currentSlide].category}
-                          </span>
-                          <span className="text-xs text-white/70">
-                            {featuredArticles[currentSlide].read_time || "5 min read"}
-                          </span>
-                        </div>
-                        
-                        <h2 className="font-display text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-3 leading-tight">
-                          {featuredArticles[currentSlide].title}
-                        </h2>
-                        
-                        <p className="text-white/80 mb-4 line-clamp-2 max-w-2xl">
-                          {featuredArticles[currentSlide].excerpt}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent" />
+                    </div>
+                    <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-8 lg:p-10">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className={`inline-flex items-center h-6 rounded-full px-3 text-[10px] font-bold uppercase tracking-widest text-white ${categoryColorMap[current.category || "news"] || "bg-blue-500"}`}>
+                          {current.category_label || current.category}
+                        </span>
+                        <span className="text-white/60 text-xs">
+                          {formatDistanceToNow(new Date(current.created_at || Date.now()), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <h2 className="text-2xl md:text-3xl lg:text-4xl font-display font-extrabold text-white leading-[1.1] max-w-2xl line-clamp-3">
+                        {current.title}
+                      </h2>
+                      {current.excerpt && (
+                        <p className="text-white/70 text-sm md:text-base mt-3 max-w-xl line-clamp-2 hidden md:block">
+                          {current.excerpt}
                         </p>
-                        
-                        <div className="flex items-center gap-4 text-sm text-white/70">
-                          <span className="flex items-center gap-1">
-                            <User className="w-4 h-4" />
-                            {featuredArticles[currentSlide].author}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            {formatDistanceToNow(new Date(featuredArticles[currentSlide].created_at), { addSuffix: true })}
-                          </span>
-                        </div>
+                      )}
+                      <div className="mt-5">
+                        <Button asChild size="lg" className="hero-gradient text-white font-bold gap-2 shadow-glow-blue">
+                          <Link to={`/stores/article/${current.slug}`}>
+                            Read Story <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
                       </div>
                     </div>
-                  </Link>
-
-                  {/* Navigation Arrows */}
-                  <button
-                    onClick={prevSlide}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-card/15 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-card/25 border border-white/15"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={nextSlide}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-card/15 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-card/25 border border-white/15"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-
-                  {/* Dots */}
-                  <div className="absolute bottom-4 right-4 flex gap-2">
-                    {featuredArticles.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentSlide(index)}
-                        className={`w-2 h-2 rounded-full transition-all ${
-                          index === currentSlide ? "bg-accent w-7" : "bg-card/50 hover:bg-card/70"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+                    <div className="absolute top-1/2 -translate-y-1/2 left-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => goTo(currentSlide - 1)} className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+                        <ChevronRight className="h-5 w-5 rotate-180" />
+                      </button>
+                    </div>
+                    <div className="absolute top-1/2 -translate-y-1/2 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => goTo(currentSlide + 1)} className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </div>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                      {slides.map((_, i) => (
+                        <button key={i} onClick={() => setCurrentSlide(i)} className={`h-1.5 rounded-full transition-all duration-300 ${i === currentSlide ? "w-8 bg-white" : "w-1.5 bg-white/40 hover:bg-white/60"}`} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </Reveal>
           </div>
 
-          {/* Trending Sidebar */}
+          {/* ── Trending Sidebar ─────────────────────────────── */}
           {showTrending && (
-              <div className="lg:col-span-4 space-y-4">
-                <div className="rounded-3xl border border-border/60 bg-card shadow-card p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="w-5 h-5 text-accent" />
-                    <h3 className="font-display text-lg font-bold">Trending</h3>
+            <div className="lg:col-span-4">
+              <Reveal delay={150}>
+                <div className="surface-elevated rounded-3xl p-5 h-full">
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                      </div>
+                      <h3 className="text-heading">Trending Now</h3>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] font-bold">Live</Badge>
                   </div>
-                
-                  {trendingLoading ? (
-                    <div className="space-y-3">
-                      {[...Array(5)].map((_, i) => (
-                        <Skeleton key={i} className="h-16" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-border/60">
-                      {trendingArticles?.slice(0, 5).map((article, index) => (
-                        <Link
-                          key={article.id}
-                          to={`/stores/article/${article.slug}`}
-                          className="flex gap-3 group py-3 first:pt-1 last:pb-1"
-                        >
-                          <span className="font-display text-base font-bold text-muted-foreground/40 w-8 shrink-0 pt-0.5">
-                            #{index + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
-                              {article.title}
-                            </h4>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(article.created_at), { addSuffix: true })}
+
+                  <div className="space-y-1">
+                    {trendingLoading ? (
+                      [...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)
+                    ) : (
+                      <Stagger staggerMs={60}>
+                        {trendingArticles?.slice(0, 4).map((article, i) => (
+                          <Link
+                            key={article.id}
+                            to={`/stores/article/${article.slug}`}
+                            className="flex gap-4 p-3 rounded-2xl hover:bg-secondary/50 transition-colors group"
+                          >
+                            <span className="text-3xl font-display font-black text-primary/15 w-10 shrink-0 group-hover:text-primary/30 transition-colors">
+                              {String(i + 1).padStart(2, "0")}
                             </span>
-                          </div>
-                          <img
-                            src={article.image || "/placeholder.svg"}
-                            alt={article.title}
-                            className="w-16 h-12 rounded-lg object-cover shrink-0 border border-border/50"
-                          />
-                        </Link>
-                      ))}
-                    </div>
-                  )}
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-sm font-semibold line-clamp-2 group-hover:text-primary transition-colors leading-snug">
+                                {article.title}
+                              </h4>
+                              <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                                <span className="capitalize">{article.category}</span>
+                                <span className="text-border">·</span>
+                                {formatDistanceToNow(new Date(article.created_at || Date.now()), { addSuffix: true })}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </Stagger>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </Reveal>
+            </div>
           )}
+        </div>
+
+        {/* ── Highlight Strip ──────────────────────────────── */}
+        <div className="mt-6">
+          <Reveal delay={300}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {highlights.map(({ icon: Icon, label, value, href }) => (
+                <Link
+                  key={label}
+                  to={href}
+                  className="surface-elevated rounded-2xl p-4 flex items-center gap-4 hover-lift group"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/15 transition-colors">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">{label}</p>
+                    <p className="text-xs text-muted-foreground">{value}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                </Link>
+              ))}
+            </div>
+          </Reveal>
         </div>
       </div>
     </section>

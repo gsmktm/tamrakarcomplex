@@ -35,7 +35,14 @@ Disallow: /suadmin/
 Disallow: /staffadmin/
 Disallow: /storeadmin/
 Disallow: /user/
+Disallow: /auth
+Disallow: /account
+Disallow: /profile
+Disallow: /dashboard
+Disallow: /wishlist
 Disallow: /checkout
+Disallow: /order-success
+Disallow: /order-failed
 Disallow: /marketplace/edit/
 Disallow: /marketplace/sell
 

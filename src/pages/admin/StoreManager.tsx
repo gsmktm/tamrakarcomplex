@@ -1017,21 +1017,21 @@ const StoreManager = () => {
                <PaginationContent>
                  <PaginationItem>
                    <PaginationPrevious
-                     href="#"
-                     isActive={storePage === 0}
+                     aria-disabled={storePage === 0}
+                     tabIndex={storePage === 0 ? -1 : undefined}
                      onClick={() => storePage > 0 && setStorePage(storePage - 1)}
                    />
                  </PaginationItem>
                  <PaginationItem>
-                   <PaginationLink href="#" isActive>
+                   <PaginationLink isActive aria-label={`Current page, page ${storePage + 1}`}>
                      Page {storePage + 1}
                    </PaginationLink>
                  </PaginationItem>
                  <PaginationItem>
                    <PaginationNext
-                     href="#"
-                     isActive
-                     onClick={() => setStorePage(storePage + 1)}
+                     aria-disabled={filteredStores.length < PAGINATION.PAGE_SIZE_SMALL}
+                     tabIndex={filteredStores.length < PAGINATION.PAGE_SIZE_SMALL ? -1 : undefined}
+                     onClick={() => filteredStores.length === PAGINATION.PAGE_SIZE_SMALL && setStorePage(storePage + 1)}
                    />
                  </PaginationItem>
                </PaginationContent>

@@ -1,15 +1,27 @@
 import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Smartphone, Banknote, Wrench, Store, MessageCircle } from "lucide-react";
+import { readAppSettings } from "@/lib/siteSettings";
 
 export const MobileStickyCTA = () => {
   const navigate = useNavigate();
+  const [settings, setSettings] = useState(readAppSettings());
 
+  useEffect(() => {
+    const sync = () => setSettings(readAppSettings());
+    window.addEventListener("app-settings-update", sync);
+    return () => window.removeEventListener("app-settings-update", sync);
+  }, []);
+
+  const whatsappDigits = (settings.contact_info.whatsapp || "").replace(/[^0-9]/g, "");
   const actions = [
     { label: "Price", icon: Smartphone, href: "/mobile-price" },
     { label: "Sell", icon: Banknote, href: "/sell-your-phone" },
     { label: "Repair", icon: Wrench, href: "/repair" },
     { label: "Stores", icon: Store, href: "/stores" },
-    { label: "Chat", icon: MessageCircle, href: "https://wa.me/9779851091542" },
+    ...(whatsappDigits
+      ? [{ label: "Chat", icon: MessageCircle, href: `https://wa.me/${whatsappDigits}` }]
+      : []),
   ];
 
   return (

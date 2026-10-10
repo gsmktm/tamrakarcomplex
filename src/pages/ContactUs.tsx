@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -21,6 +21,8 @@ import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { getErrorMessage } from "@/lib/utils";
 import { submitContactMessage } from "@/services/submissionService";
+import { readAppSettings } from "@/lib/siteSettings";
+import { normalizePhone } from "@/lib/security";
 import { useSearchParams } from "react-router-dom";
 
 const formSchema = z.object({
@@ -33,10 +35,22 @@ const formSchema = z.object({
 export default function ContactUs() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [contactInfo, setContactInfo] = useState(readAppSettings().contact_info);
   const [searchParams] = useSearchParams();
   const requestedModel = searchParams.get("model")?.trim() ?? "";
   const requestedVariant = searchParams.get("variant")?.trim() ?? "";
   const isBuyingInquiry = searchParams.get("intent") === "buy" && Boolean(requestedModel);
+
+  useEffect(() => {
+    const sync = () => setContactInfo(readAppSettings().contact_info);
+    window.addEventListener("app-settings-update", sync);
+    return () => window.removeEventListener("app-settings-update", sync);
+  }, []);
+
+  const whatsappNumber = normalizePhone(contactInfo.whatsapp).replace(/[^0-9]/g, "");
+  const mobileDigits = whatsappNumber.replace(/^977/, "");
+  const displayMobile = `+977-${mobileDigits}`;
+  const landline = contactInfo.phone || "+977-015351731";
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -112,11 +126,11 @@ export default function ContactUs() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold mb-1">Customer Support</h3>
-                  <p className="text-muted-foreground">Landline: +977-015351731</p>
+                  <p className="text-muted-foreground">Landline: {landline}</p>
                   <div className="flex items-center gap-3 mt-1">
-                    <p className="text-muted-foreground">Mobile/WhatsApp: +977-9851091542</p>
+                    <p className="text-muted-foreground">Mobile/WhatsApp: {displayMobile}</p>
                     <a
-                      href="https://api.whatsapp.com/send?phone=9779851091542"
+                      href={`https://api.whatsapp.com/send?phone=${whatsappNumber}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#25D366] text-white text-sm font-medium hover:bg-[#128C7E] transition-colors"

@@ -121,6 +121,24 @@ function checkLinks(definedRoutes) {
   return errors;
 }
 
+function checkPlaceholderAdminLinks() {
+  const files = getAllFiles(SRC_DIR);
+  let errors = 0;
+
+  files.forEach((file) => {
+    if (!file.endsWith('.tsx') && !file.endsWith('.ts')) return;
+    if (file.includes(`${path.sep}components${path.sep}ui${path.sep}`)) return;
+
+    const content = fs.readFileSync(file, 'utf8');
+    if (/href\s*=\s*["']#['"]/.test(content)) {
+      console.error(`[PLACEHOLDER LINK] ${file}: found href="#"`);
+      errors++;
+    }
+  });
+
+  return errors;
+}
+
 function checkApiRoutes() {
   let errors = 0;
   
@@ -175,7 +193,10 @@ const linkErrors = checkLinks(routes);
 console.log('Checking API route consistency...');
 const apiErrors = checkApiRoutes();
 
-const totalErrors = linkErrors + apiErrors;
+console.log('Checking for placeholder internal links...');
+const placeholderErrors = checkPlaceholderAdminLinks();
+
+const totalErrors = linkErrors + apiErrors + placeholderErrors;
 
 if (totalErrors > 0) {
   console.log(`\nFinished with ${totalErrors} potential route errors.`);

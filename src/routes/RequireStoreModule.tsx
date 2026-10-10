@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -13,12 +13,27 @@ import { usePermissions } from "@/hooks/usePermissions";
  * once loaded and the module is not granted we show a friendly deny screen.
  */
 export function RequireStoreModule({ moduleKey, children }: { moduleKey: string; children: ReactNode }) {
-  const { role, storeAdminPermissions, storeAdminPermissionsLoaded } = usePermissions();
+  const { role, storeAdminPermissions, storeAdminPermissionsLoaded, error: permissionsError, refetch } = usePermissions();
   const location = useLocation();
 
   if (role !== "storeadmin") {
     // Other roles are filtered by their own route guards.
     return <>{children}</>;
+  }
+
+  if (!storeAdminPermissionsLoaded && permissionsError) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-6 text-center">
+        <RefreshCw className="h-10 w-10 text-destructive" />
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Store permissions unavailable</h2>
+          <p className="mt-2 max-w-md text-muted-foreground">We could not verify this module right now. Protected data remains locked.</p>
+        </div>
+        <Button variant="outline" onClick={() => void refetch()}>
+          <RefreshCw className="mr-2 h-4 w-4" /> Retry access check
+        </Button>
+      </div>
+    );
   }
 
   if (!storeAdminPermissionsLoaded) {

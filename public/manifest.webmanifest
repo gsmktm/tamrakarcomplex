@@ -1,0 +1,62 @@
+{
+  "name": "Tamrakar Complex — Nepal's Gadget Hub",
+  "short_name": "Tamrakar",
+  "description": "Buy, sell, exchange, repair, compare and discover trusted gadget stores in Nepal.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2EFE5",
+  "theme_color": "#3347FF",
+  "categories": ["shopping", "business", "local"],
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse Gadgets",
+      "short_name": "Shop",
+      "url": "/cat/mobiles?tab=buy",
+      "icons": [{ "src": "/favicon.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Sell Your Phone",
+      "short_name": "Sell",
+      "url": "/sell-your-phone"
+    },
+    {
+      "name": "Book a Repair",
+      "short_name": "Repair",
+      "url": "/repair/book"
+    },
+    {
+      "name": "Marketplace",
+      "short_name": "Market",
+      "url": "/marketplace"
+    }
+  ]
+}

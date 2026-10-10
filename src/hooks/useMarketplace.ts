@@ -4,7 +4,7 @@
  * React hooks for marketplace operations with entitlements enforcement
  */
 
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { checkPackageLimit, getStoreEntitlements, resolveEffectiveStorePackage } from "@/lib/storeEntitlements";
@@ -12,6 +12,7 @@ import type {
   Listing,
   MarketplaceListing,
   ListingSearchFilters,
+  ListingCondition,
   CreateListingInput,
   UpdateListingInput,
   ListingInquiry,
@@ -29,6 +30,24 @@ const STORE_PACKAGE_PRIORITY: Record<string, number> = {
 
 function getPackagePriority(packageSlug: string | null | undefined) {
   return STORE_PACKAGE_PRIORITY[packageSlug ?? "free"] ?? 4;
+}
+
+/**
+ * Canonical store_products.product_type for a marketplace form category.
+ *
+ * The marketplace category list collapses every phone variant to "mobile"
+ * (see the inverse map in useMarketplaceListings and the public_marketplace_items
+ * view). Persisting "mobile" directly into store_products would write a
+ * non-canonical product_type and silently re-categorize store inventory on
+ * every create/edit round-trip. Phone categories therefore map back to the
+ * canonical phone values; all other categories (tablet, laptop, accessory…)
+ * pass through unchanged.
+ */
+function canonicalStoreProductType(category: string, condition?: ListingCondition): string {
+  if (category === "mobile") {
+    return condition === "new" ? "new_phone" : "used_phone";
+  }
+  return category;
 }
 
 /**
@@ -213,6 +232,7 @@ export function useStoreListings(storeId: string | null | undefined) {
  */
 export function useCreateListing() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: CreateListingInput) => {
@@ -266,7 +286,7 @@ export function useCreateListing() {
             model: input.model || null,
             description: input.description || null,
             condition: input.condition,
-            product_type: input.category || "mobile",
+            product_type: canonicalStoreProductType(input.category || "mobile", input.condition),
             price: input.price,
             stock_quantity: 1,
             images: input.images || [],
@@ -276,6 +296,7 @@ export function useCreateListing() {
           .single();
 
         if (error) throw error;
+        void queryClient.invalidateQueries({ queryKey: ["marketplace-listings"] });
         return {
           ...data,
           user_id: user.id,
@@ -311,42 +332,101 @@ export function useCreateListing() {
         .single();
 
       if (error) throw error;
+      void queryClient.invalidateQueries({ queryKey: ["marketplace-listings"] });
       return data as Listing;
     },
   });
 }
 
 /**
- * Update listing mutation
+ * Update listing mutation.
+ *
+ * Source-aware: unified marketplace rows can be personal `sell_listings` or
+ * store `store_products`. When the caller does not declare the source, the row
+ * is located first. RLS remains the final authorization layer.
  */
 export function useUpdateListing() {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateListingInput }) => {
+    mutationFn: async ({ id, data, sourceType }: { id: string; data: UpdateListingInput; sourceType?: "store_product" | "user_listing" }) => {
+      let table: "sell_listings" | "store_products" = "sell_listings";
+      if (sourceType === "store_product") {
+        table = "store_products";
+      } else if (!sourceType) {
+        const { data: userRow } = await supabase
+          .from("sell_listings")
+          .select("id")
+          .eq("id", id)
+          .maybeSingle();
+        if (!userRow) table = "store_products";
+      }
+
+      let payload: Record<string, unknown>;
+      if (table === "store_products") {
+        // store_products uses product_type instead of category and has no
+        // contact_info/store_id swap through this path.
+        payload = {};
+        if (data.title !== undefined) payload.title = data.title;
+        if (data.description !== undefined) payload.description = data.description;
+        if (data.price !== undefined) payload.price = data.price;
+        if (data.condition !== undefined) payload.condition = data.condition;
+        if (data.brand !== undefined) payload.brand = data.brand;
+        if (data.model !== undefined) payload.model = data.model;
+        if (data.images !== undefined) payload.images = data.images;
+        if (data.category !== undefined) payload.product_type = canonicalStoreProductType(data.category, data.condition);
+      } else {
+        payload = { ...data };
+      }
+
       const { data: updated, error } = await supabase
-        .from("sell_listings")
-        .update(data)
+        .from(table)
+        .update(payload)
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
-      return updated as Listing;
+
+      void queryClient.invalidateQueries({ queryKey: ["marketplace-listings"] });
+      void queryClient.invalidateQueries({ queryKey: ["listing-detail", id] });
+      return { ...(updated as Listing), listing_type: table === "store_products" ? "store_product" : (updated as Listing).listing_type };
     },
   });
 }
 
 /**
- * Delete listing mutation
+ * Delete listing mutation.
+ *
+ * Source-aware: deletes from `sell_listings` for personal listings and from
+ * `store_products` for store inventory rows. RLS enforces ownership.
  */
 export function useDeleteListing() {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, sourceType }: { id: string; sourceType?: "store_product" | "user_listing" }) => {
+      let table: "sell_listings" | "store_products" = "sell_listings";
+      if (sourceType === "store_product") {
+        table = "store_products";
+      } else if (!sourceType) {
+        const { data: userRow } = await supabase
+          .from("sell_listings")
+          .select("id")
+          .eq("id", id)
+          .maybeSingle();
+        if (!userRow) table = "store_products";
+      }
+
       const { error } = await supabase
-        .from("sell_listings")
+        .from(table)
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+
+      void queryClient.invalidateQueries({ queryKey: ["marketplace-listings"] });
+      void queryClient.invalidateQueries({ queryKey: ["listing-detail", id] });
     },
   });
 }

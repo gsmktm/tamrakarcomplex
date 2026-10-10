@@ -79,6 +79,7 @@ export default {
         rating: {
           star: "var(--rating-star)",
         },
+        gold: "var(--gold)",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -91,6 +92,7 @@ export default {
         card: "var(--shadow-card)",
         elevated: "var(--shadow-elevated)",
         glow: "var(--shadow-glow)",
+        gold: "var(--shadow-gold)",
       },
       keyframes: {
         "accordion-down": {
