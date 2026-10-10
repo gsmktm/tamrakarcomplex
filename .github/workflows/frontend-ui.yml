@@ -37,3 +37,13 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_REQUIRE_SUBSCRIPTION: "true"
           NODE_ENV: production
+      - name: Browser homepage smoke (mobile, tablet, desktop)
+        run: node scripts/homepage-browser-smoke.cjs
+      - name: Upload viewport screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-viewport-preview
+          path: artifacts/homepage/
+          if-no-files-found: ignore
+          retention-days: 7
