@@ -1,6 +1,6 @@
 # Tamrakar Complex — Storefront V3 Design & Rollout
 
-**Status:** Draft PR #3; Vite build, unit tests and route checks passed in independent storefront regression workflow (run 38072213634). Strict TypeScript check remains a release blocker; see issue #4. Latest commits still require re-validation.
+**Status:** Draft PR #3. Original Vite build and regression tests passed; recent commits require current CI review. Mandatory TypeScript errors and production dependency advisories are active release blockers, tracked in issues #4 and #5.
 **Scope:** First frontend redesign increment; not a whole-platform rewrite.
 **Primary site:** https://tamrakarcomplex.com/
 **Codebase:** React / Vite / TypeScript / Tailwind / Supabase.
@@ -39,9 +39,21 @@ A premium Nepal-based technology marketplace: midnight navy, restrained antique 
 
 GitHub Actions mandatory CI type-check failed on the first V3 branch commit with approximately **1,851 TypeScript errors across 152 files**. The primary categories include stale generated Supabase types versus newer schema migrations, missing RPC/column definitions, and role/test-type mismatches. Connected Supabase access does not include the Tamrakar project's database, so schema regeneration is not currently grounded. This is tracked in [issue #4](https://github.com/gsmktm/tamrakarcomplex/issues/4). Do not skip type-check or disable typing to obtain a green CI badge.
 
+## Security dependency blocker
+
+Enforcing the production `npm audit --omit=dev --audit-level=high` check exposed **10 existing advisories (6 high, 3 moderate, 1 low)**. Previously `continue-on-error: true` allowed the audit job to succeed despite vulnerabilities. The audit now correctly fails. See [issue #5](https://github.com/gsmktm/tamrakarcomplex/issues/5). Remediation requires updating the npm lockfile in a verified online workspace; some transitive advisories have no published patch and need scoped review. Do not claim that all security scans passed or that security is certified.
+
+## Agent and sub-agent configuration
+
+Root `AGENTS.md` and `.github/copilot-instructions.md` now describe the Tamrakar Complex system instead of an unrelated research app. Five repository GitHub Copilot agent profiles are configured under `.github/agents/`: technical lead, schema integrity, frontend craft, security review, and test reliability. Profiles prepare bounded delegation when run in a supporting GitHub Copilot environment; **they do not launch agents automatically or prove that any agent was run**.
+
+Search in the global dialog is now read-only while typing. The prior automatic `log_search_and_build_auto_page` RPC is not called on keystrokes; SEO-page publishing should occur through a separately authorized administrative workflow. Search result routing, default catalog fallback and legacy redirects have regression tests.
+
+A diagnostic-only TypeScript inventory is available through `scripts/typecheck-inventory.cjs` and uploaded as a GitHub Actions artifact. Mandatory strict TypeScript CI remains unchanged.
+
 ## Verification still required
 
-Independent GitHub Actions build and unit/route checks passed in run 38072213634. Security scans passed in run 38072213623. These do not supersede the mandatory failing strict TypeScript check, and end-to-end browser and production payment tests remain unverified. Run from a checked-out copy:
+The Vite build, unit tests and route checks passed in original independent regression run 38072213634; the new tests and scripts need current-head verification. Initial security jobs were green because audit findings did not fail the job. The fixed audit gate has now exposed the dependency issues above. These results do not supersede the mandatory failing strict TypeScript check, and end-to-end browser and production payment tests remain unverified. Run from a checked-out copy:
 
 ```bash
 npm ci
