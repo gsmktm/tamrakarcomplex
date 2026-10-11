@@ -5,6 +5,7 @@ on:
     paths:
       - "src/**"
       - "public/**"
+      - "scripts/typecheck-inventory.cjs"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/storefront-regression.yml"
@@ -37,6 +38,25 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run check-routes
+
+  typecheck-inventory:
+    name: Diagnostic only · strict TypeScript error inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Inventory existing type errors (does not waive mandatory CI)
+        run: node scripts/typecheck-inventory.cjs --report-only
+      - name: Upload classified compiler diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: typescript-inventory
+          path: artifacts/typescript-inventory.*
+          retention-days: 7
 
 # These checks intentionally run independently of strict TypeScript checks.
 # The original CI type-check remains mandatory and is not disabled.
