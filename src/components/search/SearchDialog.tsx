@@ -175,6 +175,14 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     navigate(getSearchResultDestination(result));
   };
 
+  const browseAllResults = () => {
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return;
+    onOpenChange(false);
+    setQuery("");
+    navigate("/cat/mobiles?tab=buy&q=" + encodeURIComponent(cleanQuery));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[720px] p-0 gap-0 overflow-hidden rounded-3xl border border-border/60">
@@ -189,6 +197,12 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 placeholder="Search products, guides, stores, and services…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && query.trim()) {
+                    event.preventDefault();
+                    browseAllResults();
+                  }
+                }}
                 className="h-12 rounded-full pl-11 pr-10 bg-secondary/40 border-border/60 focus-visible:ring-2 focus-visible:ring-ring"
                 maxLength={100}
                 autoFocus
@@ -274,6 +288,18 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             </div>
           )}
         </div>
+        {query.trim() && (
+          <div className="border-t border-border/60 bg-card p-3">
+            <button
+              type="button"
+              onClick={browseAllResults}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            >
+              Search all catalog listings
+              <Search className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
