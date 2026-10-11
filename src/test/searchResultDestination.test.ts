@@ -26,7 +26,7 @@ describe("getSearchResultDestination", () => {
   it("does not navigate to an external or script URL from result metadata", () => {
     expect(getSearchResultDestination({ type: "product", slug: "safe", href: "javascript:alert(1)" }))
       .toBe("/product/safe");
-    expect(getSearchResultDestination({ type: "store", slug: "safe", href: "//example.com" }))
+    expect(getSearchResultDestination({ type: "store", slug: "safe", href: "/" + "/example.com" }))
       .toBe("/stores/safe");
   });
 
