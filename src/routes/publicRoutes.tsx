@@ -4,6 +4,7 @@ import { RequireAuth } from "@/routes/RequireAuth";
 import { ParamRouteRedirect } from "@/components/routing/ParamRouteRedirect";
 import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
 import { RouteFallback } from "@/components/routing/RouteFallback";
+import { getCatalogRedirectDestination } from "@/lib/catalogRedirect";
 
 // Eager load critical routes
 import Index from "@/pages/Index";
@@ -86,9 +87,7 @@ function RedirectModelToNew() {
 
 function RedirectBuyToCatalog() {
   const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  params.set("tab", "buy");
-  return <Navigate to={"/cat/mobiles?" + params.toString() + location.hash} replace />;
+  return <Navigate to={getCatalogRedirectDestination(location.search, location.hash)} replace />;
 }
 
 function RedirectArticleToStores() {
