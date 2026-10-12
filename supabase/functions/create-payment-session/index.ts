@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     // Get order details
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
-      .select('id, user_id, total_amount, payment_status, payment_method')
+      .select('id, user_id, total_amount, payment_status, payment_method, order_status')
       .eq('id', order_id)
       .eq('user_id', user.id)
       .single()
@@ -67,18 +67,22 @@ Deno.serve(async (req) => {
     // provider-registry lookup so cash checkout never depends on the
     // payment_providers migration having been applied.
     if (payment_method === 'cod') {
-      const { data: confirmedOrders, error: updateError } = await supabaseClient
-        .from('orders')
-        .update({ order_status: 'confirmed' })
-        .eq('id', order_id)
-        .eq('user_id', user.id)
-        .eq('payment_method', 'cod')
-        .eq('payment_status', 'pending')
-        .select('id')
+      // create_order_atomic_v2 already sets COD to 'confirmed'.
+      // Avoid a redundant client-side RLS update that may silently match no
+      // rows; only transition older pending COD orders when necessary.
+      if (order.order_status !== 'confirmed') {
+        const { data: confirmedOrders, error: updateError } = await supabaseClient
+          .from('orders')
+          .update({ order_status: 'confirmed' })
+          .eq('id', order_id)
+          .eq('user_id', user.id)
+          .eq('payment_method', 'cod')
+          .eq('payment_status', 'pending')
+          .select('id')
 
-      // An RLS denial may update zero rows without returning an error.
-      if (updateError || !confirmedOrders?.length) {
-        throw new Error('Failed to confirm Cash on Delivery order')
+        if (updateError || !confirmedOrders?.length) {
+          throw new Error('Failed to confirm Cash on Delivery order')
+        }
       }
 
       // Calculate commissions for COD — service-role client, matching
