@@ -7,9 +7,10 @@ on:
       - "package-lock.json"
 jobs:
   candidate:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'design/premium-storefront-v3-20261010' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,9 +21,28 @@ jobs:
         run: |
           npm pkg set 'dependencies.dompurify=^3.4.16' 'overrides.source-map-js=^1.2.2'
           npm install --package-lock-only --ignore-scripts --no-fund --no-audit
-      - name: Report dependency audit of candidate (diagnostic only)
+      - name: Verify reproducible install and program tests
+        run: |
+          npm ci --ignore-scripts --no-fund
+          npm test
+          npm run build
+          npm run check-routes
+      - name: Report remaining advisory findings (diagnostic only; security gate separate)
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
+      - name: Commit verified manifest and lockfile candidate to PR branch
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "No lockfile changes needed"
+            exit 0
+          fi
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add package.json package-lock.json
+          git commit -m "security: update DOMPurify and source-map-js with valid npm lockfile"
+          git push origin "HEAD:refs/heads/${HEAD_BRANCH}"
       - name: Upload regenerated manifest and lockfile for review
         uses: actions/upload-artifact@v4
         with:
