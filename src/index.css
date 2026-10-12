@@ -71,8 +71,8 @@
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-    --shadow-cobalt: 0 0 20px rgba(59, 130, 246, 0.15);
-    --shadow-amber: 0 0 20px rgba(245, 158, 11, 0.15);
+    --shadow-cobalt: 0 0 20px rgba(39, 79, 128, 0.13);
+    --shadow-amber: 0 0 20px rgba(196, 154, 74, 0.17);
 
     /* Component shadows referenced by tailwind.config.ts boxShadow map */
     --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 8px 24px -8px rgba(15, 23, 42, 0.10);
@@ -280,14 +280,14 @@
   .border-navy { border-color: #334155; }
 
   /* Cobalt blue utilities */
-  .bg-cobalt { background-color: #3B82F6; }
-  .bg-cobalt-hover:hover { background-color: #2563EB; }
-  .text-cobalt { color: #3B82F6; }
-  .border-cobalt { border-color: #3B82F6; }
+  .bg-cobalt { background-color: var(--cobalt); }
+  .bg-cobalt-hover:hover { background-color: var(--cobalt-hover); }
+  .text-cobalt { color: var(--cobalt); }
+  .border-cobalt { border-color: var(--cobalt); }
 
   /* Amber gold utilities */
   .bg-amber { background-color: var(--gold); }
-  .bg-amber-hover:hover { background-color: #D97706; }
+  .bg-amber-hover:hover { background-color: var(--amber-hover); }
   .text-amber { color: var(--gold-ink); }
   .border-amber { border-color: var(--gold); }
 
@@ -311,16 +311,16 @@
 
   /* Gradients - Clean, modern */
   .gradient-navy-cobalt {
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #3B82F6 100%);
+    background: linear-gradient(135deg, #101C33 0%, #172944 60%, #274F80 100%);
   }
   .gradient-cobalt {
-    background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
+    background: linear-gradient(135deg, #274F80 0%, #101C33 100%);
   }
   .gradient-navy {
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    background: linear-gradient(135deg, #101C33 0%, #233451 100%);
   }
   .gradient-hero {
-    background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+    background: linear-gradient(180deg, #101C33 0%, #172944 100%);
   }
   .gradient-light {
     background: linear-gradient(180deg, #FFFFFF 0%, #F9FAFB 100%);
@@ -388,16 +388,16 @@
 
   /* Badge Styles - Clean */
   .badge-verified {
-    @apply bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/30 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1;
+    @apply px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1; background: color-mix(in srgb, var(--success) 11%, transparent); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
   }
   .badge-featured {
-    @apply bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/30 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1;
+    @apply px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1; background: var(--accent); color: var(--gold-ink); border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
   }
   .badge-deal {
-    @apply bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/30 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1;
+    @apply px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1; background: color-mix(in srgb, var(--error) 10%, transparent); color: var(--error); border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
   }
   .badge-new {
-    @apply bg-[#3B82F6]/10 text-[#3B82F6] border border-[#3B82F6]/30 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1;
+    @apply px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1; background: color-mix(in srgb, var(--cobalt) 10%, transparent); color: var(--cobalt); border: 1px solid color-mix(in srgb, var(--cobalt) 30%, transparent);
   }
 
   /* Product Card - Premium */
@@ -1455,7 +1455,7 @@ button:not(:disabled):not([data-no-press]):active,
 .home-sell-cta {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #3B82F6 100%);
+  background: linear-gradient(135deg, #101C33 0%, #172944 60%, #274F80 100%);
   border-radius: 20px;
 }
 .home-sell-cta::before {
@@ -1515,7 +1515,7 @@ button:not(:disabled):not([data-no-press]):active,
 .sell-hero {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+  background: linear-gradient(180deg, #101C33 0%, #172944 100%);
 }
 .sell-hero::before {
   content: "";
