@@ -214,7 +214,7 @@ export function SecurityPanel() {
                 <span className="text-sm">Email</span>
                 <div className="flex items-center gap-2">
                   <Input value={safeText(user?.email)} disabled />
-                  <Badge variant="secondary">Verified</Badge>
+                  <Badge variant="secondary">{user?.email_confirmed_at ? "Verified" : "Unverified"}</Badge>
                 </div>
               </div>
             </div>
