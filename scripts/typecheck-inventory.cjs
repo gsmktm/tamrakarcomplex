@@ -80,7 +80,7 @@ fs.writeFileSync(path.join(outDir, "typescript-inventory.json"), JSON.stringify(
   byFile: Object.fromEntries(top(byFile, byFile.size)),
   byCode: Object.fromEntries(top(byCode, byCode.size)),
   byCauseHeuristic: Object.fromEntries(causes),
-  errors: errors.slice(0, 250),
+  errors, // Preserve every failing location for schema reconciliation; artifact stays diagnostic.
 }, null, 2) + "\n");
 
 process.stdout.write(markdown);
