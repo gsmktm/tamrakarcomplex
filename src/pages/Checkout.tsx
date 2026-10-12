@@ -18,6 +18,7 @@ import { SEO } from "@/components/common/SEO";
 import { getErrorMessage, parseProductPrice } from "@/lib/utils";
 import { isValidEmail, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeText } from "@/lib/security";
 import { secureGatewayUrl } from "@/lib/paymentRedirect";
+import { checkoutIntentFingerprint, type CheckoutIntent } from "@/lib/checkoutIntent";
 
 type CreateOrderSecureResponse = {
   success?: boolean;
@@ -42,7 +43,7 @@ export default function Checkout() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const checkoutIdempotencyKey = useRef(crypto.randomUUID());
+  const checkoutIdempotencyKey = useRef({ signature: "", value: crypto.randomUUID() });
   const checkoutInFlight = useRef(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("cod");
   const { data: methods = [], isLoading: methodsLoading, isError: methodsError } = usePaymentMethods();
@@ -102,29 +103,36 @@ export default function Checkout() {
       if (!isValidNepalPhone(checkoutPhone)) throw new Error("Enter a valid Nepal mobile number.");
       if (checkoutEmail && !isValidEmail(checkoutEmail)) throw new Error("Enter a valid email address.");
 
-      // 1. Create order + items through the secure edge function so price, stock,
-      // rate limit, and commission-critical item fields are validated server-side.
-      const { data, error } = await supabase.functions.invoke<CreateOrderSecureResponse>("create-order-secure", {
-        body: {
-          payment_method: paymentMethod,
-          shipping_address: {
-            address: sanitizeText(formData.address, 240),
-            city: sanitizeText(formData.city, 80),
-          },
-          contact_info: {
-            name: sanitizeText(formData.fullName, 120),
-            phone: checkoutPhone,
-            email: checkoutEmail,
-          },
-          idempotency_key: checkoutIdempotencyKey.current,
-          items: cart.map((item) => ({
-            product_id: item.product.id,
-            source_type: item.product.source_type ?? "product",
-            store_product_id: item.product.store_product_id ?? (item.product.source_type === "store_product" ? item.product.id : null),
-            quantity: item.quantity,
-            store_id: item.product.store_id ?? null,
-          })),
+      // Same checkout intent reuses a key after network failure. Changing
+      // provider, quantities or shipping data creates a new server order key.
+      const intent: CheckoutIntent = {
+        payment_method: paymentMethod,
+        shipping_address: {
+          address: sanitizeText(formData.address, 240),
+          city: sanitizeText(formData.city, 80),
         },
+        contact_info: {
+          name: sanitizeText(formData.fullName, 120),
+          phone: checkoutPhone,
+          email: checkoutEmail,
+        },
+        items: cart.map(item => ({
+          product_id: item.product.id,
+          source_type: item.product.source_type ?? "product",
+          store_product_id: item.product.store_product_id ??
+            (item.product.source_type === "store_product" ? item.product.id : null),
+          quantity: item.quantity,
+          store_id: item.product.store_id ?? null,
+        })),
+      };
+      const fingerprint = checkoutIntentFingerprint(intent);
+      if (checkoutIdempotencyKey.current.signature !== fingerprint) {
+        checkoutIdempotencyKey.current = { signature: fingerprint, value: crypto.randomUUID() };
+      }
+
+      // 1. Secure checkout Edge Function recomputes price, stock and owner.
+      const { data, error } = await supabase.functions.invoke<CreateOrderSecureResponse>("create-order-secure", {
+        body: { ...intent, idempotency_key: checkoutIdempotencyKey.current.value },
       });
 
       if (error) throw error;
