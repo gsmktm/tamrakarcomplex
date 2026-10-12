@@ -158,16 +158,19 @@ Deno.serve(async (req) => {
         throw new Error('Failed to update payment record')
       }
       if ((updatedPayments ?? []).length === 0) {
-        // Another verification attempt already settled this payment.
+        // No payment record was transitioned. Do not claim success merely
+        // because another request might have processed it.
+        const { data: latestOrder } = await supabaseClient
+          .from('orders')
+          .select('payment_status')
+          .eq('id', oid)
+          .single()
+        if (latestOrder?.payment_status !== 'paid') {
+          throw new Error('Payment is still pending verification')
+        }
         return new Response(
-          JSON.stringify({
-            success: true,
-            message: 'Payment already verified'
-          }),
-          {
-            headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
-            status: 200,
-          },
+          JSON.stringify({ success: true, message: 'Payment already verified' }),
+          { headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' }, status: 200 },
         )
       }
 
@@ -189,17 +192,17 @@ Deno.serve(async (req) => {
         throw new Error('Failed to update order status')
       }
       if ((updatedOrders ?? []).length === 0) {
-        // A concurrent verify already flipped the order; skip duplicate
-        // commission/payout creation instead of throwing a user-facing error.
+        const { data: latestOrder } = await supabaseClient
+          .from('orders')
+          .select('payment_status')
+          .eq('id', oid)
+          .single()
+        if (latestOrder?.payment_status !== 'paid') {
+          throw new Error('Order payment is not settled yet')
+        }
         return new Response(
-          JSON.stringify({
-            success: true,
-            message: 'Payment already verified'
-          }),
-          {
-            headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
-            status: 200,
-          },
+          JSON.stringify({ success: true, message: 'Payment already verified' }),
+          { headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' }, status: 200 },
         )
       }
 
