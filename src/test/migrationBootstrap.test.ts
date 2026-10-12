@@ -29,6 +29,14 @@ describe("historical Supabase migration replay", () => {
     expect(historical).not.toMatch(/UPDATE\s+auth\.users/i);
     expect(historical).not.toMatch(/INSERT\s+INTO\s+auth\.identities/i);
   });
+  it("reconciles legacy order columns before creating ownership indexes", () => {
+    const paymentMigration = read("20260425121200_payment_commission_payout_system.sql");
+    const addUser = paymentMigration.indexOf("ADD COLUMN IF NOT EXISTS user_id");
+    const indexUser = paymentMigration.indexOf("idx_orders_user_id");
+    expect(addUser).toBeGreaterThanOrEqual(0);
+    expect(indexUser).toBeGreaterThan(addUser);
+    expect(paymentMigration).toMatch(/ADD COLUMN IF NOT EXISTS store_id/);
+  });
   it("does not recreate the type or table unconditionally later", () => {
     const content = read(roles);
     expect(content).toMatch(/IF NOT EXISTS[\s\S]*?CREATE TYPE public\.app_role/i);
