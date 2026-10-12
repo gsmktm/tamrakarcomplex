@@ -33,6 +33,12 @@
 - Tests: `paymentRedirect.test.ts`, `checkoutProviderSupport.test.ts`.
 - Tracker: [Issue #6](https://github.com/gsmktm/tamrakarcomplex/issues/6).
 
+### 6. Checkout intent idempotency
+- **Before:** the browser generated one idempotency key for the entire checkout page lifetime, even if payment method, cart or shipping details changed after a failed attempt. The SQL RPC could return an earlier order with an incompatible payment method.
+- **After:** an unchanged checkout intent (provider, cart lines, normalized address and contact fields) reuses its key for retries; a changed intent gets a new key. The submit-in-progress guard remains active.
+- **Source:** `src/lib/checkoutIntent.ts`, `src/pages/Checkout.tsx`.
+- **Tests:** `src/test/checkoutIntent.test.ts`.
+
 ## Cart reliability
 
 - Browser-stored carts are now schema-normalized instead of parsed blindly.
