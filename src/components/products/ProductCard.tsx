@@ -87,7 +87,7 @@ export function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c5a16c]/60 hover:shadow-lg focus-within:border-primary focus-within:shadow-md">
+    <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#C49A4A]/60 hover:shadow-lg focus-within:border-primary focus-within:shadow-md">
       <Link
         to={"/product/" + product.slug}
         className="flex min-w-0 flex-1 flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
@@ -104,7 +104,7 @@ export function ProductCard({ product }: ProductCardProps) {
             height={320}
           />
           {product.featured === true && !outOfStock && (
-            <span className="absolute right-3 top-3 rounded-full border border-[#d4b77d]/50 bg-[#fff5df] px-2.5 py-1 text-[10px] font-bold text-[#7a5729]">
+            <span className="absolute right-3 top-3 rounded-full border border-[#C49A4A]/50 bg-[#F7EEDC] px-2.5 py-1 text-[10px] font-bold text-[#845C1C]">
               Featured
             </span>
           )}
@@ -175,7 +175,7 @@ export function ProductCard({ product }: ProductCardProps) {
               type="button"
               size="sm"
               onClick={handleBuyNow}
-              className="h-10 min-w-0 gap-1 rounded-xl bg-[#b62e43] px-2 text-xs text-white hover:bg-[#972236]"
+              className="h-10 min-w-0 gap-1 rounded-xl bg-[#DC2626] px-2 text-xs text-white hover:bg-[#B91C1C]"
               aria-label={"Buy " + product.name + " now"}
             >
               <Zap className="h-3.5 w-3.5" aria-hidden="true" /> Buy now
