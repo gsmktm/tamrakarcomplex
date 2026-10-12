@@ -29,12 +29,12 @@ interface NavigationBarProps {
   visibleQuickItems: NavItem[];
 }
 
-/* Nav link — white on midnight, violet underline */
+/* Deep-navy navigation with a single antique-gold interaction accent. */
 const navLink =
-  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E4BD7D] focus-visible:after:scale-x-100 [color:oklch(65%_0_0_/_0.65)] hover:[color:oklch(85%_0_0)] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:[background:linear-gradient(90deg,oklch(75%_0.11_75),oklch(77%_0.12_75))] after:transition-transform after:duration-200 hover:after:scale-x-100";
+  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium text-white/75 transition-colors duration-150 hover:text-white aria-[current=page]:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E4BD7D] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:bg-[#C49A4A] after:transition-transform after:duration-200 hover:after:scale-x-100 aria-[current=page]:after:scale-x-100";
 
 const navTrigger =
-  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E4BD7D] [color:oklch(65%_0_0_/_0.65)] hover:[color:oklch(85%_0_0)] data-[state=open]:[color:oklch(85%_0_0)] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:[background:linear-gradient(90deg,oklch(75%_0.11_75),oklch(77%_0.12_75))] after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=open]:after:scale-x-100";
+  "relative inline-flex h-12 items-center whitespace-nowrap px-3 text-sm font-medium text-white/75 transition-colors duration-150 hover:text-white data-[state=open]:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E4BD7D] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:scale-x-0 after:bg-[#C49A4A] after:transition-transform after:duration-200 hover:after:scale-x-100 data-[state=open]:after:scale-x-100";
 
 export function NavigationBar({
   topLevelHomeItem,
@@ -45,13 +45,7 @@ export function NavigationBar({
   const isCurrent = (href: string) => href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <div
-      className="hidden lg:block border-b"
-      style={{
-        background: "linear-gradient(180deg, oklch(17% 0.029 255) 0%, oklch(15% 0.028 255) 100%)",
-        borderColor: "oklch(75% 0.11 75 / 0.18)",
-      }}
-    >
+    <div className="hidden lg:block border-b border-[#C49A4A]/20 bg-[#0E1A2E]">
       <div className="container flex h-12 items-center overflow-x-auto no-scrollbar">
         <NavigationMenu className="max-w-full">
           <NavigationMenuList className="flex-nowrap gap-0">
@@ -170,10 +164,9 @@ export function NavigationBar({
         {/* Phone — right edge */}
         <a
           href="tel:+977015351731"
-          className="ml-auto hidden xl:flex items-center gap-1.5 text-xs font-medium transition-colors pressable hover:opacity-90"
-          style={{ color: "oklch(78% 0.165 65 / 0.80)" }}
+          className="ml-auto hidden xl:flex items-center gap-1.5 text-xs font-medium text-[#E4BD7D] transition-colors pressable hover:text-white"
         >
-          <Phone className="h-3 w-3" style={{ color: "oklch(78% 0.165 65)" }} aria-hidden="true" />
+          <Phone className="h-3 w-3" aria-hidden="true" />
           +977-015351731
         </a>
       </div>
