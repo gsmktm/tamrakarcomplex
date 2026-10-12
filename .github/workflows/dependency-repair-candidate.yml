@@ -1,0 +1,33 @@
+name: Dependency repair candidate
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/dependency-repair-candidate.yml"
+      - "package.json"
+      - "package-lock.json"
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Repair lockfile with registry-verified integrity hashes
+        run: |
+          npm pkg set 'dependencies.dompurify=^3.4.16' 'overrides.source-map-js=^1.2.2'
+          npm install --package-lock-only --ignore-scripts --no-fund --no-audit
+      - name: Report dependency audit of candidate (diagnostic only)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+      - name: Upload regenerated manifest and lockfile for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-lock-candidate
+          path: |
+            package.json
+            package-lock.json
+          retention-days: 3
