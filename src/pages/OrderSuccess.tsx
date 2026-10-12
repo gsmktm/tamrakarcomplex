@@ -149,10 +149,16 @@ export default function OrderSuccess() {
               setStatusMessage("We are waiting for Khalti verification details before confirming payment.");
             }
           } else if (orderData.payment_method === "cod") {
-            // COD has no online settlement — order confirmation is the success state.
-            clearCart();
-            setPaymentStatus("success");
-            setStatusMessage("Your order has been placed successfully.");
+            // COD is confirmed by the server's order_status, not by the
+            // return URL or a locally selected payment method.
+            if (["confirmed", "processing", "shipped", "delivered", "completed"].includes(orderData.order_status)) {
+              clearCart();
+              setPaymentStatus("success");
+              setStatusMessage("Your Cash on Delivery order has been confirmed.");
+            } else {
+              setPaymentStatus("pending");
+              setStatusMessage("We are waiting for your Cash on Delivery order to be confirmed.");
+            }
           } else {
             // Non-COD method without gateway data: keep pending rather than
             // falsely reporting success (e.g. a stranded demo order).
