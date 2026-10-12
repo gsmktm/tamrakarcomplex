@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { Product } from "@/hooks/useProducts";
+import type { Product } from "@/hooks/useProducts";
+import { normalizeStoredCart, safeCartQuantity, MAX_CART_DISTINCT_ITEMS, MAX_CART_ITEM_QUANTITY } from "@/lib/cartState";
 import { parseProductPrice } from "@/lib/utils";
 
 export interface CartItem {
@@ -24,72 +25,90 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem("cart");
-      return saved ? JSON.parse(saved) : [];
+      return saved ? normalizeStoredCart(JSON.parse(saved)) : [];
     } catch {
       return [];
     }
   });
 
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
+    try {
+      localStorage.setItem("cart", JSON.stringify(cart));
+    } catch {
+      // Browsers can deny or exhaust local storage; keep cart usable in memory.
+    }
   }, [cart]);
 
-  const addToCart = (product: Product, quantity = 1) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+  const addToCart = useCallback((product: Product, quantity = 1) => {
+    const amount = safeCartQuantity(quantity);
+    if (!amount || !product?.id || !product.name) {
+      toast.error("Invalid item or quantity");
+      return;
+    }
+    if (product.in_stock === false || product.stock_quantity === 0) {
+      toast.error("This item is currently unavailable");
+      return;
+    }
+    setCart(previous => {
+      const existing = previous.find(item => item.product.id === product.id);
       if (existing) {
-        toast.success("Updated quantity in cart");
-        return prev.map((item) =>
+        return previous.map(item =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: Math.min(MAX_CART_ITEM_QUANTITY, item.quantity + amount) }
             : item
         );
       }
-      toast.success("Added to cart");
-      return [...prev, { product, quantity }];
+      if (previous.length >= MAX_CART_DISTINCT_ITEMS) return previous;
+      return [...previous, { product, quantity: amount }];
     });
-  };
+    toast.success("Cart updated");
+  }, []);
 
-  const removeFromCart = (productId: string) => {
-    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+  const removeFromCart = useCallback((productId: string) => {
+    setCart(previous => previous.filter(item => item.product.id !== productId));
     toast.info("Removed from cart");
-  };
+  }, []);
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = useCallback((productId: string, quantity: number) => {
+    if (!Number.isFinite(quantity) || !Number.isInteger(quantity)) return;
     if (quantity < 1) {
       removeFromCart(productId);
       return;
     }
-    setCart((prev) =>
-      prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
+    const validQuantity = Math.min(quantity, MAX_CART_ITEM_QUANTITY);
+    setCart(previous =>
+      previous.map(item =>
+        item.product.id === productId ? { ...item, quantity: validQuantity } : item
       )
     );
-  };
+  }, [removeFromCart]);
 
-  const clearCart = () => {
+  // Stable callback: payment confirmation effects must not re-verify because
+  // the cart provider happened to re-render.
+  const clearCart = useCallback(() => {
     setCart([]);
-    localStorage.removeItem("cart");
-  };
+    try {
+      localStorage.removeItem("cart");
+    } catch {
+      // State is already cleared even if browser storage is unavailable.
+    }
+  }, []);
 
-  const cartTotal = cart.reduce((total, item) => {
+  const cartTotal = useMemo(() => cart.reduce((total, item) => {
     const price = parseProductPrice(item.product.price_value, item.product.price);
-    return total + price * item.quantity;
-  }, 0);
+    return total + (Number.isFinite(price) && price > 0 ? price * item.quantity : 0);
+  }, 0), [cart]);
 
-  const cartCount = cart.reduce((count, item) => count + item.quantity, 0);
+  const cartCount = useMemo(() =>
+    cart.reduce((count, item) => count + item.quantity, 0), [cart]);
+
+  const contextValue = useMemo(() => ({
+    cart, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, cartCount,
+  }), [cart, addToCart, removeFromCart, updateQuantity, clearCart, cartTotal, cartCount]);
 
   return (
     <CartContext.Provider
-      value={{
-        cart,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        clearCart,
-        cartTotal,
-        cartCount,
-      }}
+      value={contextValue}
     >
       {children}
     </CartContext.Provider>
