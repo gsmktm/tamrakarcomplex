@@ -20,6 +20,9 @@ jobs:
       - name: Repair lockfile with registry-verified integrity hashes
         run: |
           npm pkg set 'dependencies.dompurify=^3.4.16' 'overrides.source-map-js=^1.2.2'
+          # Tailwind animation is a PostCSS/build-time plugin, not browser-runtime JS.
+          npm pkg delete 'dependencies.tailwindcss-animate'
+          npm pkg set 'devDependencies.tailwindcss-animate=^1.0.7'
           npm install --package-lock-only --ignore-scripts --no-fund --no-audit
       - name: Verify reproducible install and program tests
         run: |
@@ -42,6 +45,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git add package.json package-lock.json
           git commit -m "security: update DOMPurify and source-map-js with valid npm lockfile"
+          # Preserve any unrelated developer commits added while CI ran.
+          git fetch origin "$HEAD_BRANCH"
+          git rebase FETCH_HEAD
           git push origin "HEAD:refs/heads/${HEAD_BRANCH}"
       - name: Upload regenerated manifest and lockfile for review
         uses: actions/upload-artifact@v4
