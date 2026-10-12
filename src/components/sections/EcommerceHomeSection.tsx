@@ -589,7 +589,7 @@ function HeroSection({ products }: { products: Product[] }) {
                   <Link
                     to={category.href}
                     key={category.label}
-                    className="rounded-full border border-white/20 px-3 py-1.5 transition-colors hover:border-[#e4bd7d] hover:text-white"
+                    className="rounded-full border border-white/20 px-3 py-1.5 transition-colors hover:border-[#C49A4A] hover:text-white"
                   >
                     {category.label}
                   </Link>
@@ -624,7 +624,7 @@ function HeroSection({ products }: { products: Product[] }) {
               <div className="tc-v3-device" aria-hidden="true">
                 <div className="tc-v3-device-glow" />
                 <div className="tc-v3-device-copy">
-                  <p className="text-[10px] font-semibold uppercase tracking-[.28em] text-[#e9ca94]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[.28em] text-[#E4BD7D]">
                     Tamrakar Complex
                   </p>
                   <p className="mt-3 font-display text-3xl font-bold leading-tight text-white">
@@ -632,7 +632,7 @@ function HeroSection({ products }: { products: Product[] }) {
                     <br />Compare.
                     <br />Connect.
                   </p>
-                  <span className="mt-4 block h-1 w-14 rounded-full bg-[#e9ca94]" />
+                  <span className="mt-4 block h-1 w-14 rounded-full bg-[#C49A4A]" />
                 </div>
               </div>
               {operationTiles.map((tile) => {
@@ -656,9 +656,9 @@ function HeroSection({ products }: { products: Product[] }) {
           <div className="tc-v3-journey mt-12 md:mt-16" aria-label="Explore platform services">
             {heroStats.map(({ stat, label, eyebrow, href, icon: Icon }) => (
               <Link to={href} key={stat}>
-                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#e0be86]" aria-hidden="true" />
+                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#E4BD7D]" aria-hidden="true" />
                 <span>
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-[.14em] text-[#e0be86]">
+                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-[.14em] text-[#E4BD7D]">
                     {eyebrow}
                   </span>
                   <strong>{label}</strong>
@@ -674,7 +674,7 @@ function HeroSection({ products }: { products: Product[] }) {
         <div className="container">
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[.18em] text-[#ad8050]">Explore the market</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-[.18em] text-[#845C1C]">Explore the market</p>
               <h2 id="tc-v3-categories-title" className="font-display text-2xl font-extrabold tracking-tight md:text-3xl">
                 Shop by interest
               </h2>
@@ -682,7 +682,7 @@ function HeroSection({ products }: { products: Product[] }) {
                 Start with a brand or category, then compare available listings and current prices.
               </p>
             </div>
-            <Link to="/cat/mobiles?tab=buy" className="inline-flex items-center gap-2 text-sm font-semibold text-[#b73a4b] hover:underline">
+            <Link to="/cat/mobiles?tab=buy" className="inline-flex items-center gap-2 text-sm font-semibold text-[#B91C1C] hover:underline">
               Explore all products <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
