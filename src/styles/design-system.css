@@ -256,6 +256,12 @@
   border: 1px solid color-mix(in srgb, #B91C1C 20%, transparent);
 }
 
+/* Dark-status badges need brighter ink for small-text contrast. */
+.dark .badge-success { color: var(--success); border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+.dark .badge-warning { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 35%, transparent); }
+.dark .badge-danger { color: var(--error); border-color: color-mix(in srgb, var(--error) 35%, transparent); }
+.dark .badge-soft { color: var(--primary); }
+
 /* ── Scroll-triggered Reveal ──────────────────────────────── */
 .reveal-init {
   opacity: 0;
