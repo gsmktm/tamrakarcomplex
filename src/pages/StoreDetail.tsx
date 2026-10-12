@@ -504,8 +504,13 @@ export default function StoreDetail() {
     staleTime: 5 * 60 * 1000, // 5 min — reviews are slow-changing
   });
 
-  const averageRating = storeReviews?.length 
-    ? (storeReviews.reduce((acc: number, r: { rating: number }) => acc + r.rating, 0) / storeReviews.length).toFixed(1)
+  // Query results can be incomplete while the checked-in Supabase types
+  // are being reconciled. Only finite scores contribute to an average.
+  const validReviewRatings = (storeReviews ?? [])
+    .map((review) => Number((review as unknown as { rating?: unknown }).rating))
+    .filter((rating) => Number.isFinite(rating) && rating >= 0 && rating <= 5);
+  const averageRating = validReviewRatings.length
+    ? (validReviewRatings.reduce((sum, rating) => sum + rating, 0) / validReviewRatings.length).toFixed(1)
     : null;
 
   const { data: storeAccessories } = useQuery({
