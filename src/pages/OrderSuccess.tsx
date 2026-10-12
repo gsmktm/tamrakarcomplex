@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import type { OrderRow } from "@/types/app";
+import { isConfirmedPaymentVerification } from "@/lib/paymentVerification";
 
 type PaymentStatus = "success" | "pending" | "failed";
 
@@ -39,7 +40,7 @@ export default function OrderSuccess() {
   useEffect(() => {
     if (oid) {
       const verifyAndFetchOrder = async () => {
-        // ... existing order fetch
+        try {
         const { data: orderData, error: orderError } = await supabase
           .from("orders")
           .select("*")
@@ -55,8 +56,10 @@ export default function OrderSuccess() {
               { body: payload },
             );
 
-            if (verifyError || verifyData?.success === false) {
-              setPaymentStatus("failed");
+            if (verifyError || !isConfirmedPaymentVerification(verifyData)) {
+              // A blank response, pending gateway or network error must never
+              // be mistaken for successful settlement or clear the cart.
+              setPaymentStatus("pending");
               setStatusMessage(verifyData?.error || verifyError?.message || failureMessage);
             } else {
               // Cart is cleared only after settlement is confirmed.
@@ -125,7 +128,7 @@ export default function OrderSuccess() {
                 setStatusMessage("We are waiting for eSewa verification details before confirming payment.");
               }
             }
-          } else if (orderData.payment_method === "khalti" || khaltiPidx) {
+          } else if (orderData.payment_method === "khalti") {
             if (orderData.payment_status === "paid") {
               clearCart();
               setPaymentStatus("success");
@@ -160,9 +163,15 @@ export default function OrderSuccess() {
           setPaymentStatus("failed");
           setStatusMessage("We could not find this order.");
         }
-        setLoading(false);
+        } catch (error) {
+          console.error("Could not verify order", error);
+          setPaymentStatus("pending");
+          setStatusMessage("Order verification could not be completed. Please check your order again shortly.");
+        } finally {
+          setLoading(false);
+        }
       };
-      verifyAndFetchOrder();
+      void verifyAndFetchOrder();
     } else {
       setPaymentStatus("failed");
       setStatusMessage("Missing order information.");
