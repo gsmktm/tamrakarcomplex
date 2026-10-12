@@ -119,6 +119,10 @@ export default function StoreTeamManager() {
     enabled: !!selectedStore,
   });
 
+  const currentStaffCount = team?.length ?? 0;
+  // Negative limits mean unlimited in the store-package contract.
+  const isLimitReached = staffLimit >= 0 && currentStaffCount >= staffLimit;
+
   const addMemberMutation = useMutation({
     mutationFn: async () => {
       if (!selectedStore || !newMemberEmail) return;
