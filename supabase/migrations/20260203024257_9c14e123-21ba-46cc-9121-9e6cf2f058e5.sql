@@ -1,8 +1,18 @@
--- Create an enum for application roles
-CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user');
+-- Role definitions were bootstrapped before the original 2024 policies.
+-- Keep this historical migration compatible with both fresh local installs
+-- and deployments where these types/tables already exist.
+DO $
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public' AND t.typname = 'app_role'
+  ) THEN
+    CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user');
+  END IF;
+END
+$;
 
--- Create user_roles table for role management
-CREATE TABLE public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     role app_role NOT NULL,
