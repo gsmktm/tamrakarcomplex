@@ -1,7 +1,7 @@
 -- Role definitions were bootstrapped before the original 2024 policies.
 -- Keep this historical migration compatible with both fresh local installs
 -- and deployments where these types/tables already exist.
-DO $
+DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
@@ -10,7 +10,7 @@ BEGIN
     CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user');
   END IF;
 END
-$;
+$$;
 
 CREATE TABLE IF NOT EXISTS public.user_roles (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
