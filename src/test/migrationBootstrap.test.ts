@@ -23,6 +23,12 @@ describe("historical Supabase migration replay", () => {
     expect(content).not.toMatch(/INSERT INTO public\.user_roles/i);
     expect(read(settings)).toMatch(/public\.user_roles/);
   });
+  it("never provisions a known-password administrator during a fresh replay", () => {
+    const historical = read("20260210171000_manual_create_gskmtm.sql");
+    expect(historical).not.toMatch(/INSERT\s+INTO\s+auth\.users/i);
+    expect(historical).not.toMatch(/UPDATE\s+auth\.users/i);
+    expect(historical).not.toMatch(/INSERT\s+INTO\s+auth\.identities/i);
+  });
   it("does not recreate the type or table unconditionally later", () => {
     const content = read(roles);
     expect(content).toMatch(/IF NOT EXISTS[\s\S]*?CREATE TYPE public\.app_role/i);
