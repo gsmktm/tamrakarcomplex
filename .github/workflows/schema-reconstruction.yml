@@ -1,0 +1,53 @@
+name: Local Supabase schema reconstruction
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/schema-reconstruction.yml"
+      - "supabase/migrations/**"
+      - "src/integrations/supabase/types.ts"
+permissions:
+  contents: read
+jobs:
+  schema-candidate:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'design/premium-storefront-v3-20261010' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Read actual installed Supabase CLI usage
+        run: |
+          npx supabase --version
+          npx supabase start --help | head -n 30
+          npx supabase gen types --help | head -n 35
+      - name: Replay repository migrations in an ISOLATED local Docker database
+        id: local_migration
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          npx supabase start --debug > artifacts/supabase-local-migrations.log 2>&1 || {
+            tail -n 100 artifacts/supabase-local-migrations.log
+            exit 1
+          }
+      - name: Generate candidate types (never connected to production)
+        if: steps.local_migration.outcome == 'success'
+        run: |
+          npx supabase gen types --lang typescript --local > artifacts/generated-supabase.types.ts
+          test -s artifacts/generated-supabase.types.ts
+          cp artifacts/generated-supabase.types.ts src/integrations/supabase/types.ts
+          npx tsc -p tsconfig.app.json --noEmit --pretty false > artifacts/tsc-with-local-types.log 2>&1 || true
+          echo "Errors with locally generated migration-derived types: $(grep -c 'error TS' artifacts/tsc-with-local-types.log || true)" | tee artifacts/typecheck-result.txt
+      - name: Upload diagnostic artifacts, even on migration failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-schema-reconstruction
+          path: artifacts/
+          retention-days: 5
+      - name: Stop isolated local database
+        if: always()
+        run: npx supabase stop --no-backup || true
