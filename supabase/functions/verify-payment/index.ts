@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { assertAllowedOrigin, getCorsHeaders, requireUser } from '../_shared/cors.ts'
+import { assertMatchingPaymentMethod, parseEsewaVerification } from '../_shared/paymentGuards.ts'
 
 console.log('verify-payment function loaded')
 
@@ -45,17 +46,10 @@ Deno.serve(async (req) => {
     let amt: string | number
     let refId: string
     if (provider === 'esewa') {
-      const transaction_data = body.transaction_data ?? {
-        oid: body.orderId ?? body.order_id ?? body.oid,
-        amt: body.amount ?? body.amt,
-        refId: body.refId ?? body.ref_id ?? body.rid,
-      }
-      oid = transaction_data.oid
-      amt = transaction_data.amt
-      refId = transaction_data.refId
-      if (!oid || !amt || !refId) {
-        throw new Error('Missing required eSewa verification data')
-      }
+      const verification = parseEsewaVerification(body)
+      oid = verification.orderId
+      amt = verification.amount
+      refId = verification.referenceId
     } else {
       // Khalti: the client sends the pidx returned by the gateway redirect
       // (and the order id from the query string).
@@ -75,13 +69,18 @@ Deno.serve(async (req) => {
 
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
-      .select('id, user_id, total_amount, payment_status')
+      .select('id, user_id, total_amount, payment_status, payment_method')
       .eq('id', oid)
       .single()
 
     if (orderError || !order || order.user_id !== user.id) {
       throw new Error('Order not found')
     }
+
+    // Order identity and provider selection are immutable at settlement.
+    // Without this check, an enabled demo gateway could settle a different
+    // provider's order without completing the intended payment flow.
+    assertMatchingPaymentMethod(order.payment_method, provider)
 
     if (order.payment_status === 'paid') {
       return new Response(
@@ -182,6 +181,7 @@ Deno.serve(async (req) => {
           order_status: 'paid'
         })
         .eq('id', oid)
+        .eq('payment_method', provider)
         .eq('payment_status', 'pending') // atomic guard against concurrent replays
         .select('id')
 
