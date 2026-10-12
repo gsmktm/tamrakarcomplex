@@ -19,10 +19,11 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Outfit", "system-ui", "sans-serif"],
-        display: ["Cormorant Garamond", "Georgia", "serif"],
-        grotesk: ["Space Grotesk", "system-ui", "sans-serif"],
-        mono: ["Space Grotesk", "monospace"],
+        sans: ["Manrope", "Noto Sans Devanagari", "system-ui", "sans-serif"],
+        display: ["Syne", "Noto Sans Devanagari", "system-ui", "sans-serif"],
+        devanagari: ["Noto Sans Devanagari", "Manrope", "system-ui", "sans-serif"],
+        grotesk: ["Manrope", "system-ui", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
         border: "var(--border)",
