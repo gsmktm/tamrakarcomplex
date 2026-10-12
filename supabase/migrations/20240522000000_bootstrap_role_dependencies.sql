@@ -11,7 +11,7 @@ BEGIN
     JOIN pg_namespace AS n ON n.oid = t.typnamespace
     WHERE n.nspname = 'public' AND t.typname = 'app_role'
   ) THEN
-    CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user');
+    CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user', 'suadmin', 'store_owner', 'public_user');
   END IF;
 END
 $$;
