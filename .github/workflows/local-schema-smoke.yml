@@ -1,0 +1,41 @@
+name: Isolated database migration smoke
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - ".github/workflows/local-schema-smoke.yml"
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Start an isolated local Supabase and apply all migrations
+        id: replay
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          npx --yes supabase@latest start --debug > artifacts/db-replay.log 2>&1 || {
+            grep -E -A 18 'ERROR:|Error:|SQLSTATE|failed to apply|failed to start' artifacts/db-replay.log | tail -n 100 || true
+            exit 1
+          }
+      - name: Generate candidate local schema types
+        if: steps.replay.outcome == 'success'
+        run: |
+          npx --yes supabase@latest gen types typescript --local > artifacts/candidate.types.ts
+          test -s artifacts/candidate.types.ts
+      - name: Collect replay errors for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-schema-replay
+          path: artifacts/
+          retention-days: 3
+      - name: Stop isolated stack
+        if: always()
+        run: npx --yes supabase@latest stop --no-backup || true
