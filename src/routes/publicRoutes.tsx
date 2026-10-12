@@ -5,6 +5,7 @@ import { ParamRouteRedirect } from "@/components/routing/ParamRouteRedirect";
 import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
 import { RouteFallback } from "@/components/routing/RouteFallback";
 import { getCatalogRedirectDestination } from "@/lib/catalogRedirect";
+import { legacyDetailDestination } from "@/lib/legacyDetailRoutes";
 
 // Eager load critical routes
 import Index from "@/pages/Index";
@@ -77,12 +78,14 @@ const withSuspense = (Component: React.ComponentType) => (
 
 function RedirectBrandToNew() {
   const { brand } = useParams<{ brand: string }>();
-  return <Navigate to={`/cat/mobiles/${brand ?? ''}`} replace />;
+  const location = useLocation();
+  return <Navigate to={legacyDetailDestination("/cat/mobiles", brand, location.search, location.hash)} replace />;
 }
 
 function RedirectModelToNew() {
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/mobile/${slug ?? ''}`} replace />;
+  const location = useLocation();
+  return <Navigate to={legacyDetailDestination("/mobile", slug, location.search, location.hash)} replace />;
 }
 
 function RedirectBuyToCatalog() {
