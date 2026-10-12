@@ -37,7 +37,7 @@ export function BottomNav() {
                 end={exact}
                 className={({ isActive }) =>
                   cn(
-                    "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+                    "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                     (isActive || active) ? "text-primary" : "text-muted-foreground hover:text-foreground",
                   )
                 }
