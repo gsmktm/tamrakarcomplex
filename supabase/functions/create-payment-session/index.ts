@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { assertAllowedOrigin, getCorsHeaders, requireUser } from '../_shared/cors.ts'
+import { assertMatchingPaymentMethod } from '../_shared/paymentGuards.ts'
 
 console.log('create-payment-session function loaded')
 
@@ -54,6 +55,10 @@ Deno.serve(async (req) => {
       throw new Error('Order not found')
     }
 
+    // An authenticated customer may only initiate the method selected when
+    // the server atomically created their order.
+    assertMatchingPaymentMethod(order.payment_method, payment_method)
+
     if (order.payment_status !== 'pending') {
       throw new Error('Order payment already processed')
     }
@@ -62,16 +67,18 @@ Deno.serve(async (req) => {
     // provider-registry lookup so cash checkout never depends on the
     // payment_providers migration having been applied.
     if (payment_method === 'cod') {
-      const { error: updateError } = await supabaseClient
+      const { data: confirmedOrders, error: updateError } = await supabaseClient
         .from('orders')
-        .update({
-          payment_method: 'cod',
-          order_status: 'confirmed'
-        })
+        .update({ order_status: 'confirmed' })
         .eq('id', order_id)
+        .eq('user_id', user.id)
+        .eq('payment_method', 'cod')
+        .eq('payment_status', 'pending')
+        .select('id')
 
-      if (updateError) {
-        throw new Error('Failed to update order for COD')
+      // An RLS denial may update zero rows without returning an error.
+      if (updateError || !confirmedOrders?.length) {
+        throw new Error('Failed to confirm Cash on Delivery order')
       }
 
       // Calculate commissions for COD — service-role client, matching
