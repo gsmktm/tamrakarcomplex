@@ -46,9 +46,18 @@ jobs:
           git add package.json package-lock.json
           git commit -m "security: update DOMPurify and source-map-js with valid npm lockfile"
           # Preserve any unrelated developer commits added while CI ran.
-          git fetch origin "$HEAD_BRANCH"
-          git rebase FETCH_HEAD
-          git push origin "HEAD:refs/heads/${HEAD_BRANCH}"
+          # Other source fixes may land while the candidate is building.
+          # Rebase and retry safely; never force-push or overwrite work.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$HEAD_BRANCH"
+            git rebase FETCH_HEAD
+            if git push origin "HEAD:refs/heads/${HEAD_BRANCH}"; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Could not safely push lockfile repair after 5 attempts"
+          exit 1
       - name: Upload regenerated manifest and lockfile for review
         uses: actions/upload-artifact@v4
         with:
