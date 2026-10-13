@@ -72,10 +72,10 @@ const markdown = [
   `Missing names: ${report.missingTables.length} tables, ${report.missingFunctions.length} RPCs.`,
   "",
   "## Table names absent from checked-in types",
-  ...report.missingTables.map(x => `- \`${x.name}\`: ${x.files.length} referencing file(s)\`),
+  ...report.missingTables.map(x => "- `" + x.name + "`: " + x.files.length + " referencing file(s)"),
   "",
   "## RPC names absent from checked-in types",
-  ...report.missingFunctions.map(x => `- \`${x.name}\`: ${x.files.length} referencing file(s)\`),
+  ...report.missingFunctions.map(x => "- `" + x.name + "`: " + x.files.length + " referencing file(s)"),
   "",
   "Do not insert guessed tables or disable strict TypeScript just to pass CI.",
 ].join("\n");
