@@ -52,13 +52,13 @@ LANGUAGE sql
 SECURITY DEFINER
 STABLE
 SET search_path = public
-AS $
+AS $$
   SELECT auth.uid() IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.user_roles
     WHERE user_id = auth.uid()
       AND role = 'staffadmin'::public.app_role
   );
-$;
+$$;
 REVOKE ALL ON FUNCTION public.is_staff_admin() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_staff_admin() TO authenticated;
 
