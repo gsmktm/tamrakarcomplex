@@ -49,6 +49,13 @@ CREATE TABLE IF NOT EXISTS public.order_items (
 ALTER TABLE public.orders
     ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
 
+-- Preserve legacy orders created under phase1_core's buyer_id ownership.
+-- The older schema required buyer_id and its policy used that field;
+-- the new RLS policy uses user_id. Preserve ownership when transitioning.
+UPDATE public.orders
+SET user_id = buyer_id
+WHERE user_id IS NULL AND buyer_id IS NOT NULL;
+
 -- Add indexes
 CREATE INDEX IF NOT EXISTS idx_carts_user_id ON public.carts(user_id);
 CREATE INDEX IF NOT EXISTS idx_carts_session_id ON public.carts(session_id);
