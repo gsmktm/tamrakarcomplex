@@ -67,6 +67,20 @@ describe("historical Supabase migration replay", () => {
     expect(grant).toMatch(/RETURN target_id;/i);
     expect(grant).not.toMatch(/RETURNS boolean/i);
   });
+  it("prevents first-registered-user privilege escalation during schema replay", () => {
+    const rls = read("20260414050000_unify_rls_policies.sql");
+    const staff = rls.indexOf("CREATE OR REPLACE FUNCTION public.is_staff_admin()");
+    const policy = rls.indexOf('CREATE POLICY "Products: Admins manage all"');
+    const bootstrap = rls.slice(
+      rls.indexOf("CREATE OR REPLACE FUNCTION public.bootstrap_admin()"),
+      rls.indexOf("-- 3. Unify RLS Policies")
+    );
+    expect(staff).toBeGreaterThanOrEqual(0);
+    expect(policy).toBeGreaterThan(staff);
+    expect(rls).toMatch(/role = 'staffadmin'::public\.app_role/);
+    expect(bootstrap).toMatch(/RAISE EXCEPTION 'Administrator self-bootstrap is disabled'/);
+    expect(bootstrap).not.toMatch(/INSERT INTO public\.user_roles/);
+  });
   it("recreates the directory RPC safely when its returned columns change", () => {
     const initial = read("20260413010000_stores_directory_rpc.sql");
     const revised = read("20260413020000_add_store_address.sql");
