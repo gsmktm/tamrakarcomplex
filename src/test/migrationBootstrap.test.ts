@@ -60,6 +60,17 @@ describe("historical Supabase migration replay", () => {
     expect(grant).toMatch(/RETURN target_id;/i);
     expect(grant).not.toMatch(/RETURNS boolean/i);
   });
+  it("recreates the directory RPC safely when its returned columns change", () => {
+    const initial = read("20260413010000_stores_directory_rpc.sql");
+    const revised = read("20260413020000_add_store_address.sql");
+    expect(initial).toContain("RETURNS TABLE (");
+    const drop = revised.indexOf("DROP FUNCTION IF EXISTS public.get_stores_directory()");
+    const create = revised.indexOf("CREATE OR REPLACE FUNCTION public.get_stores_directory()");
+    expect(drop).toBeGreaterThanOrEqual(0);
+    expect(create).toBeGreaterThan(drop);
+    expect(revised).not.toMatch(/DROP FUNCTION[^;]*CASCADE/i);
+    expect(revised).toMatch(/GRANT EXECUTE ON FUNCTION public\.get_stores_directory\(\) TO anon, authenticated/i);
+  });
   it("does not recreate the type or table unconditionally later", () => {
     const content = read(roles);
     expect(content).toMatch(/IF NOT EXISTS[\s\S]*?CREATE TYPE public\.app_role/i);
