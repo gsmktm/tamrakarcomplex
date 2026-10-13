@@ -32,7 +32,7 @@ export default function StoreAdminLayout() {
   const menuGroups = useMemo(
     () => getFilteredMenu(
       panelRole,
-      panelRole === "staffadmin" && role === "staffadmin" ? permissions : null,
+      null, // This layout is storeadmin-only; never inherit staff-admin grants.
       effectiveStorePerms
     ),
     [panelRole, role, permissions, effectiveStorePerms]
