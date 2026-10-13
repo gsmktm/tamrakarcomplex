@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Search, X, Loader2, FileText, Package, Store, BookOpen, Wrench } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/useDebounce";
-import { autoSearchPageService, type AutoSearchBuildResult } from "@/services/autoSearchPageService";
+import { getSearchResultDestination } from "@/lib/searchResultDestination";
 import { getPublicStoreSlug } from "@/lib/storeRoutes";
 
 interface SearchResult {
@@ -28,16 +28,18 @@ interface SearchDialogProps {
 export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [autoPage, setAutoPage] = useState<{ query: string; result: AutoSearchBuildResult | null } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const debouncedQuery = useDebounce(query, 300);
   const navigate = useNavigate();
-  const location = useLocation();
-  const loggedQueries = useRef(new Set<string>());
+  const latestSearch = useRef(0);
 
   const searchContent = useCallback(async (searchQuery: string) => {
+    const searchId = ++latestSearch.current;
+    // Bound remote filter complexity and ignore whitespace-only searches.
+    searchQuery = searchQuery.trim().slice(0, 100);
     if (!searchQuery.trim()) {
       setResults([]);
+      setIsLoading(false);
       return;
     }
 
@@ -64,7 +66,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
         supabase
           .from("stores")
           .select("id, name, slug, seo_slug, location")
-          .or(`name.ilike.%${searchQuery}%,location.ilike.%${searchQuery}%`)
+          .ilike("name", `%${searchQuery}%`)
           .eq("status", "active")
           .eq("public_status", "published")
           .limit(5),
@@ -133,71 +135,52 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
         { id: "service-repair", title: "Repair Booking", slug: "repair", type: "service" as const, category: "Service", href: "/repair" },
       ].filter((service) => `${service.title} ${service.category}`.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const generatedResult = autoPage?.query.toLowerCase() === searchQuery.toLowerCase() ? autoPage.result : null;
-      const generatedPage: SearchResult[] = generatedResult?.created && generatedResult.path
-        ? [{
-            id: generatedResult.page_id || generatedResult.slug || generatedResult.path,
-            title: `Search page for "${searchQuery}"`,
-            slug: generatedResult.slug || "",
-            type: "service" as const,
-            category: generatedResult.noindex ? "Generated noindex" : "Generated SEO",
-            href: generatedResult.path,
-            qualityScore: generatedResult.quality_score,
-          }]
-        : [];
-
-      setResults([...generatedPage, ...models, ...articles, ...products, ...guides, ...stores, ...services].slice(0, 15));
+      if (searchId === latestSearch.current) {
+        setResults([...models, ...articles, ...products, ...guides, ...stores, ...services].slice(0, 15));
+      }
     } catch (error) {
       console.error("Search error:", error);
+      if (searchId === latestSearch.current) setResults([]);
     } finally {
-      setIsLoading(false);
+      if (searchId === latestSearch.current) setIsLoading(false);
     }
-  }, [autoPage]);
+  }, []);
 
   useEffect(() => {
-    searchContent(debouncedQuery);
-  }, [debouncedQuery, searchContent]);
+    if (!open) {
+      latestSearch.current += 1;
+      return;
+    }
+    void searchContent(debouncedQuery);
+  }, [open, debouncedQuery, searchContent]);
 
-  useEffect(() => {
-    const clean = debouncedQuery.trim();
-    if (clean.length < 2 || loggedQueries.current.has(clean.toLowerCase())) return;
-
-    loggedQueries.current.add(clean.toLowerCase());
-    autoSearchPageService
-      .logAndBuildPage(clean, `${location.pathname}${location.search}`)
-      .then((result) => setAutoPage({ query: clean, result }))
-      .catch(() => setAutoPage({ query: clean, result: null }));
-  }, [debouncedQuery, location.pathname, location.search]);
-
-  const handleSelect = async (result: SearchResult) => {
+  const handleSelect = (result: SearchResult) => {
     onOpenChange(false);
     setQuery("");
 
-    // Log search event
+    // Analytics must never delay the selected destination or block navigation.
     if (result.type === "product" || result.type === "store") {
-      try {
-        await supabase.from("device_search_events").insert({
-          user_id: null, // anonymous for now
-          brand: result.type === "product" ? result.category : null,
-          model: result.title,
-          event_type: "click",
-        });
-      } catch (error) {
-        console.error("Failed to log search event:", error);
-      }
+      void Promise.resolve(supabase.from("device_search_events").insert({
+        user_id: null,
+        brand: result.type === "product" ? result.category : null,
+        model: result.title,
+        event_type: "click",
+      })).then(({ error }) => {
+        if (error) console.warn("Search event could not be logged");
+      }).catch(() => {
+        console.warn("Search event could not be logged");
+      });
     }
 
-    if (result.type === "article") {
-      navigate(`/stores/article/${result.slug}`);
-    } else if (result.type === "product") {
-      navigate(`/product/${result.slug}`);
-    } else if (result.type === "guide") {
-      navigate(`/guide/${result.slug}`);
-    } else if (result.type === "store") {
-      navigate(`/stores/${result.slug}`);
-    } else if (result.href) {
-      navigate(result.href);
-    }
+    navigate(getSearchResultDestination(result));
+  };
+
+  const browseAllResults = () => {
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return;
+    onOpenChange(false);
+    setQuery("");
+    navigate("/cat/mobiles?tab=buy&q=" + encodeURIComponent(cleanQuery));
   };
 
   return (
@@ -214,11 +197,18 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 placeholder="Search products, guides, stores, and services…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && query.trim()) {
+                    event.preventDefault();
+                    browseAllResults();
+                  }
+                }}
                 className="h-12 rounded-full pl-11 pr-10 bg-secondary/40 border-border/60 focus-visible:ring-2 focus-visible:ring-ring"
+                maxLength={100}
                 autoFocus
               />
               {query ? (
-                <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <button type="button" aria-label="Clear search" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                   <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                 </button>
               ) : null}
@@ -298,6 +288,18 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             </div>
           )}
         </div>
+        {query.trim() && (
+          <div className="border-t border-border/60 bg-card p-3">
+            <button
+              type="button"
+              onClick={browseAllResults}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            >
+              Search all catalog listings
+              <Search className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

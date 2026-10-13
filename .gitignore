@@ -82,3 +82,6 @@ hero
 section2
 server.js
 app.js
+
+# Local compiler diagnostic outputs (GitHub Actions uploads these separately)
+artifacts/

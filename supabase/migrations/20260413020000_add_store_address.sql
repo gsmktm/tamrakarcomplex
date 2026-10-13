@@ -1,6 +1,13 @@
 -- Add address column to stores table
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS address text;
 
+-- PostgreSQL does not permit CREATE OR REPLACE FUNCTION to change a
+-- RETURNS TABLE / OUT-parameter result signature. The previous directory
+-- function has no input arguments; explicitly drop that exact signature
+-- before replacing it with the address-bearing version. No CASCADE:
+-- if a dependent database object exists, fail safely for review.
+DROP FUNCTION IF EXISTS public.get_stores_directory();
+
 -- Update get_stores_directory RPC to include address
 CREATE OR REPLACE FUNCTION public.get_stores_directory()
 RETURNS TABLE (
@@ -151,3 +158,8 @@ BEGIN
 
 END;
 $$;
+
+-- A dropped function loses its old execution grants. Restore only the
+-- intended directory caller roles after installing the new return contract.
+REVOKE ALL ON FUNCTION public.get_stores_directory() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_stores_directory() TO anon, authenticated;

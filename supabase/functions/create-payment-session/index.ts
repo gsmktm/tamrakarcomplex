@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { assertAllowedOrigin, getCorsHeaders, requireUser } from '../_shared/cors.ts'
+import { assertMatchingPaymentMethod } from '../_shared/paymentGuards.ts'
 
 console.log('create-payment-session function loaded')
 
@@ -45,7 +46,7 @@ Deno.serve(async (req) => {
     // Get order details
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
-      .select('id, user_id, total_amount, payment_status, payment_method')
+      .select('id, user_id, total_amount, payment_status, payment_method, order_status')
       .eq('id', order_id)
       .eq('user_id', user.id)
       .single()
@@ -53,6 +54,10 @@ Deno.serve(async (req) => {
     if (orderError || !order) {
       throw new Error('Order not found')
     }
+
+    // An authenticated customer may only initiate the method selected when
+    // the server atomically created their order.
+    assertMatchingPaymentMethod(order.payment_method, payment_method)
 
     if (order.payment_status !== 'pending') {
       throw new Error('Order payment already processed')
@@ -62,16 +67,22 @@ Deno.serve(async (req) => {
     // provider-registry lookup so cash checkout never depends on the
     // payment_providers migration having been applied.
     if (payment_method === 'cod') {
-      const { error: updateError } = await supabaseClient
-        .from('orders')
-        .update({
-          payment_method: 'cod',
-          order_status: 'confirmed'
-        })
-        .eq('id', order_id)
+      // create_order_atomic_v2 already sets COD to 'confirmed'.
+      // Avoid a redundant client-side RLS update that may silently match no
+      // rows; only transition older pending COD orders when necessary.
+      if (order.order_status !== 'confirmed') {
+        const { data: confirmedOrders, error: updateError } = await supabaseClient
+          .from('orders')
+          .update({ order_status: 'confirmed' })
+          .eq('id', order_id)
+          .eq('user_id', user.id)
+          .eq('payment_method', 'cod')
+          .eq('payment_status', 'pending')
+          .select('id')
 
-      if (updateError) {
-        throw new Error('Failed to update order for COD')
+        if (updateError || !confirmedOrders?.length) {
+          throw new Error('Failed to confirm Cash on Delivery order')
+        }
       }
 
       // Calculate commissions for COD — service-role client, matching

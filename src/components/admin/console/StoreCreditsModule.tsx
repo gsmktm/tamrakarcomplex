@@ -118,7 +118,7 @@ export function StoreCreditsModule() {
   >({
     queryKey: ["console-store-credit-recent"],
     queryFn: async () => {
-      const { data, error } = await sb
+      const { data, error } = await supabase
         .from("store_credit_transactions")
         .select("id, user_id, store_id, amount, reason, created_at, created_by")
         .order("created_at", { ascending: false })

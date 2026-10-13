@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Syne:wght@500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,60 +7,52 @@
 /* ─── Tamrakar Complex · Premium Tech Commerce Design System ─────────────────
    Modern, clean, international e-commerce design
    Inspired by Apple, Amazon, Best Buy premium aesthetics
-   Color palette: Navy, Pure White, Cobalt Blue, Amber Gold
-   Fonts: Inter (clean, modern, highly readable)
+   Color palette: Deep Navy, White, Antique Gold and Nepali Brand Red
+   Fonts: Manrope, Syne and Noto Sans Devanagari
    ──────────────────────────────────────────────────────────────────────────── */
 
 @layer base {
   :root {
-    /* Core UI Colors */
-    --background: #F2EFE5;
-    --foreground: #151713;
+    /* Tamrakar Complex V3 — consistent premium commerce palette
+       Source: master brief section 3. All colors are full CSS hex values. */
+    --background: #F5F7FA;
+    --foreground: #172033;
+    --card: #FFFFFF;
+    --card-foreground: #172033;
+    --popover: #FFFFFF;
+    --popover-foreground: #172033;
 
-    --card: #FAF8F0;
-    --card-foreground: #151713;
-
-    --popover: #FAF8F0;
-    --popover-foreground: #151713;
-
-    /* Primary: Deep Navy - Premium, trustworthy */
-    --primary: #3347FF;
+    /* Primary navigation/actions, subtle gold surfaces and danger actions */
+    --primary: #101C33;
     --primary-foreground: #FFFFFF;
-
-    /* Secondary: Cobalt Blue - Energetic, tech-focused */
-    --secondary: #E5E0D2;
-    --secondary-foreground: #151713;
-
-    /* Muted: Soft Gray */
-    --muted: #E8E3D6;
-    --muted-foreground: #65675F;
-
-    /* Accent: Amber Gold - Premium highlight */
-    --accent: #D8FF3E;
-    --accent-foreground: #11130F;
-
-    /* Destructive: Red */
-    --destructive: #EF4444;
+    --secondary: #EEF2F6;
+    --secondary-foreground: #172033;
+    --muted: #EDF1F5;
+    --muted-foreground: #526174;
+    --accent: #F7EEDC;
+    --accent-foreground: #172033;
+    --destructive: #B91C1C;
     --destructive-foreground: #FFFFFF;
+    --border: #D8DFE8;
+    --input: #C5D0DC;
+    --ring: #294B79;
+    --radius: 0.75rem;
 
-    /* Borders & Inputs */
-    --border: #D4CEBF;
-    --input: #D4CEBF;
-    --ring: #3347FF;
-
-    /* Radius */
-    --radius: 0.35rem;
-
-    /* Brand Custom Properties - Premium Tech Commerce */
-    --navy: #0F172A;
-    --navy-light: #1E293B;
-    --cobalt: #3B82F6;
-    --cobalt-hover: #2563EB;
-    --cobalt-light: #60A5FA;
-    --amber: #F59E0B;
-    --amber-hover: #D97706;
-    --gold: #F59E0B;
-    --success: #10B981;
+    /* Brand semantics; gold is decorative, never low-contrast body text. */
+    --navy: #101C33;
+    --navy-light: #233451;
+    --cobalt: #274F80;
+    --cobalt-hover: #1E3D65;
+    --cobalt-light: #7D9BBE;
+    --amber: #C49A4A;
+    --amber-hover: #AC8030;
+    --gold: #C49A4A;
+    --gold-ink: #845C1C;
+    --brand-red: #DC2626;
+    --brand-red-hover: #B91C1C;
+    --success: #15803D;
+    --warning: #B45309;
+    --error: #B91C1C;
     --white: #FFFFFF;
     --gray-50: #F9FAFB;
     --gray-100: #F3F4F6;
@@ -79,14 +71,14 @@
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-    --shadow-cobalt: 0 0 20px rgba(59, 130, 246, 0.15);
-    --shadow-amber: 0 0 20px rgba(245, 158, 11, 0.15);
+    --shadow-cobalt: 0 0 20px rgba(39, 79, 128, 0.13);
+    --shadow-amber: 0 0 20px rgba(196, 154, 74, 0.17);
 
     /* Component shadows referenced by tailwind.config.ts boxShadow map */
     --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 8px 24px -8px rgba(15, 23, 42, 0.10);
     --shadow-elevated: 0 12px 40px -8px rgba(15, 23, 42, 0.16), 0 2px 8px -2px rgba(15, 23, 42, 0.06);
-    --shadow-glow: 0 8px 32px -6px rgba(51, 71, 255, 0.30);
-    --shadow-gold: 0 10px 32px -8px rgba(245, 158, 11, 0.35);
+    --shadow-glow: 0 8px 32px -6px rgba(16, 28, 51, 0.18);
+    --shadow-gold: 0 10px 32px -8px rgba(196, 154, 74, 0.24);
 
     /* Category palette */
     --category-mobile: #3B82F6;
@@ -98,54 +90,53 @@
     --rating-star: #F59E0B;
 
     /* Sidebar */
-    --sidebar-background: #0F172A;
+    --sidebar-background: #101C33;
     --sidebar-foreground: #FFFFFF;
-    --sidebar-primary: #3B82F6;
-    --sidebar-primary-foreground: #FFFFFF;
-    --sidebar-accent: #1E293B;
+    --sidebar-primary: #C49A4A;
+    --sidebar-primary-foreground: #101C33;
+    --sidebar-accent: #233451;
     --sidebar-accent-foreground: #FFFFFF;
-    --sidebar-border: #334155;
-    --sidebar-ring: #3B82F6;
+    --sidebar-border: #354761;
+    --sidebar-ring: #E4BD7D;
   }
 
   .dark {
-    --background: #0F172A;
-    --foreground: #F9FAFB;
+    --background: #0B1220;
+    --foreground: #ECF1F8;
+    --card: #142139;
+    --card-foreground: #ECF1F8;
+    --popover: #18263E;
+    --popover-foreground: #ECF1F8;
+    --primary: #E4BD7D;
+    --primary-foreground: #0B1220;
+    --secondary: #24344D;
+    --secondary-foreground: #F0F4F9;
+    --muted: #24344D;
+    --muted-foreground: #B9C7DB;
+    --accent: #3D3324;
+    --accent-foreground: #F7E8C8;
+    --destructive: #EF7777;
+    --destructive-foreground: #0B1220;
+    --border: #354761;
+    --input: #51637C;
+    --ring: #E4BD7D;
+    --gold-ink: #E4BD7D;
+    --brand-red: #F87171;
+    --brand-red-hover: #EF4444;
+    --success: #4ADE80;
+    --warning: #F4B867;
+    --error: #FCA5A5;
 
-    --card: #1E293B;
-    --card-foreground: #F9FAFB;
-
-    --popover: #1E293B;
-    --popover-foreground: #F9FAFB;
-
-    --primary: #F9FAFB;
-    --primary-foreground: #0F172A;
-
-    --secondary: #3B82F6;
-    --secondary-foreground: #FFFFFF;
-
-    --muted: #334155;
-    --muted-foreground: #9CA3AF;
-
-    --accent: #F59E0B;
-    --accent-foreground: #0F172A;
-
-    --destructive: #F87171;
-    --destructive-foreground: #0F172A;
-
-    --border: #334155;
-    --input: #334155;
-    --ring: #3B82F6;
-
-    --sidebar-background: #0F172A;
-    --sidebar-foreground: #F9FAFB;
-    --sidebar-primary: #3B82F6;
-    --sidebar-primary-foreground: #0F172A;
-    --sidebar-accent: #1E293B;
-    --sidebar-accent-foreground: #F9FAFB;
-    --sidebar-border: #334155;
-    --sidebar-ring: #3B82F6;
+    --sidebar-background: #101C33;
+    --sidebar-foreground: #F1F5F9;
+    --sidebar-primary: #E4BD7D;
+    --sidebar-primary-foreground: #101C33;
+    --sidebar-accent: #233451;
+    --sidebar-accent-foreground: #F1F5F9;
+    --sidebar-border: #354761;
+    --sidebar-ring: #E4BD7D;
   }
+
 }
 
 @layer base {
@@ -183,13 +174,15 @@
 
   p { text-wrap: pretty; }
 
+  :lang(ne) { font-family: 'Noto Sans Devanagari', 'Manrope', system-ui, sans-serif; }
+
   ::selection {
-    background: rgba(59, 130, 246, 0.2);
+    background: rgba(196, 154, 74, 0.25);
     color: inherit;
   }
 
   :focus-visible {
-    outline: 2px solid #3B82F6;
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
     border-radius: 2px;
   }
@@ -268,8 +261,7 @@
     border: 1px solid rgba(51, 65, 85, 0.8);
   }
 
-  .text-success { color: #10B981; }
-  .dark .text-success { color: #34D399; }
+  .text-success { color: var(--success); }
 
   /* iOS safe-area bottom padding for sticky nav */
   .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -282,22 +274,22 @@
   .text-pretty { text-wrap: pretty; }
 
   /* Navy brand utilities */
-  .bg-navy { background-color: #0F172A; }
-  .bg-navy-light { background-color: #1E293B; }
-  .text-navy { color: #0F172A; }
+  .bg-navy { background-color: var(--navy); }
+  .bg-navy-light { background-color: var(--navy-light); }
+  .text-navy { color: var(--navy); }
   .border-navy { border-color: #334155; }
 
   /* Cobalt blue utilities */
-  .bg-cobalt { background-color: #3B82F6; }
-  .bg-cobalt-hover:hover { background-color: #2563EB; }
-  .text-cobalt { color: #3B82F6; }
-  .border-cobalt { border-color: #3B82F6; }
+  .bg-cobalt { background-color: var(--cobalt); }
+  .bg-cobalt-hover:hover { background-color: var(--cobalt-hover); }
+  .text-cobalt { color: var(--cobalt); }
+  .border-cobalt { border-color: var(--cobalt); }
 
   /* Amber gold utilities */
-  .bg-amber { background-color: #F59E0B; }
-  .bg-amber-hover:hover { background-color: #D97706; }
-  .text-amber { color: #F59E0B; }
-  .border-amber { border-color: #F59E0B; }
+  .bg-amber { background-color: var(--gold); }
+  .bg-amber-hover:hover { background-color: var(--amber-hover); }
+  .text-amber { color: var(--gold-ink); }
+  .border-amber { border-color: var(--gold); }
 
   /* WhatsApp green */
   .bg-whatsapp { background-color: #25D366; }
@@ -305,8 +297,8 @@
   .hover:bg-whatsapp-dark:hover { background-color: #12B76A; }
 
   /* Red - urgency */
-  .bg-hot-red { background-color: #EF4444; }
-  .text-hot-red { color: #EF4444; }
+  .bg-hot-red { background-color: var(--brand-red); }
+  .text-hot-red { color: var(--brand-red); }
 
   /* Shadow utilities */
   .shadow-tk-xs { box-shadow: var(--shadow-xs); }
@@ -319,16 +311,16 @@
 
   /* Gradients - Clean, modern */
   .gradient-navy-cobalt {
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #3B82F6 100%);
+    background: linear-gradient(135deg, #101C33 0%, #172944 60%, #274F80 100%);
   }
   .gradient-cobalt {
-    background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 100%);
+    background: linear-gradient(135deg, #274F80 0%, #101C33 100%);
   }
   .gradient-navy {
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    background: linear-gradient(135deg, #101C33 0%, #233451 100%);
   }
   .gradient-hero {
-    background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+    background: linear-gradient(180deg, #101C33 0%, #172944 100%);
   }
   .gradient-light {
     background: linear-gradient(180deg, #FFFFFF 0%, #F9FAFB 100%);
@@ -343,12 +335,7 @@
      renders identically in light and dark mode, and `color` is forced so
      Shadcn dark-mode color swaps can never turn CTA text unreadable. */
   .hero-gradient {
-    background-image: linear-gradient(
-      135deg,
-      var(--navy, #0F172A) 0%,
-      #3347FF 45%,
-      var(--cobalt, #3B82F6) 100%
-    );
+    background-image: linear-gradient(125deg, #101C33 0%, #233451 100%);
     color: #FFFFFF !important;
   }
   .hero-gradient:hover {
@@ -365,7 +352,7 @@
 
   /* Apple-style clipped gradient text for premium highlighted phrases */
   .gradient-text-apple {
-    background-image: linear-gradient(135deg, #3347FF 0%, #60A5FA 50%, #3B82F6 100%);
+    background-image: linear-gradient(135deg, #101C33 0%, #274F80 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -378,49 +365,56 @@
 
   /* Premium Button Styles - Professional */
   .btn-primary {
-    @apply bg-[#3B82F6] hover:bg-[#2563EB] text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200;
+    @apply bg-primary hover:opacity-90 text-primary-foreground font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200;
   }
   .btn-amber {
-    @apply bg-[#F59E0B] hover:bg-[#D97706] text-[#0F172A] font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200;
+    @apply font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200;
+    background: var(--gold);
+    color: #101C33;
   }
+  .btn-amber:hover { background: #E4BD7D; }
   .btn-navy {
-    @apply bg-[#0F172A] hover:bg-[#1E293B] text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200;
+    @apply font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200;
+    background: #101C33;
+    color: #FFFFFF;
   }
+  .btn-navy:hover { background: #233451; }
   .btn-outline {
-    @apply bg-white border border-[#E5E7EB] hover:border-[#3B82F6] text-[#111827] font-semibold py-3 px-6 rounded-xl transition-all duration-200;
+    @apply bg-card border border-input hover:border-primary text-card-foreground font-semibold py-3 px-6 rounded-xl transition-all duration-200;
   }
   .btn-ghost {
-    @apply bg-transparent hover:bg-[#F3F4F6] text-[#111827] font-semibold py-3 px-6 rounded-xl transition-all duration-200;
+    @apply bg-transparent hover:bg-accent text-foreground font-semibold py-3 px-6 rounded-xl transition-all duration-200;
   }
 
   /* Badge Styles - Clean */
   .badge-verified {
-    @apply bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/30 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1;
+    @apply px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1; background: color-mix(in srgb, var(--success) 11%, transparent); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
   }
   .badge-featured {
-    @apply bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/30 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1;
+    @apply px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1; background: var(--accent); color: var(--gold-ink); border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
   }
   .badge-deal {
-    @apply bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/30 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1;
+    @apply px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1; background: color-mix(in srgb, var(--error) 10%, transparent); color: var(--error); border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
   }
   .badge-new {
-    @apply bg-[#3B82F6]/10 text-[#3B82F6] border border-[#3B82F6]/30 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1;
+    @apply px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1; background: color-mix(in srgb, var(--cobalt) 10%, transparent); color: var(--cobalt); border: 1px solid color-mix(in srgb, var(--cobalt) 30%, transparent);
   }
 
   /* Product Card - Premium */
   .product-card {
-    @apply bg-white border border-[#E5E7EB] rounded-2xl p-4 hover:border-[#3B82F6]/30 hover:shadow-xl transition-all duration-300 overflow-hidden;
+    @apply bg-card border border-border rounded-2xl p-4 hover:shadow-lg transition-all duration-300 overflow-hidden;
   }
+  .product-card:hover { border-color: var(--gold); }
 
   /* Section Header - Professional */
   .section-header {
     @apply flex items-center justify-between mb-8;
   }
   .section-header h2 {
-    @apply text-2xl md:text-3xl font-bold text-[#111827];
+    @apply text-2xl md:text-3xl font-bold text-foreground;
   }
   .section-header .section-subtitle {
-    @apply text-sm text-[#6B7280] mt-1;
+    @apply text-sm text-muted-foreground mt-1;
   }
 
   /* Entrance animations */
@@ -469,7 +463,7 @@
   .ticker-track:hover { animation-play-state: paused; }
 
   /* Accent rule */
-  .tk-rule { border-top: 2px solid #3B82F6; }
+  .tk-rule { border-top: 2px solid var(--gold); }
   .tk-rule-thin { border-top: 1px solid #E5E7EB; }
   .dark .tk-rule-thin { border-top: 1px solid #334155; }
 }
@@ -1461,7 +1455,7 @@ button:not(:disabled):not([data-no-press]):active,
 .home-sell-cta {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #3B82F6 100%);
+  background: linear-gradient(135deg, #101C33 0%, #172944 60%, #274F80 100%);
   border-radius: 20px;
 }
 .home-sell-cta::before {
@@ -1521,7 +1515,7 @@ button:not(:disabled):not([data-no-press]):active,
 .sell-hero {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+  background: linear-gradient(180deg, #101C33 0%, #172944 100%);
 }
 .sell-hero::before {
   content: "";

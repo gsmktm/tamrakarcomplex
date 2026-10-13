@@ -135,181 +135,11 @@ $$;
 -- This function is no longer needed. Use proper role assignment via user_roles table instead.
 DROP FUNCTION IF EXISTS public.dev_ensure_confirmed_admin(text);
 
--- 4. Update bootstrap_admin to use only user_roles table
-CREATE OR REPLACE FUNCTION public.bootstrap_admin()
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, auth
-AS $$
-DECLARE
-  v_user_email text;
-  v_instance_id uuid;
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'not_authenticated';
-  END IF;
-
-  SELECT email, instance_id INTO v_user_email, v_instance_id FROM auth.users WHERE id = auth.uid();
-
-  -- Only allow bootstrap if no admin exists yet
-  IF NOT public.no_admin_exists() THEN
-    RETURN false;
-  END IF;
-
-  -- Aggressively force confirm current user
-  UPDATE auth.users 
-  SET email_confirmed_at = now(),
-      confirmed_at = now(),
-      updated_at = now(),
-      confirmation_token = '',
-      instance_id = COALESCE(instance_id, public.get_auth_instance_id()),
-      raw_app_meta_data = jsonb_set(
-        COALESCE(raw_app_meta_data, '{"provider": "email", "providers": ["email"]}'::jsonb),
-        '{email_verified}',
-        'true'::jsonb
-      )
-  WHERE id = auth.uid();
-
-  -- Ensure profile exists
-  INSERT INTO public.profiles (id, email, display_name)
-  VALUES (auth.uid(), lower(v_user_email), split_part(v_user_email, '@', 1))
-  ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
-
-  -- Assign suadmin role only
-  INSERT INTO public.user_roles (user_id, role)
-  VALUES (auth.uid(), 'suadmin'::public.app_role)
-  ON CONFLICT DO NOTHING;
-
-  RETURN true;
-END;
-$$;
-
--- 4. Force-confirm all known admin emails and ensure suadmin role
-DO $$
-DECLARE
-  v_new_pw text := crypt('CHANGE_ME_DO_NOT_USE', gen_salt('bf', 10)); -- Explicitly use bcrypt with 10 rounds
-  v_instance_id uuid;
-  v_emails text[] := ARRAY[
-    'suadmin@tamrakarcomplex.com',
-    'admin@tamrakarcomplex.com',
-    'gsmktm@gmail.com',
-    'gskmtm@gmail.com',
-    'gsktm@gmail.com',
-    'superadmin@tamrakarcomplex.com',
-    'bootstrap-admin@example.invalid',
-    'info@tamrakarcomplex.com'
-  ];
-  v_email text;
-  v_user_id uuid;
-  v_existing_email text;
-  v_target_role public.app_role;
-BEGIN
-  -- 1. Instance ID Lookup
-  SELECT instance_id INTO v_instance_id FROM auth.users WHERE instance_id IS NOT NULL LIMIT 1;
-  IF v_instance_id IS NULL THEN
-    v_instance_id := '00000000-0000-0000-0000-000000000000';
-  END IF;
-
-  FOREACH v_email IN ARRAY v_emails
-  LOOP
-    -- Determine role based on email
-    IF lower(v_email) = 'bootstrap-admin@example.invalid' THEN
-      v_target_role := 'staffadmin'::public.app_role;
-    ELSIF lower(v_email) = 'gsmktm@gmail.com' THEN
-      v_target_role := 'suadmin'::public.app_role;
-    ELSE
-      v_target_role := 'suadmin'::public.app_role; -- Default for others in this list
-    END IF;
-
-    -- 2. Find or Create User
-    SELECT id, email INTO v_user_id, v_existing_email FROM auth.users WHERE lower(email) = lower(v_email);
-
-    IF v_user_id IS NULL THEN
-      v_user_id := gen_random_uuid();
-
-      INSERT INTO auth.users (
-        id, aud, role, email, encrypted_password,
-        email_confirmed_at, confirmed_at, last_sign_in_at,
-        raw_app_meta_data, raw_user_meta_data,
-        created_at, updated_at, instance_id,
-        is_sso_user, confirmation_token
-      ) VALUES (
-        v_user_id, 'authenticated', 'authenticated', lower(v_email), v_new_pw,
-        now(), now(), now(),
-        '{"provider": "email", "providers": ["email"]}',
-        json_build_object('full_name', split_part(v_email, '@', 1), 'email_verified', true),
-        now(), now(), v_instance_id,
-        false, ''
-      );
-
-      RAISE NOTICE 'Created and confirmed user: %', v_email;
-    ELSE
-      -- 3. FORCE UPDATE Password & Confirmation status
-      UPDATE auth.users
-      SET encrypted_password = v_new_pw,
-          email_confirmed_at = now(),
-          confirmed_at = now(),
-          last_sign_in_at = now(),
-          updated_at = now(),
-          instance_id = v_instance_id,
-          confirmation_token = '',
-          recovery_token = '',
-          raw_app_meta_data = jsonb_set(
-            COALESCE(raw_app_meta_data, '{"provider": "email", "providers": ["email"]}'::jsonb),
-            '{email_verified}',
-            'true'::jsonb
-          ),
-          raw_user_meta_data = jsonb_set(
-            COALESCE(raw_user_meta_data, '{}'::jsonb),
-            '{email_verified}',
-            'true'::jsonb
-          )
-      WHERE id = v_user_id;
-
-      RAISE NOTICE 'Force-updated password and confirmed existing user: %', v_email;
-    END IF;
-
-    -- 4. Identity Management (Crucial for GoTrue lookup)
-    -- Standard Supabase identity pattern: provider_id matches email for email provider
-    DELETE FROM auth.identities WHERE user_id = v_user_id;
-    
-    INSERT INTO auth.identities (
-      id, 
-      user_id, 
-      identity_data, 
-      provider, 
-      provider_id, 
-      last_sign_in_at, 
-      created_at, 
-      updated_at
-    ) VALUES (
-      v_user_id, -- Using user_id as identity id is common in manual seeding to ensure 1:1
-      v_user_id,
-      json_build_object(
-        'sub', v_user_id::text, 
-        'email', lower(v_email), 
-        'email_verified', true,
-        'full_name', split_part(v_email, '@', 1)
-      ),
-      'email',
-      lower(v_email),
-      now(), now(), now()
-    );
-
-    -- 5. Profile & Role Linkage
-    INSERT INTO public.profiles (id, email, display_name)
-    VALUES (v_user_id, lower(v_email), split_part(v_email, '@', 1))
-    ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
-
-    -- Clear and set exact requested roles
-    DELETE FROM public.user_roles WHERE user_id = v_user_id;
-    
-    INSERT INTO public.user_roles (user_id, role)
-    VALUES (v_user_id, v_target_role);
-
-    END LOOP;
-END $$;
+-- 4. The former block reset a list of named Auth accounts to a known
+-- password, bypassed email verification and reassigned super-admin roles.
+-- Bootstrap must remain disabled, and all Auth account provisioning must
+-- happen through the separately authorized Supabase Auth Admin API.
+-- No auth.users/auth.identities DML or role seeding is permitted here.
 
 -- 5. Security Hardening: Ensure RLS for user_roles
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
@@ -318,24 +148,13 @@ DROP POLICY IF EXISTS "Admins can view all roles" ON public.user_roles;
 CREATE POLICY "Admins can view all roles"
 ON public.user_roles FOR SELECT
 TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid()
-    AND ur.role IN ('admin', 'suadmin')
-  )
-);
+USING (public.is_admin());
 
 DROP POLICY IF EXISTS "Suadmins can manage all roles" ON public.user_roles;
 CREATE POLICY "Suadmins can manage all roles"
 ON public.user_roles FOR ALL
 TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid()
-    AND ur.role = 'suadmin'
-  )
-);
+USING (public.is_super_admin())
+WITH CHECK (public.is_super_admin());
 
 

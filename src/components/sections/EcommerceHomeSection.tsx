@@ -1,3 +1,4 @@
+import "@/styles/storefront-v3.css";
 import { useEffect, useMemo, useState, useRef, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -15,6 +16,7 @@ import {
   Headphones,
   Laptop,
   Mail,
+  MapPin,
   MessageCircle,
   Phone,
   RefreshCw,
@@ -41,7 +43,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCard } from "@/components/products/ProductCard";
 import { ArticleCard } from "@/components/articles/ArticleCard";
-import { ChatWidget } from "@/components/chat/ChatWidget";
 import { PollSection } from "@/components/sections/PollSection";
 import { HomeSearchBox } from "@/components/home/HomeSearchBox";
 import { HomePriceFinder } from "@/components/home/HomePriceFinder";
@@ -61,6 +62,7 @@ import { useHomepageSettings } from "@/hooks/useHomepageSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { readThemeSettings } from "@/lib/siteSettings";
+import { resolveHomepageVisibility } from "@/lib/resolveHomepageVisibility";
 import { getPublicStorePath } from "@/lib/storeRoutes";
 import type { SectionConfig } from "@/types/app";
 import { formatDistanceToNow } from "date-fns";
@@ -121,6 +123,13 @@ function DeviceFrame({ type, children, className }: { type: 'phone' | 'laptop', 
 const defaultSections: SectionConfig[] = [
   { key: "hero", label: "Hero", enabled: true, settings: {} },
   { key: "quick_actions", label: "Quick Actions", enabled: true, settings: {} },
+  { key: "offers", label: "Offers and Deals", enabled: true, settings: {} },
+  { key: "price_finder", label: "Price Finder", enabled: true, settings: {} },
+  { key: "marketplace_feed", label: "Marketplace Feed", enabled: true, settings: {} },
+  { key: "phone_finder", label: "Phone Finder Quiz", enabled: false, settings: {} },
+  { key: "compare_mini", label: "Quick Compare", enabled: false, settings: {} },
+  { key: "repair_form", label: "Repair Booking", enabled: true, settings: {} },
+  { key: "store_spotlight", label: "Store Spotlight", enabled: true, settings: {} },
   { key: "serviceMatrix", label: "Service Matrix", enabled: true, settings: {} },
   { key: "priceDesk", label: "Price Desk", enabled: true, settings: {} },
   { key: "featured", label: "Featured Products", enabled: true, settings: {} },
@@ -145,8 +154,8 @@ function mergeSections(saved: unknown): SectionConfig[] {
 // ─── Static data ─────────────────────────────────────────────────────────────
 
 const tickerItems = [
-  { label: "New iPhone 16 Pro — Now Available", href: "/buy?brand=Apple" },
-  { label: "Samsung Galaxy S24 Ultra — Best Price in Nepal", href: "/buy?brand=Samsung" },
+  { label: "New iPhone 16 Pro — Now Available", href: "/cat/mobiles?tab=buy&brand=Apple" },
+  { label: "Samsung Galaxy S24 Ultra — Best Price in Nepal", href: "/cat/mobiles?tab=buy&brand=Samsung" },
   { label: "Free Diagnosis with Every Repair Booking", href: "/repair" },
   { label: "Sell Your Old Phone — Get Instant Quote", href: "/sell-your-phone" },
   { label: "MacBook Air M3 — Unbeatable Exchange Offer", href: "/exchange-your-phone" },
@@ -322,19 +331,12 @@ function SkeletonGrid({ count = 6, cols = "grid-cols-2 sm:grid-cols-3 lg:grid-co
 
 export function EcommerceHomeSection() {
   const [sections, setSections] = useState(defaultSections);
-  const { data: homeSettings, isLoading: settingsLoading } = useHomepageSettings();
+  const { data: homeSettings } = useHomepageSettings();
   
-  const enabledSections = useMemo(() => {
-    // If we have database settings, use those primarily
-    if (homeSettings?.sections_control) {
-      return homeSettings.sections_control;
-    }
-    // Fallback to theme settings or defaults
-    return sections.reduce((acc: Record<string, boolean>, s) => {
-      acc[s.key] = s.enabled;
-      return acc;
-    }, {});
-  }, [sections, homeSettings]);
+  const enabledSections = useMemo(
+    () => resolveHomepageVisibility(sections, homeSettings),
+    [sections, homeSettings],
+  );
 
   useEffect(() => {
     const sync = () => {
@@ -456,8 +458,7 @@ export function EcommerceHomeSection() {
 
       {/* Community Poll — removed */}
 
-      {/* ── CHAT WIDGET ──────────────────────────────────────────────────── */}
-      {enabledSections.chat && <ChatWidget />}
+      {/* ChatWidget is mounted globally by App.tsx; do not duplicate it here. */}
       {/* Global mobile bottom nav (BottomNav) replaces the old homepage-only sticky CTA */}
     </div>
   );
@@ -506,7 +507,7 @@ const heroStats = [
 ];
 
 const heroCTAs = [
-  { label: "Browse Phones",   icon: ShoppingBag,       href: "/buy",               variant: "gold" },
+  { label: "Browse Phones",   icon: ShoppingBag,       href: "/cat/mobiles?tab=buy",               variant: "gold" },
   { label: "Find Stores",     icon: Store,              href: "/stores",            variant: "outline" },
   { label: "Book Repair",     icon: Wrench,             href: "/repair",            variant: "outline" },
   { label: "Sell Phone",      icon: CircleDollarSign,   href: "/sell-your-phone",   variant: "ghost" },
@@ -515,142 +516,207 @@ const heroCTAs = [
 ];
 
 const quickCategories = [
-  { label: "iPhone",      href: "/buy?brand=Apple",    icon: Smartphone },
-  { label: "Samsung",     href: "/buy?brand=Samsung",  icon: Star },
-  { label: "Xiaomi",      href: "/buy?brand=Xiaomi",   icon: Zap },
-  { label: "MacBook",     href: "/buy?category=Laptops&brand=Apple", icon: Laptop },
+  { label: "iPhone",      href: "/cat/mobiles?tab=buy&brand=Apple",    icon: Smartphone },
+  { label: "Samsung",     href: "/cat/mobiles?tab=buy&brand=Samsung",  icon: Star },
+  { label: "Xiaomi",      href: "/cat/mobiles?tab=buy&brand=Xiaomi",   icon: Zap },
+  { label: "MacBook",     href: "/cat/mobiles?tab=buy&category=Laptops&brand=Apple", icon: Laptop },
   { label: "Used Phones", href: "/marketplace",        icon: RefreshCw },
-  { label: "Accessories", href: "/buy?category=Accessories", icon: Headphones },
+  { label: "Accessories", href: "/cat/mobiles?tab=buy&category=Accessories", icon: Headphones },
   { label: "Repair",      href: "/repair",             icon: Wrench },
-  { label: "iPad",        href: "/buy?category=Tablets", icon: Tablet },
+  { label: "iPad",        href: "/cat/mobiles?tab=buy&category=Tablets", icon: Tablet },
 ];
 
 const operationTiles = [
-  { label: "Buy", value: "Live stock", href: "/buy", icon: ShoppingBag },
-  { label: "Sell", value: "Instant quote", href: "/sell-your-phone", icon: CircleDollarSign },
+  { label: "Buy", value: "Browse products", href: "/cat/mobiles?tab=buy", icon: ShoppingBag },
+  { label: "Sell", value: "Request valuation", href: "/sell-your-phone", icon: CircleDollarSign },
   { label: "Repair", value: "Book service", href: "/repair", icon: Wrench },
-  { label: "Stores", value: "Verified only", href: "/stores", icon: Store },
+  { label: "Stores", value: "Local directory", href: "/stores", icon: Store },
 ];
 
 function HeroSection({ products }: { products: Product[] }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
 
-  const handleSearch = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    navigate(`/buy?q=${encodeURIComponent(query.trim() || "")}`);
+  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const search = query.trim();
+    navigate(search ? "/cat/mobiles?tab=buy&q=" + encodeURIComponent(search) : "/cat/mobiles?tab=buy");
   };
 
   return (
-    <section className="home-hero">
-      <div className="home-hero-grid" aria-hidden />
-      <div className="home-hero-sun" aria-hidden />
-      <div className="container home-hero-content">
-        <div className="grid min-h-[720px] items-center gap-12 py-14 lg:grid-cols-[1.08fr_.92fr] lg:py-20">
-          <div className="relative z-10 animate-fade-up">
-            <div className="mb-7 flex items-center gap-3">
-              <span className="home-hero-index">TC / 01</span>
-              <span className="home-hero-badge">
-                <Zap className="h-3 w-3" aria-hidden />
-                New Road · Kathmandu
-              </span>
-            </div>
-            <h1 className="home-hero-title">
-              Nepal&apos;s tech
-              <span>market, decoded.</span>
-            </h1>
-            <p className="home-hero-description mt-6 max-w-xl text-base leading-7 md:text-lg">
-              Compare devices, discover independent stores, repair what you own,
-              and trade into what comes next—all through one connected gadget exchange.
-            </p>
+    <>
+      <section className="tc-v3-hero" aria-labelledby="tc-hero-title">
+        <div className="container relative mx-auto pt-12 pb-9 md:pt-20 md:pb-14">
+          <div className="grid items-center gap-6 lg:grid-cols-[1.08fr_.92fr] lg:gap-10">
+            <div className="relative z-10 max-w-2xl">
+              <p className="tc-v3-eyebrow mb-5 flex items-center gap-2">
+                <MapPin className="h-4 w-4" aria-hidden="true" />
+                Tamrakar Complex · New Road, Kathmandu
+              </p>
+              <h1 id="tc-hero-title" className="tc-v3-headline">
+                Nepal’s mobile market.
+                <br />
+                <em>One digital home.</em>
+              </h1>
+              <p className="mt-6 max-w-xl text-base leading-8 text-white/75 md:text-lg">
+                Discover phones, compare prices, connect with local shops, sell or exchange your device,
+                and book repairs — all in one place.
+              </p>
 
-            <form onSubmit={handleSearch} className="mt-8 max-w-2xl">
-              <div className="home-search-shell">
-                <Search className="ml-5 h-5 w-5 shrink-0" aria-hidden />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search a device, store, price or repair…"
-                  className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm outline-none md:text-base"
-                  aria-label="Search products and stores"
-                />
-                <button type="submit" className="home-search-submit">
-                  Explore <ArrowRight className="h-4 w-4" />
-                </button>
+              <form onSubmit={handleSearch} role="search" className="mt-8 max-w-xl">
+                <label htmlFor="tc-v3-search-input" className="mb-2 block text-xs font-semibold text-white/75">
+                  Find a product in the catalog
+                </label>
+                <div className="tc-v3-search gap-2 p-1.5 pl-4">
+                  <Search className="h-5 w-5 shrink-0 text-slate-600" aria-hidden="true" />
+                  <input
+                    id="tc-v3-search-input"
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search iPhone, Samsung, laptops…"
+                    autoComplete="off"
+                  />
+                  <button type="submit" className="flex items-center gap-1.5">
+                    Search <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-white/70">
+                <span className="mr-1 text-white/50">Popular:</span>
+                {quickCategories.slice(0, 4).map((category) => (
+                  <Link
+                    to={category.href}
+                    key={category.label}
+                    className="rounded-full border border-white/20 px-3 py-1.5 transition-colors hover:border-[#C49A4A] hover:text-white"
+                  >
+                    {category.label}
+                  </Link>
+                ))}
               </div>
-            </form>
 
-            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-3">
-              {quickCategories.slice(0, 6).map((cat) => (
-                <Link key={cat.label} to={cat.href} className="home-chip">
-                  <span>{cat.label}</span><ArrowRight className="h-3 w-3" />
-                </Link>
-              ))}
+              <div className="mt-9 flex flex-wrap gap-3">
+                {heroCTAs.slice(0, 3).map((action, index) => {
+                  const Icon = action.icon;
+                  return (
+                    <Link
+                      to={action.href}
+                      key={action.label}
+                      className={index === 0 ? "tc-v3-action tc-v3-action-primary" : "tc-v3-action"}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      {action.label}
+                      {index === 0 && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+                    </Link>
+                  );
+                })}
+              </div>
+              {products.length > 0 && (
+                <p className="mt-5 text-xs text-white/55">
+                  Browse featured selections and review seller terms before purchase.
+                </p>
+              )}
             </div>
 
-            <div className="mt-9 flex flex-wrap gap-3">
-              {heroCTAs.slice(0, 3).map((cta, index) => {
-                const Icon = cta.icon;
+            <div className="tc-v3-device-stage" aria-label="Explore buy, sell, repair and store services">
+              <div className="tc-v3-device-halo" aria-hidden="true" />
+              <div className="tc-v3-device" aria-hidden="true">
+                <div className="tc-v3-device-glow" />
+                <div className="tc-v3-device-copy">
+                  <p className="text-[10px] font-semibold uppercase tracking-[.28em] text-[#E4BD7D]">
+                    Tamrakar Complex
+                  </p>
+                  <p className="mt-3 font-display text-3xl font-bold leading-tight text-white">
+                    Discover.
+                    <br />Compare.
+                    <br />Connect.
+                  </p>
+                  <span className="mt-4 block h-1 w-14 rounded-full bg-[#C49A4A]" />
+                </div>
+              </div>
+              {operationTiles.map((tile) => {
+                const Icon = tile.icon;
                 return (
-                  <Link key={cta.label} to={cta.href} className={index === 0 ? "home-cta-primary" : "home-cta-secondary"}>
-                    <Icon className="h-4 w-4" /> {cta.label}
+                  <Link to={tile.href} className="tc-v3-float" key={tile.label}>
+                    <span className="tc-v3-float-icon">
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0">
+                      <strong className="block text-xs">{tile.label}</strong>
+                      <small className="mt-0.5 block text-[10px] text-white/60">{tile.value}</small>
+                    </span>
+                    <span className="sr-only"> — open {tile.label}</span>
                   </Link>
                 );
               })}
             </div>
           </div>
 
-          <div className="home-device-stage animate-fade-up delay-150" aria-label="Connected gadget services">
-            <div className="home-device-shadow" aria-hidden />
-            <div className="home-device-card home-device-card-back" aria-hidden>
-              <span>REPAIR / 24</span>
-            </div>
-            <div className="home-device-card home-device-card-front">
-              <div className="home-device-camera" />
-              <div className="home-device-screen">
-                <span className="home-device-kicker">LIVE EXCHANGE</span>
-                <strong>Find your<br />next device.</strong>
-                <div className="home-device-price">NPR / MARKET</div>
-                <div className="home-device-wave" aria-hidden />
-              </div>
-            </div>
-            {operationTiles.map((tile, index) => (
-              <Link key={tile.label} to={tile.href} className={`home-orbit-card home-orbit-${index + 1}`}>
-                <tile.icon className="h-4 w-4" />
-                <span><strong>{tile.label}</strong>{tile.value}</span>
+          <div className="tc-v3-journey mt-12 md:mt-16" aria-label="Explore platform services">
+            {heroStats.map(({ stat, label, eyebrow, href, icon: Icon }) => (
+              <Link to={href} key={stat}>
+                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#E4BD7D]" aria-hidden="true" />
+                <span>
+                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-[.14em] text-[#E4BD7D]">
+                    {eyebrow}
+                  </span>
+                  <strong>{label}</strong>
+                  <small>Explore service <ArrowRight className="inline h-3 w-3" aria-hidden="true" /></small>
+                </span>
               </Link>
             ))}
-            <div className="home-stage-stamp" aria-hidden>
-              <span>TAMRAKAR</span><span>COMPLEX</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="tc-v3-categories py-12 md:py-16" aria-labelledby="tc-v3-categories-title">
+        <div className="container">
+          <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-[.18em] text-[#845C1C]">Explore the market</p>
+              <h2 id="tc-v3-categories-title" className="font-display text-2xl font-extrabold tracking-tight md:text-3xl">
+                Shop by interest
+              </h2>
+              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+                Start with a brand or category, then compare available listings and current prices.
+              </p>
+            </div>
+            <Link to="/cat/mobiles?tab=buy" className="inline-flex items-center gap-2 text-sm font-semibold text-[#B91C1C] hover:underline">
+              Explore all products <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+            {quickCategories.map((category) => {
+              const Icon = category.icon;
+              return (
+                <Link key={category.label} to={category.href} className="tc-v3-category">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  <span className="text-sm font-semibold">{category.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+          <div className="mt-8 flex flex-col gap-5 rounded-2xl border border-[#dfd8cc] bg-white px-5 py-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between md:px-8">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.16em] text-[#a87c48]">For local merchants</p>
+              <h3 className="mt-1 font-display text-xl font-extrabold">Bring your New Road shop online.</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Create a store profile, list products, and connect with customers.</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/map" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <MapPin className="h-4 w-4" aria-hidden="true" /> Explore the map
+              </Link>
+              <Link to="/stores/apply" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#b62e43] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#98243a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                Join as a store <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
             </div>
           </div>
         </div>
-
-        <div className="home-route-constellation" aria-label="Explore Tamrakar Complex services">
-          <span className="home-route-line" aria-hidden />
-          {heroStats.map(({ stat, label, eyebrow, href, icon: Icon }, index) => (
-            <Link
-              key={label}
-              to={href}
-              className="home-route-node"
-              style={{ "--route-order": index } as CSSProperties}
-            >
-              <span className="home-route-orbit" aria-hidden />
-              <span className="home-route-number">{stat}</span>
-              <span className="home-route-copy">
-                <span className="home-route-eyebrow"><Icon className="h-3.5 w-3.5" />{eyebrow}</span>
-                <strong>{label}</strong>
-              </span>
-              <span className="home-route-arrow" aria-hidden><ArrowRight className="h-4 w-4" /></span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
-
 
 
 // ─── Service Matrix ───────────────────────────────────────────────────────────

@@ -6,30 +6,51 @@ This project is a React/Vite SPA backed by Supabase. It can be deployed to Verce
 
 ## Step 1 — Supabase Database Setup
 
-### 1a. Run All Migrations
+### 1a. Release gates before any database change
 
-From your project root (with Supabase CLI installed and linked):
+**STOP: the complete historical migration replay and strict TypeScript CI
+have not passed. Do not run `supabase db push`, apply old SQL patches
+in the dashboard, or link this repository to a live database until these
+checks have passed.**
+
+The `supabase/migrations/` folder contains hundreds of timestamped
+historical SQL files, including obsolete credentials bootstrap, incompatible
+legacy RPC definitions, and overlapping order schemas. This history is being
+repaired and verified in the **isolated Docker migration smoke workflow**.
+A successful frontend build or passing dependency audit is **not** approval
+to apply migrations.
+
+For an authorized upgrade, first:
+
+1. Connect the **correct Tamrakar Complex** Supabase project, not any other
+   project associated with your account.
+2. Take and verify a restorable database backup.
+3. Compare `supabase_migrations.schema_migrations` against the Git history
+   **read-only**. Editing an already applied migration does not repair the live DB.
+4. Run full isolated migration replay, regenerate schema types, pass strict
+   TypeScript, RLS/role, payment-method, and idempotency regression tests.
+5. Review the exact additive migrations for the live schema before authorizing
+   any production application.
+
+**Never** seed admins by modifying `auth.users` or `auth.identities` in
+migration SQL, use committed passwords, or insert fake
+`supabase_migrations.schema_migrations` rows. Auth admin provisioning and
+role grants require explicit owner approval and an audited administrative
+workflow.
+
+### 1b. Controlled migration process (only after the release gates pass)
 
 ```sh
-supabase link --project-ref YOUR_PROJECT_REF
-supabase db push
+# Verify target and history BEFORE initiating any remote migration
+supabase projects list
+supabase migration list --linked
+# Review locally generated schema types and diffs first.
+# Do not run supabase db push until the correct project,
+# backup, reviewed migration plan, and release approvals are established.
 ```
 
-This runs all ~162 migration files in `supabase/migrations/` in chronological order.
-
-> **Important:** After `supabase db push`, also run these two files manually in the Supabase SQL Editor — they are not timestamped and will not be picked up automatically:
-> - `supabase/migrations/fix_gsmktm_suadmin.sql`
-> - `supabase/migrations/repair_service_fix_all.sql`
-
-### 1b. Run Fix Patches
-
-Run the following SQL files in the **Supabase Dashboard → SQL Editor** in this order:
-
-1. `fix_app_settings_policy.sql` — fixes `app_settings` write access for suadmin
-2. `fix_products_policy.sql` — fixes products RLS for suadmin
-3. `fix_repairs_policy.sql` — fixes repair_requests RLS
-4. `fix_stores_policy.sql` — fixes stores RLS for suadmin
-5. `fix_suadmin.sql` — creates the `suadmin@tamrakarcomplex.com` account
+See `docs/DATABASE_MIGRATION_CONSOLIDATION_20261013.md` for the
+quarantined scripts and release procedure.
 
 ### 1c. Storage Buckets
 
@@ -41,7 +62,7 @@ The migration `20260430014000_add_storage_buckets.sql` creates the required stor
 - `user-avatars`
 - `article-images`
 
-If they don't exist, run that migration manually.
+If they do not exist, investigate migration history and prepare a reviewed, additive fix. Do not run a historical migration manually against production.
 
 ---
 
@@ -79,7 +100,7 @@ In **Supabase Dashboard → Project → Edge Functions → Secrets**, add:
 
 ### Option A: Vercel (Recommended)
 
-1. Push code to GitHub.
+1. Merge only after required checks pass and release approval is recorded. A branch merge may trigger automatic deployment.
 2. Go to [vercel.com](https://vercel.com) → **Add New Project** → select your repo.
 3. Framework preset: **Vite** (auto-detected).
 4. Add environment variables:
@@ -120,9 +141,9 @@ SPA routing is handled by `netlify.toml` (already configured).
 ## Step 4 — Post-Deploy Verification
 
 - [ ] Visit the site and confirm the homepage loads.
-- [ ] Log in as `suadmin@tamrakarcomplex.com` and confirm `/suadmin` panel is accessible.
+- [ ] Log in with an explicitly provisioned authorized administrator test identity and confirm `/suadmin` permissions.
 - [ ] Place a test order (COD) and verify the order appears in the suadmin orders panel.
-- [ ] Test eSewa checkout if enabled (use eSewa test credentials first).
+- [ ] Test eSewa with sandbox credentials only after the database checkout contract is verified; do not enable Khalti until its atomic checkout contract and sandbox callbacks are validated.
 - [ ] Confirm the valuation estimator returns a price estimate.
 - [ ] Check **Supabase Dashboard → Logs → Edge Functions** for any runtime errors.
 
@@ -143,4 +164,4 @@ Set `ESEWA_MERCHANT_ID`, `ESEWA_SECRET_KEY`, and `SITE_URL` in Supabase Edge Fun
 Seed the database: `app_settings`, `products`, `repair_categories`, `repair_devices`, `device_catalog` must have rows. The app will show empty state (not demo data) in production mode.
 
 **`suadmin` panel inaccessible after login**
-Run `fix_suadmin.sql` in the Supabase SQL Editor to ensure the account exists with the correct role.
+Verify the identity and effective roles through an authorized Supabase Auth administration workflow and read-only role queries. Never execute legacy `fix_suadmin.sql` scripts or create privileged accounts with a migration.

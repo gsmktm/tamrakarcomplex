@@ -4,6 +4,8 @@ import { RequireAuth } from "@/routes/RequireAuth";
 import { ParamRouteRedirect } from "@/components/routing/ParamRouteRedirect";
 import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
 import { RouteFallback } from "@/components/routing/RouteFallback";
+import { getCatalogRedirectDestination } from "@/lib/catalogRedirect";
+import { legacyDetailDestination } from "@/lib/legacyDetailRoutes";
 
 // Eager load critical routes
 import Index from "@/pages/Index";
@@ -76,12 +78,19 @@ const withSuspense = (Component: React.ComponentType) => (
 
 function RedirectBrandToNew() {
   const { brand } = useParams<{ brand: string }>();
-  return <Navigate to={`/cat/mobiles/${brand ?? ''}`} replace />;
+  const location = useLocation();
+  return <Navigate to={legacyDetailDestination("/cat/mobiles", brand, location.search, location.hash)} replace />;
 }
 
 function RedirectModelToNew() {
   const { slug } = useParams<{ slug: string }>();
-  return <Navigate to={`/mobile/${slug ?? ''}`} replace />;
+  const location = useLocation();
+  return <Navigate to={legacyDetailDestination("/mobile", slug, location.search, location.hash)} replace />;
+}
+
+function RedirectBuyToCatalog() {
+  const location = useLocation();
+  return <Navigate to={getCatalogRedirectDestination(location.search, location.hash)} replace />;
 }
 
 function RedirectArticleToStores() {
@@ -163,8 +172,8 @@ export const publicRoutes = (
     <Route path="/repair/custom" element={withSuspense(CustomRepairRequest)} />
     <Route path="/news" element={<Navigate to="/stores/article" replace />} />
     <Route path="/reviews" element={withSuspense(Reviews)} />
-    <Route path="/buy" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
-    <Route path="/products" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
+    <Route path="/buy" element={<RedirectBuyToCatalog />} />
+    <Route path="/products" element={<RedirectBuyToCatalog />} />
     <Route path="/brands" element={withSuspense(Brands)} />
     <Route path="/cat/mobiles" element={withSuspense(MobileCategoryPage)} />
     <Route path="/cat/mobiles/:brand" element={withSuspense(MobileBrandPage)} />
@@ -219,8 +228,8 @@ export const publicRoutes = (
     <Route path="/sell" element={<Navigate to="/sell-your-phone" replace />} />
     <Route path="/exchange" element={<Navigate to="/sell-your-phone?mode=exchange" replace />} />
     <Route path="/repairs" element={<Navigate to="/repair" replace />} />
-    <Route path="/shop" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
-    <Route path="/explore" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
+    <Route path="/shop" element={<RedirectBuyToCatalog />} />
+    <Route path="/explore" element={<RedirectBuyToCatalog />} />
     <Route path="/prices" element={<Navigate to="/mobile-price" replace />} />
     <Route path="/newsroom" element={<Navigate to="/stores/article" replace />} />
     <Route path="/guides" element={<Navigate to="/mobile-guides" replace />} />

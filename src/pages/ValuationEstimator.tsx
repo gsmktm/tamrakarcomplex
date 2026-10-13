@@ -125,7 +125,7 @@ export default function ValuationEstimator() {
           return sameBrand && deviceModel.includes(requestedModel) && (!requestedStorage || deviceModel.includes(requestedStorage));
         });
         const synthetic = matchingDevice ?? { id: 0, brand, model: `${model} ${normalizedStorage ?? ""}`.trim(), image: "" };
-        const quoted_value = estimateDevicePrice(synthetic, normalizedCondition, [], Number(ageMonths || 0));
+        const quoted_value = estimateDevicePrice(synthetic, normalizedCondition, []);
         if (quoted_value <= 0) {
           throw new Error("Manual quote required");
         }

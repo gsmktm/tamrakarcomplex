@@ -633,7 +633,7 @@ describe("Core Business Logic Tests", () => {
 
     it("store admin cannot access other store data", async () => {
       // Mock store ownership check
-      const userStoreId = "store1";
+      const userStoreId: string = "store1";
       const requestedStoreId = "store2";
       const hasAccess = userStoreId === requestedStoreId;
       expect(hasAccess).toBe(false);

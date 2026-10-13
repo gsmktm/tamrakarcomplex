@@ -187,12 +187,12 @@ export default function DeviceVerificationManager() {
   const bulkUpdateVerificationMutation = useMutation({
     mutationFn: ({ ids, verified }: { ids: string[]; verified: boolean }) =>
       deviceVerificationService.bulkUpdateVerification(ids, verified),
-    onSuccess: () => {
+    onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["device-verification"] });
       queryClient.invalidateQueries({ queryKey: ["verification-stats"] });
       queryClient.invalidateQueries({ queryKey: ["verification-audit"] });
       setSelectedIds([]);
-      toast.success(`Bulk ${verified ? "verified" : "unverified"} successfully`);
+      toast.success(`Bulk ${variables.verified ? "verified" : "unverified"} successfully`);
     },
     onError: (error) => {
       toast.error("Bulk update failed: " + error.message);

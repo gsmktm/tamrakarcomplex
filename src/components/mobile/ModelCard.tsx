@@ -57,10 +57,10 @@ export function ModelCard({ model, className = '' }: ModelCardProps) {
   return (
     <Link
       to={`/mobile/${model.slug}`}
-      className={`group flex min-w-0 flex-col rounded-xl border bg-card hover:border-primary/40 hover:shadow-lg transition-all duration-200 overflow-hidden ${className}`}
+      className={`group flex min-w-0 flex-col rounded-2xl border border-border/80 bg-card hover:border-[#c5a16c]/70 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-all duration-200 overflow-hidden ${className}`}
     >
       {/* Image */}
-      <div className="relative overflow-hidden flex items-center justify-center aspect-square min-h-[150px] sm:min-h-[180px]">
+      <div className="relative overflow-hidden flex items-center justify-center aspect-square min-h-[150px] sm:min-h-[180px] bg-secondary/25">
         {model.image ? (
           <SafeImage
             src={model.image}
@@ -80,7 +80,7 @@ export function ModelCard({ model, className = '' }: ModelCardProps) {
             <Badge variant="secondary" className="text-[10px] h-5 px-1.5">Upcoming</Badge>
           )}
           {model.is_featured && (
-            <Badge className="text-[10px] h-5 px-1.5 bg-amber-500 hover:bg-amber-500 text-white">Featured</Badge>
+            <Badge className="text-[10px] h-5 px-1.5 bg-[#a87c48] hover:bg-[#a87c48] text-white">Featured</Badge>
           )}
           {model.is_top_rated && (
             <Badge className="text-[10px] h-5 px-1.5 bg-blue-600 hover:bg-blue-600 text-white">Top Rated</Badge>
@@ -97,7 +97,7 @@ export function ModelCard({ model, className = '' }: ModelCardProps) {
       </div>
 
       {/* Content */}
-      <div className="flex min-w-0 flex-col flex-1 p-3 gap-1.5">
+      <div className="flex min-w-0 flex-col flex-1 p-4 gap-2">
         <div className="font-semibold text-sm leading-snug group-hover:text-primary transition-colors line-clamp-2 break-words">
           {model.name}
         </div>

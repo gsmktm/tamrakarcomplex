@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/utils";
 import { handleSupabaseError, isConnectionError } from "@/lib/supabaseErrorHandler";
-import { AppRole } from "@/types/auth";
+import type { AppRole } from "@/types/app";
 import { Search, Trash2, Plus, Shield, User as UserIcon, Mail, Activity, Lock, Loader2, AlertCircle, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

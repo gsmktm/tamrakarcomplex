@@ -1,3 +1,9 @@
+# HISTORICAL REFERENCE ONLY — DO NOT EXECUTE
+# File was never a valid timestamped Supabase migration.
+# It may rewrite migration history, grant privileged roles, or overlap a newer schema.
+# Keep solely for forensics while consolidating migration history.
+# Original: supabase/migrations/fix_gsmktm_suadmin.sql
+
 -- Fix: Grant suadmin role to gsmktm@gmail.com
 -- Run this in Supabase SQL Editor
 

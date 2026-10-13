@@ -17,6 +17,8 @@ import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { getErrorMessage, parseProductPrice } from "@/lib/utils";
 import { isValidEmail, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeText } from "@/lib/security";
+import { secureGatewayUrl } from "@/lib/paymentRedirect";
+import { checkoutIntentFingerprint, type CheckoutIntent } from "@/lib/checkoutIntent";
 
 type CreateOrderSecureResponse = {
   success?: boolean;
@@ -41,9 +43,10 @@ export default function Checkout() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const checkoutIdempotencyKey = useRef(crypto.randomUUID());
+  const checkoutIdempotencyKey = useRef({ signature: "", value: crypto.randomUUID() });
+  const checkoutInFlight = useRef(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("cod");
-  const { data: methods = [], isLoading: methodsLoading } = usePaymentMethods();
+  const { data: methods = [], isLoading: methodsLoading, isError: methodsError } = usePaymentMethods();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -88,6 +91,8 @@ export default function Checkout() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checkoutInFlight.current) return;
+    checkoutInFlight.current = true;
     setLoading(true);
 
     try {
@@ -98,29 +103,36 @@ export default function Checkout() {
       if (!isValidNepalPhone(checkoutPhone)) throw new Error("Enter a valid Nepal mobile number.");
       if (checkoutEmail && !isValidEmail(checkoutEmail)) throw new Error("Enter a valid email address.");
 
-      // 1. Create order + items through the secure edge function so price, stock,
-      // rate limit, and commission-critical item fields are validated server-side.
-      const { data, error } = await supabase.functions.invoke<CreateOrderSecureResponse>("create-order-secure", {
-        body: {
-          payment_method: paymentMethod,
-          shipping_address: {
-            address: sanitizeText(formData.address, 240),
-            city: sanitizeText(formData.city, 80),
-          },
-          contact_info: {
-            name: sanitizeText(formData.fullName, 120),
-            phone: checkoutPhone,
-            email: checkoutEmail,
-          },
-          idempotency_key: checkoutIdempotencyKey.current,
-          items: cart.map((item) => ({
-            product_id: item.product.id,
-            source_type: item.product.source_type ?? "product",
-            store_product_id: item.product.store_product_id ?? (item.product.source_type === "store_product" ? item.product.id : null),
-            quantity: item.quantity,
-            store_id: item.product.store_id ?? null,
-          })),
+      // Same checkout intent reuses a key after network failure. Changing
+      // provider, quantities or shipping data creates a new server order key.
+      const intent: CheckoutIntent = {
+        payment_method: paymentMethod,
+        shipping_address: {
+          address: sanitizeText(formData.address, 240),
+          city: sanitizeText(formData.city, 80),
         },
+        contact_info: {
+          name: sanitizeText(formData.fullName, 120),
+          phone: checkoutPhone,
+          email: checkoutEmail,
+        },
+        items: cart.map(item => ({
+          product_id: item.product.id,
+          source_type: item.product.source_type ?? "product",
+          store_product_id: item.product.store_product_id ??
+            (item.product.source_type === "store_product" ? item.product.id : null),
+          quantity: item.quantity,
+          store_id: item.product.store_id ?? null,
+        })),
+      };
+      const fingerprint = checkoutIntentFingerprint(intent);
+      if (checkoutIdempotencyKey.current.signature !== fingerprint) {
+        checkoutIdempotencyKey.current = { signature: fingerprint, value: crypto.randomUUID() };
+      }
+
+      // 1. Secure checkout Edge Function recomputes price, stock and owner.
+      const { data, error } = await supabase.functions.invoke<CreateOrderSecureResponse>("create-order-secure", {
+        body: { ...intent, idempotency_key: checkoutIdempotencyKey.current.value },
       });
 
       if (error) throw error;
@@ -159,14 +171,18 @@ export default function Checkout() {
       // Khalti-style hosted checkout: the gateway returns a payment_url to
       // redirect the customer to (GET navigation, no form POST).
       if (sessionData.redirect_url && !sessionData.payment_data) {
-        window.location.href = sessionData.redirect_url;
+        const redirectUrl = secureGatewayUrl(sessionData.redirect_url);
+        if (!redirectUrl) throw new Error("Payment gateway returned an unsafe redirect URL.");
+        window.location.assign(redirectUrl);
         return;
       }
 
       if (sessionData.payment_url && sessionData.payment_data) {
+        const formUrl = secureGatewayUrl(sessionData.payment_url);
+        if (!formUrl) throw new Error("Payment gateway returned an unsafe payment URL.");
         const form = document.createElement("form");
         form.setAttribute("method", "POST");
-        form.setAttribute("action", sessionData.payment_url);
+        form.setAttribute("action", formUrl);
 
         for (const key in sessionData.payment_data) {
           const hiddenField = document.createElement("input");
@@ -187,6 +203,7 @@ export default function Checkout() {
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to place order"));
     } finally {
+      checkoutInFlight.current = false;
       setLoading(false);
     }
   };
@@ -280,6 +297,14 @@ export default function Checkout() {
             <CardContent>
               {methodsLoading ? (
                 <p className="text-sm text-muted-foreground">Loading payment options…</p>
+              ) : methodsError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  Payment methods are unavailable. Please try checkout again shortly.
+                </p>
+              ) : selectableMethods.length === 0 ? (
+                <p role="alert" className="text-sm text-muted-foreground">
+                  There are no ready payment methods at the moment. No order has been submitted.
+                </p>
               ) : (
                 <RadioGroup value={paymentMethod} onValueChange={(value) => setPaymentMethod(value)} className="space-y-3">
                   {selectableMethods.map((method) => (
@@ -355,7 +380,7 @@ export default function Checkout() {
                 {loading ? "Processing..." : `Place Order (NPR ${cartTotal.toLocaleString()})`}
               </Button>
               <p className="text-xs text-muted-foreground text-center mt-2">
-                By placing this order, you agree to our Terms of Service.
+                Amounts shown are estimates. Your order is repriced and stock-checked securely before submission. By placing an order, you agree to our Terms of Service.
               </p>
             </CardContent>
           </Card>

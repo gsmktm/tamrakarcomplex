@@ -402,7 +402,7 @@ export default function ProfileManager() {
                 <div className="text-sm text-muted-foreground">{user.email}</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {roles.map((r) => (
-                    <Badge key={r} variant={r === "suadmin" || r === "admin" ? "default" : "outline"}>
+                    <Badge key={r} variant={r === "suadmin" || r === "staffadmin" ? "default" : "outline"}>
                       {r}
                     </Badge>
                   ))}

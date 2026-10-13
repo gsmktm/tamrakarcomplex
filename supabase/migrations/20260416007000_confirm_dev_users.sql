@@ -1,11 +1,5 @@
--- Auto-confirm specific dev users
--- Run this in Supabase SQL Editor
-
-UPDATE auth.users 
-SET email_confirmed_at = NOW(), 
-    confirmed_at = NOW()
-WHERE lower(email) IN (
-  lower('admin@tamrakarcomplex.com'),
-  lower('store@tamrakarcomplex.com'),
-  lower('user@tamrakarcomplex.com')
-);
+-- Historical developer-only bulk email confirmation disabled.
+-- Direct Auth confirmation for named accounts must never run as schema DML;
+-- current Supabase also exposes confirmed_at as a generated column.
+-- All verification must pass through supported Supabase Auth flows.
+SELECT 1;

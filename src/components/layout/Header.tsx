@@ -148,17 +148,17 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full">
       {/* ── Trust bar ──────────────────────────────────────────────────────── */}
-      <div className="text-[11px] font-medium hidden md:block border-b bg-[#11130F] border-white/10">
+      <div className="text-[11px] font-medium hidden md:block border-b bg-[#101C33] border-white/10">
         <div className="container flex items-center justify-between h-8 gap-4">
           <div className="flex items-center gap-4">
             <span className="inline-flex items-center gap-1.5 text-white/70">
-              <MapPin className="h-3.5 w-3.5 text-[#D8FF3E]" aria-hidden />
-              Tamrakar Complex, New Road - Verified Mobile Shops
+              <MapPin className="h-3.5 w-3.5 text-[#E4BD7D]" aria-hidden />
+              Tamrakar Complex · New Road, Kathmandu
             </span>
             <span className="text-white/30">•</span>
             <span className="inline-flex items-center gap-1.5 text-white/70">
               <BadgeCheck className="h-3.5 w-3.5 text-[#10B981]" aria-hidden />
-              Verified Stores Only
+              Explore local shop profiles
             </span>
           </div>
           <div className="flex items-center gap-4 text-white/60">
@@ -166,13 +166,13 @@ export function Header() {
             <span className="text-white/30">•</span>
             <Link to="/repair" className="transition-colors hover:text-white">Book Repair</Link>
             <span className="text-white/30">•</span>
-            <Link to="/sell-your-phone" className="transition-colors font-semibold text-[#D8FF3E]">Sell Phone</Link>
+            <Link to="/sell-your-phone" className="transition-colors font-semibold text-[#E4BD7D]">Sell Phone</Link>
           </div>
         </div>
       </div>
 
       {/* ── Main bar ─────────────────────────────────────────────────────── */}
-      <div className="border-b bg-[#11130F] border-white/10 shadow-sm">
+      <div className="border-b bg-[#101C33] border-white/10 shadow-sm">
         <div className="container flex h-14 items-center gap-4">
           {/* Wordmark */}
           <Link
@@ -182,34 +182,21 @@ export function Header() {
           >
             <div
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-white shadow-sm"
-              style={{
-                border: "1px solid rgba(216, 255, 62, 0.35)",
-              }}
+              style={{ border: "1px solid rgba(196, 154, 74, 0.42)" }}
             >
               <img src={logo} alt="Tamrakar Complex" width={32} height={32} className="h-7 w-7 object-contain" loading="eager" />
             </div>
             <span className="hidden font-display text-base font-bold tracking-tight sm:block text-white">
-              Tamrakar<span className="text-[#D8FF3E]">.</span>
+              Tamrakar<span className="text-[#E4BD7D]">.</span>
             </span>
           </Link>
 
           {/* Search bar - desktop */}
           <button
             onClick={() => setIsSearchDialogOpen(true)}
-            className="hidden lg:flex flex-1 max-w-lg ml-4 items-center gap-2 h-10 px-3 text-sm transition-all pressable rounded-xl"
+            className="hidden lg:flex flex-1 max-w-lg ml-4 items-center gap-2 h-10 px-3 text-sm transition-colors rounded-xl border border-white/15 bg-white/[.07] hover:bg-white/[.11] hover:border-[#C49A4A]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E4BD7D]"
             aria-label="Open search"
-            style={{
-              background: "rgba(255, 255, 255, 0.06)",
-              border: "1px solid rgba(255, 255, 255, 0.10)",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.09)";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(59, 130, 246, 0.30)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255, 255, 255, 0.06)";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255, 255, 255, 0.10)";
-            }}
+            
           >
             <Search className="h-3.5 w-3.5 shrink-0 text-white/50" />
             <span className="truncate flex-1 text-left text-white/50">Search iPhone, Samsung, MacBook, shop, repair…</span>
@@ -237,7 +224,7 @@ export function Header() {
               <Link to="/wishlist" aria-label="Wishlist">
                 <Heart className="h-4 w-4" />
                 {wishlistCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center px-1 text-[9px] font-bold rounded-full bg-[#FF6848] text-[#11130F]">
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center px-1 text-[9px] font-bold rounded-full bg-[#DC2626] text-white">
                     {wishlistCount > 9 ? "9+" : wishlistCount}
                   </span>
                 )}
@@ -259,7 +246,7 @@ export function Header() {
             {/* Amber Sell CTA */}
             <Link
               to="/sell-your-phone"
-              className="hidden xl:inline-flex h-8 items-center px-4 text-xs font-bold transition-all hover:opacity-90 pressable bg-[#D8FF3E] text-[#11130F]"
+              className="hidden xl:inline-flex h-9 items-center px-4 text-xs font-bold transition-colors pressable rounded-lg bg-[#DC2626] text-white hover:bg-[#B91C1C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E4BD7D]"
               style={{ clipPath: "polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%)" }}
             >
               Sell Phone
@@ -275,7 +262,7 @@ export function Header() {
                       ? "/staffadmin/console"
                       : "/storeadmin/console"
                 }
-                className="hidden xl:inline-flex h-8 items-center px-4 text-xs font-semibold transition-all hover:opacity-90 pressable rounded-lg border border-[#3B82F6]/30 bg-[#3B82F6]/15 text-[#60A5FA]"
+                className="hidden xl:inline-flex h-8 items-center px-4 text-xs font-semibold transition-colors pressable rounded-lg border border-[#C49A4A]/45 bg-[#C49A4A]/10 text-[#E4BD7D] hover:bg-[#C49A4A]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E4BD7D]"
               >
                 Console
               </Link>

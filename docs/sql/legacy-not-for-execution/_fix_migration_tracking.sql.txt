@@ -1,3 +1,9 @@
+# HISTORICAL REFERENCE ONLY — DO NOT EXECUTE
+# File was never a valid timestamped Supabase migration.
+# It may rewrite migration history, grant privileged roles, or overlap a newer schema.
+# Keep solely for forensics while consolidating migration history.
+# Original: supabase/migrations/_fix_migration_tracking.sql
+
 -- ============================================================
 -- FIX: Record manually-applied migrations in schema_migrations
 -- so supabase CLI migration list shows them correctly

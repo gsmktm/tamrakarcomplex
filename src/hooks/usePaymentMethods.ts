@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { constrainCheckoutMethods } from "@/lib/checkoutProviderSupport";
 
 export type CheckoutPaymentMethod = {
   slug: string;
@@ -23,7 +24,7 @@ export function usePaymentMethods() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("list_active_payment_providers");
       if (error) throw error;
-      return (data ?? []) as unknown as CheckoutPaymentMethod[];
+      return constrainCheckoutMethods((data ?? []) as unknown as CheckoutPaymentMethod[]);
     },
     staleTime: 2 * 60 * 1000,
     retry: 1,

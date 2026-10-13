@@ -1,0 +1,210 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+
+const root = "supabase/migrations";
+const ordered = readdirSync(root).filter(name => name.endsWith(".sql")).sort();
+const baseline = "20240522000000_bootstrap_role_dependencies.sql";
+const settings = "20240523100000_create_app_settings.sql";
+const roles = "20260203024257_9c14e123-21ba-46cc-9121-9e6cf2f058e5.sql";
+const read = (file: string) => readFileSync(join(root, file), "utf8");
+
+describe("historical Supabase migration replay", () => {
+  it("has no unversioned/manual SQL in the active migrations folder", () => {
+    const unversioned = ordered.filter(name => !/^\d{14}_[a-zA-Z0-9_-]+\.sql$/.test(name));
+    expect(unversioned).toEqual([]);
+  });
+  it("bootstraps roles before app settings policies and legacy role migrations", () => {
+    expect(ordered.indexOf(baseline)).toBeGreaterThanOrEqual(0);
+    expect(ordered.indexOf(baseline)).toBeLessThan(ordered.indexOf(settings));
+    expect(ordered.indexOf(settings)).toBeLessThan(ordered.indexOf(roles));
+  });
+  it("keeps role security enabled before any permissive grants", () => {
+    const content = read(baseline);
+    expect(content).toMatch(/CREATE TABLE IF NOT EXISTS public\.user_roles/i);
+    expect(content).toMatch(/ALTER TABLE public\.user_roles ENABLE ROW LEVEL SECURITY/i);
+    expect(content).not.toMatch(/CREATE POLICY.+USING\s*\(\s*true\s*\)/i);
+    expect(content).not.toMatch(/INSERT INTO public\.user_roles/i);
+    for (const role of ["suadmin", "staffadmin", "storeadmin", "storestaff", "user"]) {
+      expect(content).toContain("'" + role + "'");
+    }
+    expect(read(settings)).toMatch(/public\.user_roles/);
+  });
+  it("never provisions a known-password administrator during a fresh replay", () => {
+    const historical = read("20260210171000_manual_create_gskmtm.sql");
+    expect(historical).not.toMatch(/INSERT\s+INTO\s+auth\.users/i);
+    expect(historical).not.toMatch(/UPDATE\s+auth\.users/i);
+    expect(historical).not.toMatch(/INSERT\s+INTO\s+auth\.identities/i);
+  });
+  it("creates the orders ownership key before the earliest orders index", () => {
+    const march = read("20260305050000_create_ecommerce_tables.sql");
+    const normalize = march.indexOf("ADD COLUMN IF NOT EXISTS user_id");
+    const backfill = march.indexOf("SET user_id = buyer_id");
+    const createIndex = march.indexOf("CREATE INDEX IF NOT EXISTS idx_orders_user_id");
+    expect(normalize).toBeGreaterThanOrEqual(0);
+    expect(backfill).toBeGreaterThan(normalize);
+    expect(createIndex).toBeGreaterThan(backfill);
+    expect(ordered.indexOf("20260305050000_create_ecommerce_tables.sql"))
+      .toBeLessThan(ordered.indexOf("20260425121200_payment_commission_payout_system.sql"));
+  });
+  it("does not reset Auth accounts or recurse in user_roles RLS policies", () => {
+    const sql = read("20260423130000_admin_auth_hardening.sql");
+    const noncomments = sql.replace(/--[^\n]*/g, "");
+    expect(noncomments).not.toMatch(/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?auth\.(?:users|identities)/i);
+    expect(noncomments).not.toMatch(/encrypted_password/i);
+    expect(sql).toContain("USING (public.is_admin());");
+    expect(sql).toContain("WITH CHECK (public.is_super_admin());");
+  });
+  it("never destroys real users or resets credentials to seed demo administrators", () => {
+    const names = [
+      "20260210171000_manual_create_gskmtm.sql",
+      "20260414090000_rebuild_superadmin_v2.sql",
+      "20260414170000_rebuild_all_demo_accounts.sql",
+      "20260414160000_ultimate_auth_fix.sql",
+      "20260210172000_manual_create_gskmtm_v2.sql",
+      "20260210173000_manual_create_gsktm.sql",
+      "20260305030000_force_password_reset.sql",
+      "20260414070000_fix_suadmin_login_hardened.sql",
+      "20260414130000_final_demo_users.sql",
+      "20260416005000_auto_confirm_users.sql",
+      "20260416005001_bootstrap_confirm_email.sql",
+      "20260416010001_harden_timrobani_bootstrap.sql",
+      "20260416011000_dev_confirm_logic.sql",
+      "20260416006000_disable_email_confirm.sql",
+      "20260416007000_confirm_dev_users.sql",
+      "20260416010000_fix_gsmktm_suadmin.sql",
+    ];
+    for (const name of names) {
+      const sql = read(name).replace(/--[^\n]*/g, "");
+      expect(sql).not.toMatch(/DELETE\s+FROM\s+auth\.users/i);
+      expect(sql).not.toMatch(/INSERT\s+INTO\s+auth\.users/i);
+      expect(sql).not.toMatch(/UPDATE\s+auth\.users/i);
+      expect(sql).not.toMatch(/encrypted_password/i);
+    }
+  });
+  it("removes demo password mutation and email authorization shortcuts", () => {
+    const sql = read("20260414150000_harden_demo_and_cleanup.sql")
+      .replace(/--[^\n]*/g, "");
+    expect(sql).not.toMatch(/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?auth\.users/i);
+    expect(sql).not.toMatch(/encrypted_password/i);
+    expect(sql).not.toMatch(/auth\.jwt\(\)\s*->>\s*'email'/i);
+    expect(sql).toContain("Destructive demo account cleanup is disabled");
+    expect(sql).toContain("REVOKE ALL ON FUNCTION public.cleanup_demo_accounts()");
+  });
+  it("does not grant paid store subscription tiers by random schema seeds", () => {
+    const sql = read("20260414180000_seed_store_subscriptions.sql")
+      .replace(/--[^\n]*/g, "");
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.store_subscriptions/i);
+    expect(sql).not.toMatch(/UPDATE\s+public\.stores/i);
+    expect(sql).not.toMatch(/ORDER\s+BY\s+random\(\)/i);
+  });
+  it("never books fabricated demo payouts, leads or repairs in schema setup", () => {
+    const sql = read("20260414210000_database_reform_full_stack.sql")
+      .replace(/--[^\n]*/g, "");
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.payouts/i);
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.leads\b/i);
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES public\.stores/);
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.repair_requests/i);
+  });
+  it("reconciles legacy order columns before creating ownership indexes", () => {
+    const paymentMigration = read("20260425121200_payment_commission_payout_system.sql");
+    const addUser = paymentMigration.indexOf("ADD COLUMN IF NOT EXISTS user_id");
+    const indexUser = paymentMigration.indexOf("idx_orders_user_id");
+    expect(addUser).toBeGreaterThanOrEqual(0);
+    expect(indexUser).toBeGreaterThan(addUser);
+    expect(paymentMigration).toMatch(/ADD COLUMN IF NOT EXISTS store_id/);
+  });
+  it("preserves the admin role RPC return contract during privilege hardening", () => {
+    const april = read("20260413000000_remove_hardcoded_emails.sql");
+    const start = april.indexOf("CREATE OR REPLACE FUNCTION public.grant_role_by_email");
+    const end = april.indexOf("-- Step 5:", start);
+    const grant = april.slice(start, end);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(grant).toMatch(/grant_role_by_email\(\s*p_email text,\s*p_role public\.app_role\s*\)/i);
+    expect(grant).toMatch(/RETURNS uuid/i);
+    expect(grant).toMatch(/public\.has_role\(caller_id, 'suadmin'/i);
+    expect(grant).toMatch(/RETURN target_id;/i);
+    expect(grant).not.toMatch(/RETURNS boolean/i);
+  });
+  it("prevents first-registered-user privilege escalation during schema replay", () => {
+    const rls = read("20260414050000_unify_rls_policies.sql");
+    const staff = rls.indexOf("CREATE OR REPLACE FUNCTION public.is_staff_admin()");
+    const policy = rls.indexOf('CREATE POLICY "Products: Admins manage all"');
+    const bootstrap = rls.slice(
+      rls.indexOf("CREATE OR REPLACE FUNCTION public.bootstrap_admin()"),
+      rls.indexOf("-- 3. Unify RLS Policies")
+    );
+    expect(staff).toBeGreaterThanOrEqual(0);
+    expect(policy).toBeGreaterThan(staff);
+    expect(rls).toMatch(/role = 'staffadmin'::public\.app_role/);
+    expect(rls).toContain("AS " + "$$" + "\n  SELECT auth.uid() IS NOT NULL");
+
+    expect(bootstrap).toMatch(/RAISE EXCEPTION 'Administrator self-bootstrap is disabled'/);
+    expect(bootstrap).not.toMatch(/INSERT INTO public\.user_roles/);
+  });
+  it("keeps privileged self-bootstrap locked down in the final additive migration", () => {
+    const finalMigration = "20261013000000_disable_admin_self_bootstrap.sql";
+    const sql = read(finalMigration);
+    expect(sql).toMatch(/SECURITY INVOKER/i);
+    expect(sql).toMatch(/RAISE EXCEPTION 'Administrator self-bootstrap is disabled'/);
+    expect(sql).toContain("FROM PUBLIC, anon, authenticated");
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.dev_ensure_confirmed_admin\(p_email text\)/);
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.cleanup_demo_accounts\(\)/);
+    expect(sql).toMatch(/Destructive demo account cleanup is disabled/);
+
+    const later = ordered.filter(name => name > finalMigration);
+    for (const name of later) {
+      expect(read(name)).not.toMatch(/CREATE OR REPLACE FUNCTION public\.bootstrap_admin\s*\(/i);
+    }
+  });
+  it("drops existing store/order policy names before replacing them", () => {
+    const sql = read("20260414140000_store_specific_data.sql");
+    const statements = [
+      'DROP POLICY IF EXISTS "Products: Viewable by everyone" ON public.products;',
+      'CREATE POLICY "Products: Viewable by everyone" ON public.products',
+      'DROP POLICY IF EXISTS "Orders: Store owners update own status" ON public.orders;',
+      'CREATE POLICY "Orders: Store owners update own status" ON public.orders',
+    ];
+    const indices = statements.map(statement => sql.indexOf(statement));
+    expect(indices.every(index => index >= 0)).toBe(true);
+    expect(indices[0]).toBeLessThan(indices[1]);
+    expect(indices[2]).toBeLessThan(indices[3]);
+  });
+  it("also keeps v2 directory contacts private without random plan grants", () => {
+    const sql = read("20260414200000_database_reform_v2.sql");
+    const statements = sql.replace(/--[^\n]*/g, "");
+    expect(statements).not.toMatch(/ORDER BY random\(\)/i);
+    expect(statements).not.toMatch(/INSERT INTO public\.store_subscriptions/i);
+    expect(sql).toContain("DROP FUNCTION IF EXISTS public.get_stores_directory()");
+    expect(sql).toContain("s.owner_id = auth.uid() OR public.is_admin()");
+    expect(sql).toContain("s.subscription_end_date > now()");
+  });
+  it("rebuilds the later directory RPC without random paid entitlements or contact leaks", () => {
+    const sql = read("20260414190000_database_reform_stores.sql");
+    const sqlOnly = sql.replace(/--[^\n]*/g, "");
+    expect(sqlOnly).not.toMatch(/ORDER BY random\(\)/i);
+    expect(sqlOnly).not.toMatch(/INSERT INTO public\.store_subscriptions/i);
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS slug text");
+    expect(sql).toContain("WHERE slug IS NULL");
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.get_stores_directory\(\)/);
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.get_stores_directory\(\) FROM PUBLIC/);
+    expect(sql).toMatch(/s\.owner_id = auth\.uid\(\) OR public\.is_admin\(\)/);
+    expect(sql).toMatch(/s\.subscription_end_date > now\(\)/);
+  });
+  it("recreates the directory RPC safely when its returned columns change", () => {
+    const initial = read("20260413010000_stores_directory_rpc.sql");
+    const revised = read("20260413020000_add_store_address.sql");
+    expect(initial).toContain("RETURNS TABLE (");
+    const drop = revised.indexOf("DROP FUNCTION IF EXISTS public.get_stores_directory()");
+    const create = revised.indexOf("CREATE OR REPLACE FUNCTION public.get_stores_directory()");
+    expect(drop).toBeGreaterThanOrEqual(0);
+    expect(create).toBeGreaterThan(drop);
+    expect(revised).not.toMatch(/DROP FUNCTION[^;]*CASCADE/i);
+    expect(revised).toMatch(/GRANT EXECUTE ON FUNCTION public\.get_stores_directory\(\) TO anon, authenticated/i);
+  });
+  it("does not recreate the type or table unconditionally later", () => {
+    const content = read(roles);
+    expect(content).toMatch(/IF NOT EXISTS[\s\S]*?CREATE TYPE public\.app_role/i);
+    expect(content).toMatch(/CREATE TABLE IF NOT EXISTS public\.user_roles/i);
+  });
+});

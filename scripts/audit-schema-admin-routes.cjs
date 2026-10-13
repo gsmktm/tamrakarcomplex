@@ -1,4 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -65,18 +67,25 @@ async function probeTable(name) {
   } catch (e) { return false; }
 }
 
-async function probeRPC(name) {
-  try {
-    // Try calling with fake params; if error is "function does not exist" => missing
-    const { error } = await supabase.rpc(name, {});
-    if (!error) return true;
-    if (error.code === '42883') return false;
-    // Any other error (wrong args, permission) means it exists
-    return true;
-  } catch (e) {
-    if (String(e).includes('does not exist')) return false;
-    return true;
-  }
+// RPC existence cannot be checked by INVOKING it with service-role privileges.
+// That method can trigger actual user/role/payment mutations when functions have
+// default arguments. Search source migrations instead; deployed RPC signatures
+// must be verified separately using read-only database catalog queries.
+const migrationDir = path.resolve(__dirname, '../supabase/migrations');
+const migrationSQL = fs.existsSync(migrationDir)
+  ? fs.readdirSync(migrationDir)
+      .filter(name => name.endsWith('.sql'))
+      .sort()
+      .map(name => fs.readFileSync(path.join(migrationDir, name), 'utf8'))
+      .join('\n')
+  : '';
+
+function hasLocalRPCDefinition(name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(
+    '(?:CREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION|CREATE\\s+FUNCTION\\s+IF\\s+NOT\\s+EXISTS)\\s+(?:public\\.)?["]?' + escaped + '["]?\\s*\\(',
+    'i',
+  ).test(migrationSQL);
 }
 
 async function audit() {
@@ -94,13 +103,15 @@ async function audit() {
   if (tblMissing === 0) console.log(`  ✅ All ${CRITICAL_TABLES.length} critical tables EXIST or at least resolvable`);
 
   // 2. RPC CHECK
-  console.log(`\n🔌 RPC FUNCTION CHECK (${CRITICAL_RPCS.length} RPCs probed):`);
+  console.log(`\n🔌 RPC SOURCE CHECK (${CRITICAL_RPCS.length} names; never invokes RPCs):`);
   let rpcMissing = 0;
   for (const r of CRITICAL_RPCS) {
-    const exists = await probeRPC(r);
-    if (!exists) { console.log(`  ❌ MISSING RPC: ${r}`); rpcMissing++; }
+    if (!hasLocalRPCDefinition(r)) {
+      console.log(`  ⚠️  No local migration definition found for RPC: ${r}`);
+      rpcMissing++;
+    }
   }
-  if (rpcMissing === 0) console.log(`  ✅ All ${CRITICAL_RPCS.length} referenced RPCs EXIST on remote`);
+  console.log(`  ⚠️  Remote RPC existence, arguments and RLS are NOT verified by this source audit.`);
 
   // 3. COLUMNS: store_packages scale cols
   console.log('\n📐 store_packages: scale columns (from migration 20260825000000):');
@@ -153,27 +164,24 @@ async function audit() {
   console.log(`  repair_pricing:      ${rpOk ? '✅ EXISTS' : '❌ MISSING'}`);
   console.log(`  price_audit_logs:    ${paOk ? '✅ EXISTS' : '❌ MISSING'}`);
 
-  // 7. pg_trgm extension (stores search)
-  console.log('\n🔍 pg_trgm extension + search_vector trigger:');
-  try {
-    const { data, error } = await supabase.rpc('get_stores_directory', { p_limit: 1 });
-    if (error && error.message.includes('pg_trgm')) {
-      console.log('  ❌ pg_trgm extension missing (stores search will fail)');
-    } else {
-      const { count } = await supabase.from('stores').select('*', { count: 'exact', head: true }).not('search_vector', 'is', null).limit(0);
-      console.log(`  ✅ pg_trgm seems OK; stores with populated search_vector: ~${count || '(unknown)'}`);
-    }
-  } catch (e) {
-    console.log('  ⚠️  pg_trgm check inconclusive:', e.message?.slice(0,120));
+  // 7. Read-only store search-vector column check.
+  console.log('\n🔍 Store search_vector column (read-only inspection):');
+  const { error: searchColumnError } = await supabase
+    .from('stores').select('search_vector', { head: true }).limit(0);
+  if (searchColumnError) {
+    console.log('  ⚠️  stores.search_vector unavailable or inaccessible:', searchColumnError.message?.slice(0, 120));
+  } else {
+    console.log('  ✅ stores.search_vector is readable; pg_trgm extension itself was NOT verified.');
   }
 
   // SUMMARY
   console.log('\n================================================');
   const total = tblMissing + rpcMissing;
   if (total === 0) {
-    console.log('  ✅ ZERO CRITICAL SCHEMA GAPS — EVERYTHING IS LIVE');
+    console.log('  ✅ No missing tables detected and local RPC migration definitions found.');
+    console.log('  ⚠️  Live RPC signatures, grants and RLS still require authorized read-only catalog inspection.');
   } else {
-    console.log(`  ⚠️  ${tblMissing} missing tables + ${rpcMissing} missing RPCs = ${total} issues`);
+    console.log(`  ⚠️  ${tblMissing} missing tables + ${rpcMissing} missing LOCAL RPC definitions; live RPC inventory unverified.`);
   }
   console.log('================================================\n');
 

@@ -38,7 +38,7 @@ interface StoreWithSubscriptions extends StoreRow {
 }
 import { SEO } from "@/components/common/SEO";
 import { cn, getErrorMessage } from "@/lib/utils";
-import type { StorePageInsert, StorePageRow, StoreRow, StoreUpdate } from "@/types/app";
+import type { StorePageInsert, StorePageRow, StoreUpdate } from "@/types/app";
 
 type PageFormState = {
   id: string | null;

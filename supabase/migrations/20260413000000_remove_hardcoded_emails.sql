@@ -43,11 +43,14 @@ AS $$
 $$;
 
 -- Step 4: Rewrite grant_role_by_email — caller must be suadmin in user_roles.
+-- Preserve the existing UUID return contract from the February and March
+-- migrations. PostgreSQL CREATE OR REPLACE cannot change a function's return
+-- type; authorization is strengthened without breaking RPC callers.
 CREATE OR REPLACE FUNCTION public.grant_role_by_email(
-  target_email text,
-  new_role public.app_role
+  p_email text,
+  p_role public.app_role
 )
-RETURNS boolean
+RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -63,18 +66,18 @@ BEGIN
 
   SELECT id INTO target_id
   FROM auth.users
-  WHERE lower(email) = lower(target_email)
+  WHERE lower(email) = lower(p_email)
   LIMIT 1;
 
   IF target_id IS NULL THEN
-    RAISE EXCEPTION 'User not found with email: %', target_email;
+    RAISE EXCEPTION 'User not found with email: %', p_email;
   END IF;
 
   INSERT INTO public.user_roles (user_id, role)
-  VALUES (target_id, new_role)
+  VALUES (target_id, p_role)
   ON CONFLICT (user_id, role) DO NOTHING;
 
-  RETURN true;
+  RETURN target_id;
 END;
 $$;
 

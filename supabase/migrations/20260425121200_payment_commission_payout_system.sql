@@ -74,6 +74,14 @@ CREATE TABLE IF NOT EXISTS public.store_payouts (
   updated_at timestamp with time zone DEFAULT now()
 );
 
+-- Earlier environments may already have a legacy orders table created
+-- without the account/merchant columns. CREATE TABLE IF NOT EXISTS is a
+-- no-op for those tables; make the required columns explicit before indexes
+-- and ownership policies. These additions are idempotent and non-destructive.
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES public.stores(id) ON DELETE SET NULL;
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON public.orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_store_id ON public.orders(store_id);
