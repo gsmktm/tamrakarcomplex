@@ -48,6 +48,17 @@ describe("historical Supabase migration replay", () => {
     expect(indexUser).toBeGreaterThan(addUser);
     expect(paymentMigration).toMatch(/ADD COLUMN IF NOT EXISTS store_id/);
   });
+  it("preserves the admin role RPC return contract during privilege hardening", () => {
+    const april = read("20260413000000_remove_hardcoded_emails.sql");
+    const start = april.indexOf("CREATE OR REPLACE FUNCTION public.grant_role_by_email");
+    const end = april.indexOf("-- Step 5:", start);
+    const grant = april.slice(start, end);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(grant).toMatch(/RETURNS uuid/i);
+    expect(grant).toMatch(/public\.has_role\(caller_id, 'suadmin'/i);
+    expect(grant).toMatch(/RETURN target_id;/i);
+    expect(grant).not.toMatch(/RETURNS boolean/i);
+  });
   it("does not recreate the type or table unconditionally later", () => {
     const content = read(roles);
     expect(content).toMatch(/IF NOT EXISTS[\s\S]*?CREATE TYPE public\.app_role/i);
