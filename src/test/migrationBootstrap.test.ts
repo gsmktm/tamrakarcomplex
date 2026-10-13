@@ -72,6 +72,7 @@ describe("historical Supabase migration replay", () => {
       "20260416011000_dev_confirm_logic.sql",
       "20260416006000_disable_email_confirm.sql",
       "20260416007000_confirm_dev_users.sql",
+      "20260416010000_fix_gsmktm_suadmin.sql",
     ];
     for (const name of names) {
       const sql = read(name).replace(/--[^\n]*/g, "");
