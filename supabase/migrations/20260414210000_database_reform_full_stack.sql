@@ -69,6 +69,13 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
   created_at timestamptz DEFAULT now()
 );
 
+-- An earlier repair_requests table already exists on fresh replay and does
+-- not necessarily carry store_id. CREATE TABLE IF NOT EXISTS doesn't update
+-- pre-existing definitions. Preserve existing data and fail closed for rows
+-- without an assigned store until the owner is explicitly set.
+ALTER TABLE public.repair_requests
+  ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES public.stores(id) ON DELETE SET NULL;
+
 -- Enable RLS on all new tables
 ALTER TABLE public.store_branches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.repair_requests ENABLE ROW LEVEL SECURITY;
