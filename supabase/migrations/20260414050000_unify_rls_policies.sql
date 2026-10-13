@@ -44,6 +44,24 @@ AS $$
     );
 $$;
 
+-- Staff-admin check must exist before policies reference it. Fail closed
+-- for unauthenticated callers and verify explicit database-granted role only.
+CREATE OR REPLACE FUNCTION public.is_staff_admin()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = auth.uid()
+      AND role = 'staffadmin'::public.app_role
+  );
+$;
+REVOKE ALL ON FUNCTION public.is_staff_admin() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_staff_admin() TO authenticated;
+
 -- 2. Update Bootstrap Admin Function
 CREATE OR REPLACE FUNCTION public.no_admin_exists()
 RETURNS boolean
@@ -59,29 +77,22 @@ AS $$
   );
 $$;
 
+-- SECURITY: A 'first signed-in user becomes suadmin' bootstrap gives the
+-- next arbitrary sign-up an administrator role on an empty database.
+-- Schema replay must NEVER provision privileged identities. Preserve the RPC
+-- signature for older clients but deny unauthorized bootstrap requests.
 CREATE OR REPLACE FUNCTION public.bootstrap_admin()
 RETURNS boolean
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public
 AS $$
 BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'not_authenticated';
-  END IF;
-
-  IF NOT public.no_admin_exists() THEN
-    RETURN false;
-  END IF;
-
-  -- The first user gets suadmin
-  INSERT INTO public.user_roles (user_id, role)
-  VALUES (auth.uid(), 'suadmin'::public.app_role)
-  ON CONFLICT (user_id, role) DO NOTHING;
-
-  RETURN true;
+  RAISE EXCEPTION 'Administrator self-bootstrap is disabled'
+    USING ERRCODE = '42501';
 END;
 $$;
+REVOKE ALL ON FUNCTION public.bootstrap_admin() FROM PUBLIC;
 
 -- 3. Unify RLS Policies for all key tables
 
