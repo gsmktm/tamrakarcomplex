@@ -310,7 +310,7 @@ export default function ProductDetail() {
                       onClick={() => setIsZoomed(z => !z)}
                     >
                       <div className="absolute top-3 left-3 z-10 flex gap-2">
-                        {product.condition === "New" || (!product.condition && !product.used_price_value) ? (
+                        {product.condition === "New" || !product.condition ? (
                           <Badge className="shadow-sm bg-primary text-primary-foreground">New</Badge>
                         ) : (
                           <Badge variant="secondary" className="shadow-sm border border-border/60">Used</Badge>
@@ -500,23 +500,10 @@ export default function ProductDetail() {
                       <p className="font-display font-bold text-3xl sm:text-4xl lg:text-[2.6rem] text-primary tabular-nums leading-none">
                         {availability.displayPrice}
                       </p>
-                      {availability.hasPrice && (product.old_price_value || product.mrp_price_value) && (() => {
-                        const base = product.old_price_value || product.mrp_price_value;
-                        const baseNum = Number(base);
-                        if (!baseNum || baseNum <= numericPrice) return null;
-                        const saved = baseNum - numericPrice;
-                        const pct = Math.round((saved / baseNum) * 100);
-                        return (
-                          <>
-                            <span className="text-muted-foreground line-through text-sm sm:text-base tabular-nums">
-                              {formatPrice(baseNum)}
-                            </span>
-                            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-[11px] sm:text-xs font-semibold">
-                              Save {pct}% · {formatPrice(saved)}
-                            </Badge>
-                          </>
-                        );
-                      })()}
+                      {/* Reference/strikethrough prices remain hidden until
+                          a verified catalog schema actually supplies them.
+                          Never invent a discount from absent DB fields. */}
+
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
                       {availability.hasPrice ? "Prices include VAT. Delivery charges may apply depending on your location." : "Final price is set by the verified seller during checkout."}
