@@ -59,6 +59,9 @@ describe("historical Supabase migration replay", () => {
       "20260414070000_fix_suadmin_login_hardened.sql",
       "20260414130000_final_demo_users.sql",
       "20260416005000_auto_confirm_users.sql",
+      "20260416005001_bootstrap_confirm_email.sql",
+      "20260416010001_harden_timrobani_bootstrap.sql",
+      "20260416011000_dev_confirm_logic.sql",
     ];
     for (const name of names) {
       const sql = read(name).replace(/--[^\n]*/g, "");
