@@ -29,6 +29,15 @@ describe("historical Supabase migration replay", () => {
     expect(historical).not.toMatch(/UPDATE\s+auth\.users/i);
     expect(historical).not.toMatch(/INSERT\s+INTO\s+auth\.identities/i);
   });
+  it("creates the orders ownership key before the earliest orders index", () => {
+    const march = read("20260305050000_create_ecommerce_tables.sql");
+    const normalize = march.indexOf("ADD COLUMN IF NOT EXISTS user_id");
+    const createIndex = march.indexOf("CREATE INDEX IF NOT EXISTS idx_orders_user_id");
+    expect(normalize).toBeGreaterThanOrEqual(0);
+    expect(createIndex).toBeGreaterThan(normalize);
+    expect(ordered.indexOf("20260305050000_create_ecommerce_tables.sql"))
+      .toBeLessThan(ordered.indexOf("20260425121200_payment_commission_payout_system.sql"));
+  });
   it("reconciles legacy order columns before creating ownership indexes", () => {
     const paymentMigration = read("20260425121200_payment_commission_payout_system.sql");
     const addUser = paymentMigration.indexOf("ADD COLUMN IF NOT EXISTS user_id");
