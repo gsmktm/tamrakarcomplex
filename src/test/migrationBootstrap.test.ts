@@ -58,6 +58,7 @@ describe("historical Supabase migration replay", () => {
       "20260305030000_force_password_reset.sql",
       "20260414070000_fix_suadmin_login_hardened.sql",
       "20260414130000_final_demo_users.sql",
+      "20260416005000_auto_confirm_users.sql",
     ];
     for (const name of names) {
       const sql = read(name).replace(/--[^\n]*/g, "");
