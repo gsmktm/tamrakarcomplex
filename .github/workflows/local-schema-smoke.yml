@@ -20,6 +20,32 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
+          # An earlier run could not bind the default db port 54322. Allocate
+          # separate free local ports and a run-specific Docker project name.
+          # This changes only the ephemeral checked-out CI config, never the
+          # checked-in Supabase project or any remote database.
+          python3 - <<'PY'
+          import os
+          import socket
+          from pathlib import Path
+          def port():
+              with socket.socket() as sock:
+                  sock.bind(("127.0.0.1", 0))
+                  return sock.getsockname()[1]
+          api, db, shadow, studio = [port() for _ in range(4)]
+          cfg = Path("supabase/config.toml")
+          original = cfg.read_text()
+          original = original.replace(
+              'project_id = "tvgmnjuexdgtgtqhrjok"',
+              'project_id = "tamrakar-ci-' + os.environ["GITHUB_RUN_ID"] + '"'
+          )
+          cfg.write_text(original + (
+              f"\n[api]\nport = {api}\n"
+              f"\n[db]\nport = {db}\nshadow_port = {shadow}\n"
+              f"\n[studio]\nport = {studio}\n"
+          ))
+          print("Local isolated ports selected (api/db/shadow/studio):", api, db, shadow, studio)
+          PY
           npx --yes supabase@latest start --debug > artifacts/db-replay.log 2>&1 || {
             grep -E -A 18 'ERROR:|Error:|SQLSTATE|failed to apply|failed to start' artifacts/db-replay.log | tail -n 100 || true
             exit 1
