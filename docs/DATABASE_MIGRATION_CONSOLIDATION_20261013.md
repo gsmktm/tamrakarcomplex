@@ -36,6 +36,15 @@ change has been made** and live-state assertions are not justified.
 4. Disabled one known-credential administrator bootstrap SQL. Remaining
    historical Auth SQL needs **separate security review** (Issue #8).
 
+## Read-only preflight for a future authorized live connection
+
+When the correct Tamrakar project is connected, inspect
+`docs/sql/read-only/tamrakar_schema_preflight.sql`. Its queries return
+migration version IDs, public table/RLS metadata, policy definitions,
+relevant commerce columns, public RPC signatures, and role enum labels
+**without modifying any user, order, token, role, or database object**.
+Do not run this inventory against an unrelated Supabase project.
+
 ## Why we must NOT squash or delete timestamped migrations yet
 
 Supabase stores applied versions in
