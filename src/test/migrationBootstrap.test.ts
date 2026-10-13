@@ -52,6 +52,7 @@ describe("historical Supabase migration replay", () => {
       "20260210171000_manual_create_gskmtm.sql",
       "20260414090000_rebuild_superadmin_v2.sql",
       "20260414170000_rebuild_all_demo_accounts.sql",
+      "20260414160000_ultimate_auth_fix.sql",
     ];
     for (const name of names) {
       const sql = read(name).replace(/--[^\n]*/g, "");
