@@ -61,6 +61,15 @@ describe("historical Supabase migration replay", () => {
       expect(sql).not.toMatch(/encrypted_password/i);
     }
   });
+  it("removes demo password mutation and email authorization shortcuts", () => {
+    const sql = read("20260414150000_harden_demo_and_cleanup.sql")
+      .replace(/--[^\n]*/g, "");
+    expect(sql).not.toMatch(/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?auth\.users/i);
+    expect(sql).not.toMatch(/encrypted_password/i);
+    expect(sql).not.toMatch(/auth\.jwt\(\)\s*->>\s*'email'/i);
+    expect(sql).toContain("Destructive demo account cleanup is disabled");
+    expect(sql).toContain("REVOKE ALL ON FUNCTION public.cleanup_demo_accounts()");
+  });
   it("reconciles legacy order columns before creating ownership indexes", () => {
     const paymentMigration = read("20260425121200_payment_commission_payout_system.sql");
     const addUser = paymentMigration.indexOf("ADD COLUMN IF NOT EXISTS user_id");
