@@ -21,6 +21,9 @@ describe("historical Supabase migration replay", () => {
     expect(content).toMatch(/ALTER TABLE public\.user_roles ENABLE ROW LEVEL SECURITY/i);
     expect(content).not.toMatch(/CREATE POLICY.+USING\s*\(\s*true\s*\)/i);
     expect(content).not.toMatch(/INSERT INTO public\.user_roles/i);
+    for (const role of ["suadmin", "staffadmin", "storeadmin", "storestaff", "user"]) {
+      expect(content).toContain("'" + role + "'");
+    }
     expect(read(settings)).toMatch(/public\.user_roles/);
   });
   it("never provisions a known-password administrator during a fresh replay", () => {
