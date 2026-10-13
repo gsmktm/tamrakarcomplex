@@ -138,6 +138,16 @@ describe("historical Supabase migration replay", () => {
     expect(indices[0]).toBeLessThan(indices[1]);
     expect(indices[2]).toBeLessThan(indices[3]);
   });
+  it("rebuilds the later directory RPC without random paid entitlements or contact leaks", () => {
+    const sql = read("20260414190000_database_reform_stores.sql");
+    const sqlOnly = sql.replace(/--[^\n]*/g, "");
+    expect(sqlOnly).not.toMatch(/ORDER BY random\(\)/i);
+    expect(sqlOnly).not.toMatch(/INSERT INTO public\.store_subscriptions/i);
+    expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.get_stores_directory\(\)/);
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.get_stores_directory\(\) FROM PUBLIC/);
+    expect(sql).toMatch(/s\.owner_id = auth\.uid\(\) OR public\.is_admin\(\)/);
+    expect(sql).toMatch(/s\.subscription_end_date > now\(\)/);
+  });
   it("recreates the directory RPC safely when its returned columns change", () => {
     const initial = read("20260413010000_stores_directory_rpc.sql");
     const revised = read("20260413020000_add_store_address.sql");
