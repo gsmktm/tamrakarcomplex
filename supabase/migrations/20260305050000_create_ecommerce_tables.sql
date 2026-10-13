@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS public.order_items (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+-- Pre-existing installations may have an earlier orders table without a
+-- user_id column. CREATE TABLE IF NOT EXISTS above doesn't add columns to
+-- existing tables; normalize the ownership key BEFORE indexes and RLS.
+-- This additive correction does not change or delete existing orders.
+ALTER TABLE public.orders
+    ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+
 -- Add indexes
 CREATE INDEX IF NOT EXISTS idx_carts_user_id ON public.carts(user_id);
 CREATE INDEX IF NOT EXISTS idx_carts_session_id ON public.carts(session_id);
