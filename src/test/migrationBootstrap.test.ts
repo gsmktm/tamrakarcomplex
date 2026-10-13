@@ -83,6 +83,13 @@ describe("historical Supabase migration replay", () => {
     expect(sql).not.toMatch(/UPDATE\s+public\.stores/i);
     expect(sql).not.toMatch(/ORDER\s+BY\s+random\(\)/i);
   });
+  it("never books fabricated demo payouts, leads or repairs in schema setup", () => {
+    const sql = read("20260414210000_database_reform_full_stack.sql")
+      .replace(/--[^\n]*/g, "");
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.payouts/i);
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.leads\b/i);
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.repair_requests/i);
+  });
   it("reconciles legacy order columns before creating ownership indexes", () => {
     const paymentMigration = read("20260425121200_payment_commission_payout_system.sql");
     const addUser = paymentMigration.indexOf("ADD COLUMN IF NOT EXISTS user_id");
