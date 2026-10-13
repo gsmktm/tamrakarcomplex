@@ -47,6 +47,20 @@ describe("historical Supabase migration replay", () => {
     expect(ordered.indexOf("20260305050000_create_ecommerce_tables.sql"))
       .toBeLessThan(ordered.indexOf("20260425121200_payment_commission_payout_system.sql"));
   });
+  it("never destroys real users or resets credentials to seed demo administrators", () => {
+    const names = [
+      "20260210171000_manual_create_gskmtm.sql",
+      "20260414090000_rebuild_superadmin_v2.sql",
+      "20260414170000_rebuild_all_demo_accounts.sql",
+    ];
+    for (const name of names) {
+      const sql = read(name).replace(/--[^\n]*/g, "");
+      expect(sql).not.toMatch(/DELETE\s+FROM\s+auth\.users/i);
+      expect(sql).not.toMatch(/INSERT\s+INTO\s+auth\.users/i);
+      expect(sql).not.toMatch(/UPDATE\s+auth\.users/i);
+      expect(sql).not.toMatch(/encrypted_password/i);
+    }
+  });
   it("reconciles legacy order columns before creating ownership indexes", () => {
     const paymentMigration = read("20260425121200_payment_commission_payout_system.sql");
     const addUser = paymentMigration.indexOf("ADD COLUMN IF NOT EXISTS user_id");
