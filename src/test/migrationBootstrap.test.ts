@@ -83,6 +83,17 @@ describe("historical Supabase migration replay", () => {
     expect(bootstrap).toMatch(/RAISE EXCEPTION 'Administrator self-bootstrap is disabled'/);
     expect(bootstrap).not.toMatch(/INSERT INTO public\.user_roles/);
   });
+  it("keeps privileged self-bootstrap locked down in the final additive migration", () => {
+    const finalMigration = "20261013000000_disable_admin_self_bootstrap.sql";
+    const sql = read(finalMigration);
+    expect(sql).toMatch(/SECURITY INVOKER/i);
+    expect(sql).toMatch(/RAISE EXCEPTION 'Administrator self-bootstrap is disabled'/);
+    expect(sql).toContain("FROM PUBLIC, anon, authenticated");
+    const later = ordered.filter(name => name > finalMigration);
+    for (const name of later) {
+      expect(read(name)).not.toMatch(/CREATE OR REPLACE FUNCTION public\.bootstrap_admin\s*\(/i);
+    }
+  });
   it("recreates the directory RPC safely when its returned columns change", () => {
     const initial = read("20260413010000_stores_directory_rpc.sql");
     const revised = read("20260413020000_add_store_address.sql");
