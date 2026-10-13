@@ -78,6 +78,8 @@ describe("historical Supabase migration replay", () => {
     expect(staff).toBeGreaterThanOrEqual(0);
     expect(policy).toBeGreaterThan(staff);
     expect(rls).toMatch(/role = 'staffadmin'::public\.app_role/);
+    expect(rls).toContain("AS " + "$$" + "\n  SELECT auth.uid() IS NOT NULL");
+
     expect(bootstrap).toMatch(/RAISE EXCEPTION 'Administrator self-bootstrap is disabled'/);
     expect(bootstrap).not.toMatch(/INSERT INTO public\.user_roles/);
   });
