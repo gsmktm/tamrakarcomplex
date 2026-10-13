@@ -1,0 +1,71 @@
+# HISTORICAL REFERENCE ONLY — DO NOT EXECUTE
+# File was never a valid timestamped Supabase migration.
+# It may rewrite migration history, grant privileged roles, or overlap a newer schema.
+# Keep solely for forensics while consolidating migration history.
+# Original: supabase/migrations/_fix_migration_tracking.sql
+
+-- ============================================================
+-- FIX: Record manually-applied migrations in schema_migrations
+-- so supabase CLI migration list shows them correctly
+-- ============================================================
+
+-- 1. Insert tracking records for the 4 migrations applied via apply_migration tool
+INSERT INTO supabase_migrations.schema_migrations (version, statements, name)
+VALUES
+  ('20260823120000', '{}', 'repair_pricing'),
+  ('20260825000000', '{}', 'marketplace_scale_thousands'),
+  ('20260825000001', '{}', 'seed_thousands_stores'),
+  ('20260825000002', '{}', 'laptop_catalog_nepal_2026')
+ON CONFLICT (version) DO NOTHING;
+
+-- ============================================================
+-- VALIDATION QUERIES (run these to confirm data integrity)
+-- ============================================================
+
+-- Check 1: Stores count (should be >= 1000 after seeding)
+SELECT COUNT(*) AS stores_count FROM public.stores;
+
+-- Check 2: Demo stores with "demo-store-" prefix (should be ~919)
+SELECT COUNT(*) AS demo_stores_count FROM public.stores WHERE slug LIKE 'demo-store-%';
+
+-- Check 3: Products count (Laptops: should have at least 89)
+SELECT COUNT(*) AS products_count FROM public.products;
+
+-- Check 4: Laptop products specifically
+SELECT brand, COUNT(*) AS laptop_count 
+FROM public.products 
+WHERE category = 'Laptops' 
+GROUP BY brand ORDER BY brand;
+
+-- Check 5: repair_pricing table exists (should have 0 rows but table should exist)
+SELECT COUNT(*) AS repair_pricing_count FROM public.repair_pricing;
+
+-- Check 6: price_audit_logs table exists
+SELECT COUNT(*) AS price_audit_logs_count FROM public.price_audit_logs;
+
+-- Check 7: pg_trgm extension enabled (for store search)
+SELECT EXISTS (
+  SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'
+) AS pg_trgm_enabled;
+
+-- Check 8: search_vector trigger exists on stores
+SELECT EXISTS (
+  SELECT 1 FROM pg_trigger 
+  WHERE tgname = 'trg_stores_search_vector' 
+    AND tgrelid = 'public.stores'::regclass
+) AS stores_search_trigger_exists;
+
+-- Check 9: idx_stores_slug_unique exists
+SELECT EXISTS (
+  SELECT 1 FROM pg_indexes 
+  WHERE indexname = 'idx_stores_slug_unique' 
+    AND tablename = 'stores'
+) AS stores_slug_unique_exists;
+
+-- Check 10: Package columns on store_packages
+SELECT 
+  COUNT(*) FILTER (WHERE is_active IS NOT NULL) AS has_is_active,
+  COUNT(*) FILTER (WHERE is_popular IS NOT NULL) AS has_is_popular,
+  COUNT(*) FILTER (WHERE yearly_price IS NOT NULL) AS has_yearly_price,
+  COUNT(*) FILTER (WHERE sort_order IS NOT NULL) AS has_sort_order
+FROM public.store_packages;
