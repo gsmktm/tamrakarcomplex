@@ -43,57 +43,14 @@ CREATE TRIGGER tr_sync_store_plan
 AFTER INSERT OR UPDATE OR DELETE ON public.store_subscriptions
 FOR EACH ROW EXECUTE FUNCTION public.sync_store_plan_info();
 
--- 4. Seed Subscriptions for the 81 existing stores to make directory alive
-DO $$
-DECLARE
-  v_diamond_id uuid;
-  v_gold_id    uuid;
-  v_silver_id  uuid;
-  v_store_record RECORD;
-BEGIN
-  -- Get package IDs
-  SELECT id INTO v_diamond_id FROM public.packages WHERE slug = 'diamond' LIMIT 1;
-  SELECT id INTO v_gold_id    FROM public.packages WHERE slug = 'gold' LIMIT 1;
-  SELECT id INTO v_silver_id  FROM public.packages WHERE slug = 'silver' LIMIT 1;
-
-  -- A. Assign Diamond (5 random stores)
-  FOR v_store_record IN (SELECT id FROM public.stores ORDER BY random() LIMIT 5)
-  LOOP
-    INSERT INTO public.store_subscriptions (store_id, package_id, status, is_enabled, start_date, end_date)
-    VALUES (v_store_record.id, v_diamond_id, 'active', true, now(), now() + interval '1 year')
-    ON CONFLICT (store_id) DO UPDATE SET package_id = EXCLUDED.package_id, status = 'active', end_date = now() + interval '1 year';
-  END LOOP;
-
-  -- B. Assign Gold (10 random stores)
-  FOR v_store_record IN (SELECT id FROM public.stores WHERE id NOT IN (SELECT store_id FROM public.store_subscriptions) ORDER BY random() LIMIT 10)
-  LOOP
-    INSERT INTO public.store_subscriptions (store_id, package_id, status, is_enabled, start_date, end_date)
-    VALUES (v_store_record.id, v_gold_id, 'active', true, now(), now() + interval '1 year')
-    ON CONFLICT (store_id) DO UPDATE SET package_id = EXCLUDED.package_id, status = 'active', end_date = now() + interval '1 year';
-  END LOOP;
-
-  -- C. Assign Silver (15 random stores)
-  FOR v_store_record IN (SELECT id FROM public.stores WHERE id NOT IN (SELECT store_id FROM public.store_subscriptions) ORDER BY random() LIMIT 15)
-  LOOP
-    INSERT INTO public.store_subscriptions (store_id, package_id, status, is_enabled, start_date, end_date)
-    VALUES (v_store_record.id, v_silver_id, 'active', true, now(), now() + interval '1 year')
-    ON CONFLICT (store_id) DO UPDATE SET package_id = EXCLUDED.package_id, status = 'active', end_date = now() + interval '1 year';
-  END LOOP;
-
-  -- D. Force initial sync for all stores
-  UPDATE public.stores s
-  SET 
-    subscription_status = COALESCE(ss.status, 'inactive'),
-    plan_slug = p.slug,
-    plan_name = p.name,
-    subscription_end_date = ss.end_date
-  FROM public.store_subscriptions ss
-  JOIN public.packages p ON p.id = ss.package_id
-  WHERE s.id = ss.store_id;
-
-END $$;
+-- 4. Do not silently assign paid subscriptions during schema installation.
+-- Subscription upgrades must be explicitly purchased and approved. Existing
+-- values will be kept synchronized by the trigger above.
 
 -- 5. Finalize get_stores_directory RPC to include these fields
+-- Its RETURNS TABLE shape changed from an earlier historical migration, so
+-- CREATE OR REPLACE cannot update it in place. No CASCADE: surface dependencies.
+DROP FUNCTION IF EXISTS public.get_stores_directory();
 CREATE OR REPLACE FUNCTION public.get_stores_directory()
 RETURNS TABLE (
   id uuid,
@@ -121,15 +78,40 @@ SECURITY DEFINER
 STABLE
 SET search_path = public
 AS $$
-  SELECT 
-    id, name, slug, logo_url, description, location, shop_no, address,
-    is_verified, services, phone, email, website, map_url, owner_id,
-    plan_slug, plan_name, subscription_status, subscription_end_date
-  FROM public.stores
-  ORDER BY 
-    CASE WHEN subscription_status = 'active' AND plan_slug = 'diamond' THEN 1
-         WHEN subscription_status = 'active' AND plan_slug = 'gold' THEN 2
-         WHEN subscription_status = 'active' AND plan_slug = 'silver' THEN 3
+  SELECT
+    s.id, s.name, s.slug, s.logo_url,
+    CASE WHEN s.owner_id = auth.uid() OR public.is_admin()
+      OR (s.subscription_status = 'active' AND s.subscription_end_date > now())
+      THEN s.description ELSE NULL END,
+    s.location, s.shop_no, s.address, s.is_verified,
+    CASE WHEN s.owner_id = auth.uid() OR public.is_admin()
+      OR (s.subscription_status = 'active' AND s.subscription_end_date > now())
+      THEN s.services ELSE NULL END,
+    CASE WHEN s.owner_id = auth.uid() OR public.is_admin()
+      OR (s.subscription_status = 'active' AND s.subscription_end_date > now())
+      THEN s.phone ELSE NULL END,
+    CASE WHEN s.owner_id = auth.uid() OR public.is_admin()
+      OR (s.subscription_status = 'active' AND s.subscription_end_date > now())
+      THEN s.email ELSE NULL END,
+    CASE WHEN s.owner_id = auth.uid() OR public.is_admin()
+      OR (s.subscription_status = 'active' AND s.subscription_end_date > now())
+      THEN s.website ELSE NULL END,
+    CASE WHEN s.owner_id = auth.uid() OR public.is_admin()
+      OR (s.subscription_status = 'active' AND s.subscription_end_date > now())
+      THEN s.map_url ELSE NULL END,
+    CASE WHEN s.owner_id = auth.uid() OR public.is_admin()
+      THEN s.owner_id ELSE NULL END,
+    s.plan_slug, s.plan_name, s.subscription_status, s.subscription_end_date
+  FROM public.stores AS s
+  ORDER BY
+    CASE WHEN s.subscription_status = 'active' AND s.subscription_end_date > now()
+      AND s.plan_slug = 'diamond' THEN 1
+         WHEN s.subscription_status = 'active' AND s.subscription_end_date > now()
+           AND s.plan_slug = 'gold' THEN 2
+         WHEN s.subscription_status = 'active' AND s.subscription_end_date > now()
+           AND s.plan_slug = 'silver' THEN 3
          ELSE 4 END ASC,
-    name ASC;
+    s.name ASC;
 $$;
+REVOKE ALL ON FUNCTION public.get_stores_directory() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_stores_directory() TO anon, authenticated;
