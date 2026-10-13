@@ -28,10 +28,15 @@ jobs:
           import os
           import socket
           from pathlib import Path
+          chosen = set()
           def port():
-              with socket.socket() as sock:
-                  sock.bind(("127.0.0.1", 0))
-                  return sock.getsockname()[1]
+              while True:
+                  with socket.socket() as sock:
+                      sock.bind(("127.0.0.1", 0))
+                      p = sock.getsockname()[1]
+                  if p not in chosen:
+                      chosen.add(p)
+                      return p
           api, db, shadow, studio = [port() for _ in range(4)]
           cfg = Path("supabase/config.toml")
           original = cfg.read_text()
