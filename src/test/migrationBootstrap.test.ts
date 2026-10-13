@@ -108,6 +108,19 @@ describe("historical Supabase migration replay", () => {
       expect(read(name)).not.toMatch(/CREATE OR REPLACE FUNCTION public\.bootstrap_admin\s*\(/i);
     }
   });
+  it("drops existing store/order policy names before replacing them", () => {
+    const sql = read("20260414140000_store_specific_data.sql");
+    const statements = [
+      'DROP POLICY IF EXISTS "Products: Viewable by everyone" ON public.products;',
+      'CREATE POLICY "Products: Viewable by everyone" ON public.products',
+      'DROP POLICY IF EXISTS "Orders: Store owners update own status" ON public.orders;',
+      'CREATE POLICY "Orders: Store owners update own status" ON public.orders',
+    ];
+    const indices = statements.map(statement => sql.indexOf(statement));
+    expect(indices.every(index => index >= 0)).toBe(true);
+    expect(indices[0]).toBeLessThan(indices[1]);
+    expect(indices[2]).toBeLessThan(indices[3]);
+  });
   it("recreates the directory RPC safely when its returned columns change", () => {
     const initial = read("20260413010000_stores_directory_rpc.sql");
     const revised = read("20260413020000_add_store_address.sql");
