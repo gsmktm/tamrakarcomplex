@@ -110,26 +110,6 @@ CREATE POLICY "Public: View active branches" ON public.store_branches FOR SELECT
 CREATE POLICY "Public: View product reviews" ON public.product_reviews FOR SELECT USING (true);
 CREATE POLICY "Public: Insert leads" ON public.leads FOR INSERT WITH CHECK (true);
 
--- Seed some demo data
-DO $$
-DECLARE
-  v_store_id uuid;
-  v_user_id uuid := '00000000-0000-0000-0000-000000000004'; -- Demo User
-BEGIN
-  SELECT id INTO v_store_id FROM public.stores WHERE slug = 'tamrakar-demo-store' LIMIT 1;
-  
-  IF v_store_id IS NOT NULL THEN
-    -- Branch
-    INSERT INTO public.store_branches (store_id, name, location) VALUES (v_store_id, 'Tamrakar Branch 2', '2nd Floor, Shop #205');
-    
-    -- Lead
-    INSERT INTO public.leads (store_id, name, email, message) VALUES (v_store_id, 'Test Customer', 'customer@gmail.com', 'Inquiry about iPhone price.');
-    
-    -- Repair
-    INSERT INTO public.repair_requests (user_id, store_id, device_model, issue_description) 
-    VALUES (v_user_id, v_store_id, 'iPhone 13', 'Screen cracked, need replacement.');
-    
-    -- Payout
-    INSERT INTO public.payouts (store_id, amount, status) VALUES (v_store_id, 15000.00, 'pending');
-  END IF;
-END $$;
+-- Demo orders, payouts, repairs, and test leads are NOT production data.
+-- No fabricated payable balances or fake-customer records are inserted during
+-- schema installation. Use a dedicated isolated-development seed script.
