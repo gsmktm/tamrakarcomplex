@@ -88,6 +88,7 @@ describe("historical Supabase migration replay", () => {
       .replace(/--[^\n]*/g, "");
     expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.payouts/i);
     expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.leads\b/i);
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES public\.stores/);
     expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.repair_requests/i);
   });
   it("reconciles legacy order columns before creating ownership indexes", () => {
