@@ -71,6 +71,13 @@ describe("historical Supabase migration replay", () => {
     expect(sql).toContain("Destructive demo account cleanup is disabled");
     expect(sql).toContain("REVOKE ALL ON FUNCTION public.cleanup_demo_accounts()");
   });
+  it("does not grant paid store subscription tiers by random schema seeds", () => {
+    const sql = read("20260414180000_seed_store_subscriptions.sql")
+      .replace(/--[^\n]*/g, "");
+    expect(sql).not.toMatch(/INSERT\s+INTO\s+public\.store_subscriptions/i);
+    expect(sql).not.toMatch(/UPDATE\s+public\.stores/i);
+    expect(sql).not.toMatch(/ORDER\s+BY\s+random\(\)/i);
+  });
   it("reconciles legacy order columns before creating ownership indexes", () => {
     const paymentMigration = read("20260425121200_payment_commission_payout_system.sql");
     const addUser = paymentMigration.indexOf("ADD COLUMN IF NOT EXISTS user_id");
