@@ -1,5 +1,12 @@
 
 -- 1. Ensure public.stores has denormalized fields for fast directory rendering
+-- The original February stores schema did not include a slug field. An
+-- address-aware directory added slug before the later storefront migrations.
+-- Backfill only missing values with a deterministic collision-resistant key.
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS slug text;
+UPDATE public.stores SET slug = 'store-' || id::text
+WHERE slug IS NULL;
+
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS plan_slug text;
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS plan_name text;
 ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS subscription_status text DEFAULT 'inactive';
