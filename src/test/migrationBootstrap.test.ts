@@ -148,6 +148,8 @@ describe("historical Supabase migration replay", () => {
     const sqlOnly = sql.replace(/--[^\n]*/g, "");
     expect(sqlOnly).not.toMatch(/ORDER BY random\(\)/i);
     expect(sqlOnly).not.toMatch(/INSERT INTO public\.store_subscriptions/i);
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS slug text");
+    expect(sql).toContain("WHERE slug IS NULL");
     expect(sql).toMatch(/DROP FUNCTION IF EXISTS public\.get_stores_directory\(\)/);
     expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.get_stores_directory\(\) FROM PUBLIC/);
     expect(sql).toMatch(/s\.owner_id = auth\.uid\(\) OR public\.is_admin\(\)/);
