@@ -32,9 +32,11 @@ describe("historical Supabase migration replay", () => {
   it("creates the orders ownership key before the earliest orders index", () => {
     const march = read("20260305050000_create_ecommerce_tables.sql");
     const normalize = march.indexOf("ADD COLUMN IF NOT EXISTS user_id");
+    const backfill = march.indexOf("SET user_id = buyer_id");
     const createIndex = march.indexOf("CREATE INDEX IF NOT EXISTS idx_orders_user_id");
     expect(normalize).toBeGreaterThanOrEqual(0);
-    expect(createIndex).toBeGreaterThan(normalize);
+    expect(backfill).toBeGreaterThan(normalize);
+    expect(createIndex).toBeGreaterThan(backfill);
     expect(ordered.indexOf("20260305050000_create_ecommerce_tables.sql"))
       .toBeLessThan(ordered.indexOf("20260425121200_payment_commission_payout_system.sql"));
   });
