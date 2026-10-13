@@ -6,6 +6,7 @@ on:
       - "src/**"
       - "public/**"
       - "scripts/typecheck-inventory.cjs"
+      - "scripts/schema-type-drift.cjs"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/storefront-regression.yml"
@@ -51,11 +52,15 @@ jobs:
       - run: npm ci
       - name: Inventory existing type errors (does not waive mandatory CI)
         run: node scripts/typecheck-inventory.cjs --report-only
+      - name: Inventory checked-in schema type drift (diagnostic only)
+        run: node scripts/schema-type-drift.cjs
       - name: Upload classified compiler diagnostics
         uses: actions/upload-artifact@v4
         with:
           name: typescript-inventory
-          path: artifacts/typescript-inventory.*
+          path: |
+            artifacts/typescript-inventory.*
+            artifacts/schema-type-drift.*
           retention-days: 7
 
 # These checks intentionally run independently of strict TypeScript checks.
