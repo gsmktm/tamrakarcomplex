@@ -143,6 +143,15 @@ describe("historical Supabase migration replay", () => {
     expect(indices[0]).toBeLessThan(indices[1]);
     expect(indices[2]).toBeLessThan(indices[3]);
   });
+  it("also keeps v2 directory contacts private without random plan grants", () => {
+    const sql = read("20260414200000_database_reform_v2.sql");
+    const statements = sql.replace(/--[^\n]*/g, "");
+    expect(statements).not.toMatch(/ORDER BY random\(\)/i);
+    expect(statements).not.toMatch(/INSERT INTO public\.store_subscriptions/i);
+    expect(sql).toContain("DROP FUNCTION IF EXISTS public.get_stores_directory()");
+    expect(sql).toContain("s.owner_id = auth.uid() OR public.is_admin()");
+    expect(sql).toContain("s.subscription_end_date > now()");
+  });
   it("rebuilds the later directory RPC without random paid entitlements or contact leaks", () => {
     const sql = read("20260414190000_database_reform_stores.sql");
     const sqlOnly = sql.replace(/--[^\n]*/g, "");
