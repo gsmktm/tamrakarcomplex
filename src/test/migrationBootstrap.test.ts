@@ -147,6 +147,10 @@ describe("historical Supabase migration replay", () => {
     expect(sql).toMatch(/SECURITY INVOKER/i);
     expect(sql).toMatch(/RAISE EXCEPTION 'Administrator self-bootstrap is disabled'/);
     expect(sql).toContain("FROM PUBLIC, anon, authenticated");
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.dev_ensure_confirmed_admin\(p_email text\)/);
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.cleanup_demo_accounts\(\)/);
+    expect(sql).toMatch(/Destructive demo account cleanup is disabled/);
+
     const later = ordered.filter(name => name > finalMigration);
     for (const name of later) {
       expect(read(name)).not.toMatch(/CREATE OR REPLACE FUNCTION public\.bootstrap_admin\s*\(/i);
