@@ -54,6 +54,7 @@ describe("historical Supabase migration replay", () => {
     const end = april.indexOf("-- Step 5:", start);
     const grant = april.slice(start, end);
     expect(start).toBeGreaterThanOrEqual(0);
+    expect(grant).toMatch(/grant_role_by_email\(\s*p_email text,\s*p_role public\.app_role\s*\)/i);
     expect(grant).toMatch(/RETURNS uuid/i);
     expect(grant).toMatch(/public\.has_role\(caller_id, 'suadmin'/i);
     expect(grant).toMatch(/RETURN target_id;/i);
