@@ -47,6 +47,14 @@ describe("historical Supabase migration replay", () => {
     expect(ordered.indexOf("20260305050000_create_ecommerce_tables.sql"))
       .toBeLessThan(ordered.indexOf("20260425121200_payment_commission_payout_system.sql"));
   });
+  it("does not reset Auth accounts or recurse in user_roles RLS policies", () => {
+    const sql = read("20260423130000_admin_auth_hardening.sql");
+    const noncomments = sql.replace(/--[^\n]*/g, "");
+    expect(noncomments).not.toMatch(/(?:INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?auth\.(?:users|identities)/i);
+    expect(noncomments).not.toMatch(/encrypted_password/i);
+    expect(sql).toContain("USING (public.is_admin());");
+    expect(sql).toContain("WITH CHECK (public.is_super_admin());");
+  });
   it("never destroys real users or resets credentials to seed demo administrators", () => {
     const names = [
       "20260210171000_manual_create_gskmtm.sql",
