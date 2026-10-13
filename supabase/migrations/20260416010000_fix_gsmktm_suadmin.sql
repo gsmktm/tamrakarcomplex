@@ -1,10 +1,5 @@
--- Fix: Grant suadmin role to gsmktm@gmail.com
--- Run this in Supabase SQL Editor
-
--- First, find the user_id for gsmktm@gmail.com
-SELECT id, email FROM auth.users WHERE email = 'gsmktm@gmail.com';
-
--- Then insert/update the user_roles table
-INSERT INTO public.user_roles (user_id, role)
-VALUES ('YOUR_USER_ID_HERE', 'suadmin'::public.app_role)
-ON CONFLICT (user_id, role) DO NOTHING;
+-- Historical manual super-admin instruction disabled.
+-- A literal 'YOUR_USER_ID_HERE' is not a UUID and cannot be used in a
+-- replayable migration. Granting privileged roles requires an authenticated,
+-- audited, explicitly authorized administrative action, never fixed SQL.
+SELECT 1;
