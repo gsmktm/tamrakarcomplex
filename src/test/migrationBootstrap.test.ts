@@ -10,6 +10,10 @@ const roles = "20260203024257_9c14e123-21ba-46cc-9121-9e6cf2f058e5.sql";
 const read = (file: string) => readFileSync(join(root, file), "utf8");
 
 describe("historical Supabase migration replay", () => {
+  it("has no unversioned/manual SQL in the active migrations folder", () => {
+    const unversioned = ordered.filter(name => !/^\d{14}_[a-zA-Z0-9_-]+\.sql$/.test(name));
+    expect(unversioned).toEqual([]);
+  });
   it("bootstraps roles before app settings policies and legacy role migrations", () => {
     expect(ordered.indexOf(baseline)).toBeGreaterThanOrEqual(0);
     expect(ordered.indexOf(baseline)).toBeLessThan(ordered.indexOf(settings));
