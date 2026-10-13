@@ -18,8 +18,8 @@ import { AdminGlobalSearch } from "@/components/admin/AdminGlobalSearch";
 
 export default function StoreAdminLayout() {
   const location = useLocation();
-  const { signOut, role } = useAuth();
-  const { permissions, storeAdminPermissions, storeAdminPermissionsLoaded } = usePermissions();
+  const { signOut } = useAuth();
+  const { storeAdminPermissions, storeAdminPermissionsLoaded } = usePermissions();
   const [navQuery, setNavQuery] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -35,7 +35,7 @@ export default function StoreAdminLayout() {
       null, // This layout is storeadmin-only; never inherit staff-admin grants.
       effectiveStorePerms
     ),
-    [panelRole, role, permissions, effectiveStorePerms]
+    [panelRole, effectiveStorePerms]
   );
 
   const filteredGroups = useMemo(() => {
