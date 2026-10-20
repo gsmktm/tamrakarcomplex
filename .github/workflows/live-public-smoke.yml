@@ -30,6 +30,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate changed feature contracts
+        run: |
+          npm run check:production-contract
+          npx vitest run src/test/catalogRedirect.test.ts
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
