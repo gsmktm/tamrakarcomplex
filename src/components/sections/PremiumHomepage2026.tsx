@@ -5,7 +5,7 @@ import {
   ArrowRight, BadgeCheck, ChevronRight, CircleHelp, Headphones, Laptop,
   MapPin, MonitorSmartphone, Search, ShieldCheck, ShoppingBag, Smartphone,
   Sparkles, Store, Tablet, Watch, Wrench, RefreshCw, Zap, PackageCheck,
-  ScanSearch, Star, CheckCircle2,
+  ScanSearch, CheckCircle2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useStorePreview } from "@/hooks/useStorePreview";
@@ -155,7 +155,7 @@ export function PremiumHomepage2026() {
         </div>
       </section>
 
-      <section className="tc26-container tc26-products" aria-labelledby="tc26-products-title">
+      <section className="tc26-container tc26-products" aria-label="Discover trending devices">
         <Headline eyebrow="EXPLORE THE CATALOG" title="Discover trending devices" note="Browse available catalog items; prices and availability come from current listings." href="/buy" action="All products" />
         <div className="tc26-tabs" role="group" aria-label="Filter products by category">
           {["All", "Smartphones", "Laptops", "Tablets", "Accessories"].map((label) => (
@@ -175,7 +175,7 @@ export function PremiumHomepage2026() {
         )}
       </section>
 
-      <section className="tc26-container tc26-store-section" aria-labelledby="tc26-stores-title">
+      <section className="tc26-container tc26-store-section" aria-label="Discover local electronics stores">
         <Headline eyebrow="PEOPLE BEHIND THE PRODUCTS" title="Discover stores at Tamrakar Complex" note="Connect directly with shops and specialists in New Road, Kathmandu." href="/stores" action="View store directory" />
         {storesLoading ? (
           <div className="tc26-store-grid">{[0,1,2].map((i)=><div key={i} className="tc26-store-skeleton" />)}</div>
