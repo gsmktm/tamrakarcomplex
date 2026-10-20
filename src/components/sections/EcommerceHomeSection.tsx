@@ -51,6 +51,7 @@ import { HomeRepairMiniForm } from "@/components/home/HomeRepairMiniForm";
 import { HomeStoreSpotlight } from "@/components/home/HomeStoreSpotlight";
 import { HomeOffers } from "@/components/home/HomeOffers";
 import { HomeTrustStats } from "@/components/home/HomeTrustStats";
+import { CommerceJourney } from "@/components/home/CommerceJourney";
 import { HomeCompareMini } from "@/components/home/HomeCompareMini";
 import { useFeaturedProducts, useProducts, type Product } from "@/hooks/useProducts";
 import { useLatestPrices } from "@/hooks/useLatestPrices";
@@ -408,6 +409,9 @@ export function EcommerceHomeSection() {
         <HeroSection products={products} />
       )}
 
+      {/* ── GUIDED CUSTOMER JOURNEYS ──────────────────────────────────── */}
+      <CommerceJourney />
+
       {/* ── FLAGSHIP SHOWCASE (Apple + Samsung + Algorithm) ──────────────── */}
       <FlagshipShowcase />
 
@@ -529,7 +533,7 @@ const operationTiles = [
   { label: "Buy", value: "Live stock", href: "/buy", icon: ShoppingBag },
   { label: "Sell", value: "Instant quote", href: "/sell-your-phone", icon: CircleDollarSign },
   { label: "Repair", value: "Book service", href: "/repair", icon: Wrench },
-  { label: "Stores", value: "Verified only", href: "/stores", icon: Store },
+  { label: "Stores", value: "Compare shops", href: "/stores", icon: Store },
 ];
 
 function HeroSection({ products }: { products: Product[] }) {
