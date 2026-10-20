@@ -89,6 +89,14 @@ function RedirectArticleToStores() {
   return <Navigate to={slug ? `/stores/article/${slug}` : "/stores/article"} replace />;
 }
 
+/** Keep the original search, brand, price and category filters on /buy. */
+function RedirectBuyToCatalog() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.set("tab", "buy");
+  return <Navigate to={`/cat/mobiles?${params.toString()}${location.hash}`} replace />;
+}
+
 function RedirectAuthAlias({ mode }: { mode: "login" | "signup" }) {
   const location = useLocation();
   const search = new URLSearchParams(location.search);
@@ -163,7 +171,7 @@ export const publicRoutes = (
     <Route path="/repair/custom" element={withSuspense(CustomRepairRequest)} />
     <Route path="/news" element={<Navigate to="/stores/article" replace />} />
     <Route path="/reviews" element={withSuspense(Reviews)} />
-    <Route path="/buy" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
+    <Route path="/buy" element={<RedirectBuyToCatalog />} />
     <Route path="/products" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
     <Route path="/brands" element={withSuspense(Brands)} />
     <Route path="/cat/mobiles" element={withSuspense(MobileCategoryPage)} />
