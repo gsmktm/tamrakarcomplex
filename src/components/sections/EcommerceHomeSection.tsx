@@ -41,7 +41,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCard } from "@/components/products/ProductCard";
 import { ArticleCard } from "@/components/articles/ArticleCard";
-import { ChatWidget } from "@/components/chat/ChatWidget";
 import { PollSection } from "@/components/sections/PollSection";
 import { HomeSearchBox } from "@/components/home/HomeSearchBox";
 import { HomePriceFinder } from "@/components/home/HomePriceFinder";
@@ -460,8 +459,7 @@ export function EcommerceHomeSection() {
 
       {/* Community Poll — removed */}
 
-      {/* ── CHAT WIDGET ──────────────────────────────────────────────────── */}
-      {enabledSections.chat && <ChatWidget />}
+      {/* ChatWidget is mounted once globally in AppContent to avoid duplicate chat sessions. */}
       {/* Global mobile bottom nav (BottomNav) replaces the old homepage-only sticky CTA */}
     </div>
   );
