@@ -42,11 +42,17 @@ async function httpCheck(target, url, label) {
     const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(18000) });
     const contentType = response.headers.get("content-type") || "";
     const body = await response.text();
-    const pass = response.ok && contentType.includes("html") &&
+    const isHealth = url.endsWith("/health");
+    let pass = response.ok && contentType.includes("html") &&
       (body.includes("<html") || body.includes("<!DOCTYPE html"));
+    if (isHealth) {
+      try { const json = JSON.parse(body); pass = response.ok && json.status === "ok"; } catch { pass = false; }
+    }
     addCheck(target, { label, type: "http", status: response.status, url: response.url, pass,
+      warning: isHealth && !pass,
       message: "HTTP " + response.status + "; content-type " + contentType +
-        "; body " + body.length + " bytes" });
+        "; body " + body.length + " bytes" +
+        (isHealth && !pass ? "; no verified JSON health endpoint" : "") });
   } catch (error) {
     addCheck(target, { label, type: "http", pass: false, message: String(error.message || error) });
   }
@@ -64,7 +70,7 @@ async function navigatePublic(browser, target, route) {
     try {
       await page.waitForFunction(
         () => { const root = document.querySelector("#root"); return !!root && root.textContent.trim().length > 60; },
-        { timeout: 10000 }
+        null, { timeout: 10000 }
       );
     } catch { /* collect actual result below */ }
     await page.waitForTimeout(800);
