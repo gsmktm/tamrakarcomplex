@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { getRoleFromEmail, normalizeRole } from "@/lib/roles";
+import { normalizeRole } from "@/lib/roles";
 import type { AppRole } from "@/types/app";
 import { normalizeEmail, sanitizeOptionalText } from "@/lib/security";
 
@@ -41,20 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchingRoleForRef.current = authUser.id;
     const rolePromise = (async () => {
       setRoleError(null);
-      const rawMetadataRole =
+      // App metadata is administrator-controlled. User metadata and email
+      // patterns are user-controllable and must NEVER grant elevated roles.
+      const trustedMetadataRole =
         typeof authUser.app_metadata?.role === "string"
-          ? authUser.app_metadata.role
-          : typeof authUser.user_metadata?.role === "string"
-            ? authUser.user_metadata.role
-            : null;
-      const metadataRole = rawMetadataRole ? normalizeRole(rawMetadataRole) : null;
-      const emailRole = getRoleFromEmail(authUser.email);
-
-      // Dev mode: if email role is present, use it without DB query
-      if (import.meta.env.DEV && emailRole) {
-        setRole(emailRole);
-        return;
-      }
+          ? normalizeRole(authUser.app_metadata.role)
+          : null;
 
       try {
         // Read the role assignment. A transient network/RLS failure must not
@@ -82,20 +74,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 3. Last resort: metadata heuristics only - no email-based bypass
-        const finalRole = emailRole ?? metadataRole ?? "user";
-
+        // Fail closed on database errors. The app never grants administrator
+        // access based on email substrings or editable user_metadata.
+        const finalRole = tableError ? "user" : trustedMetadataRole ?? "user";
         setRole(finalRole);
-        if (!emailRole && !metadataRole && finalRole === "user") {
-          const reason = tableError
-            ? "Role lookup failed after retry. Please sign out and sign back in."
-            : "No role assigned. Using guest access.";
-          setRoleError(reason);
-          console.error("Auth: user_roles lookup failed:", tableError);
+        if (tableError || finalRole === "user") {
+          setRoleError(
+            tableError
+              ? "Role verification is temporarily unavailable. Privileged features are disabled."
+              : "No elevated role assigned."
+          );
+          if (tableError) console.error("Auth: user_roles lookup failed:", tableError);
         }
       } catch (error) {
         console.error("Auth: Role resolution failed:", error);
-        setRole(emailRole ?? metadataRole ?? "user");
+        setRole("user");
+        setRoleError("Role verification failed. Privileged features are disabled.");
       } finally {
         fetchingRoleForRef.current = null;
         fetchingRolePromiseRef.current = null;
@@ -218,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInAsDev = async (devRole: AppRole) => {
+    if (!import.meta.env.DEV) throw new Error("Development impersonation is unavailable in production.");
     const mockUser = {
       id: `dev-${devRole}-id-123`,
       email: `dev-${devRole}@tamrakarcomplex.com`,
