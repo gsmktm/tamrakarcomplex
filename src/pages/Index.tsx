@@ -5,10 +5,10 @@ import { SEO } from "@/components/common/SEO";
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col tc26-shell">
       <SEO
-        title="Tamrakar Complex - Nepal's Connected Gadget Homepage"
-        description="A premium Nepal-first gadget homepage for buying, selling, exchanging, repairing, comparing, and discovering trusted stores."
+        title="Tamrakar Complex | Nepal's Tech Marketplace"
+        description="Explore phones and electronics, published shop profiles, device comparison, exchange, and repair services at Tamrakar Complex, New Road, Kathmandu."
         url="/"
         keywords={["gadget Nepal", "buy sell exchange repair", "mobile price Nepal", "Tamrakar Complex"]}
         structuredData={{
