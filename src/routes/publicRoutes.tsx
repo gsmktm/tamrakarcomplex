@@ -4,6 +4,7 @@ import { RequireAuth } from "@/routes/RequireAuth";
 import { ParamRouteRedirect } from "@/components/routing/ParamRouteRedirect";
 import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
 import { RouteFallback } from "@/components/routing/RouteFallback";
+import { buildBuyCatalogDestination } from "@/lib/catalogRoutes";
 
 // Eager load critical routes
 import Index from "@/pages/Index";
@@ -92,9 +93,7 @@ function RedirectArticleToStores() {
 /** Keep the original search, brand, price and category filters on /buy. */
 function RedirectBuyToCatalog() {
   const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  params.set("tab", "buy");
-  return <Navigate to={`/cat/mobiles?${params.toString()}${location.hash}`} replace />;
+  return <Navigate to={buildBuyCatalogDestination(location.search, location.hash)} replace />;
 }
 
 function RedirectAuthAlias({ mode }: { mode: "login" | "signup" }) {
