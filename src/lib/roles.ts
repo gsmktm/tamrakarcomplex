@@ -32,25 +32,6 @@ export function normalizeRole(role?: string | null): AppRole {
   }
 }
 
-export function getRoleFromEmail(email?: string | null): AppRole | null {
-  if (!email) return null;
-  
-  // Dev mode quick test emails
-  if (import.meta.env.DEV) {
-    if (email.toLowerCase().includes("suadmin") || email.toLowerCase().includes("admin")) {
-      return "suadmin";
-    }
-    if (email.toLowerCase().includes("staff")) {
-      return "staffadmin";
-    }
-    if (email.toLowerCase().includes("store")) {
-      return "storeadmin";
-    }
-  }
-  
-  return null;
-}
-
 /**
  * Checks if the role has platform-wide management access (Super Admin or Staff Admin).
  */

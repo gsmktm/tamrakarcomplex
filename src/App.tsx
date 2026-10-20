@@ -30,6 +30,7 @@ import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
 
 import "@/styles/dynamic-theme.css";
 import "@/styles/design-system.css";
+import "@/styles/commerce-2026.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

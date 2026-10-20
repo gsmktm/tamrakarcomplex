@@ -14,53 +14,53 @@
 @layer base {
   :root {
     /* Core UI Colors */
-    --background: #F2EFE5;
-    --foreground: #151713;
+    --background: #F5F7FC;
+    --foreground: #13233A;
 
-    --card: #FAF8F0;
-    --card-foreground: #151713;
+    --card: #FFFFFF;
+    --card-foreground: #13233A;
 
-    --popover: #FAF8F0;
-    --popover-foreground: #151713;
+    --popover: #FFFFFF;
+    --popover-foreground: #13233A;
 
     /* Primary: Deep Navy - Premium, trustworthy */
-    --primary: #3347FF;
+    --primary: #315CFF;
     --primary-foreground: #FFFFFF;
 
     /* Secondary: Cobalt Blue - Energetic, tech-focused */
-    --secondary: #E5E0D2;
-    --secondary-foreground: #151713;
+    --secondary: #EAF0FB;
+    --secondary-foreground: #13233A;
 
     /* Muted: Soft Gray */
-    --muted: #E8E3D6;
-    --muted-foreground: #65675F;
+    --muted: #EDF2F9;
+    --muted-foreground: #607087;
 
     /* Accent: Amber Gold - Premium highlight */
-    --accent: #D8FF3E;
-    --accent-foreground: #11130F;
+    --accent: #EFD39E;
+    --accent-foreground: #15243B;
 
     /* Destructive: Red */
     --destructive: #EF4444;
     --destructive-foreground: #FFFFFF;
 
     /* Borders & Inputs */
-    --border: #D4CEBF;
-    --input: #D4CEBF;
-    --ring: #3347FF;
+    --border: #DDE6F2;
+    --input: #DDE6F2;
+    --ring: #315CFF;
 
     /* Radius */
-    --radius: 0.35rem;
+    --radius: 0.75rem;
 
     /* Brand Custom Properties - Premium Tech Commerce */
-    --navy: #0F172A;
-    --navy-light: #1E293B;
-    --cobalt: #3B82F6;
-    --cobalt-hover: #2563EB;
+    --navy: #0B172B;
+    --navy-light: #182B49;
+    --cobalt: #315CFF;
+    --cobalt-hover: #2048DF;
     --cobalt-light: #60A5FA;
-    --amber: #F59E0B;
+    --amber: #E2B971;
     --amber-hover: #D97706;
     --gold: #F59E0B;
-    --success: #10B981;
+    --success: #0CA58C;
     --white: #FFFFFF;
     --gray-50: #F9FAFB;
     --gray-100: #F3F4F6;

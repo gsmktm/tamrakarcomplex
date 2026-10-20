@@ -41,7 +41,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCard } from "@/components/products/ProductCard";
 import { ArticleCard } from "@/components/articles/ArticleCard";
-import { ChatWidget } from "@/components/chat/ChatWidget";
 import { PollSection } from "@/components/sections/PollSection";
 import { HomeSearchBox } from "@/components/home/HomeSearchBox";
 import { HomePriceFinder } from "@/components/home/HomePriceFinder";
@@ -51,6 +50,7 @@ import { HomeRepairMiniForm } from "@/components/home/HomeRepairMiniForm";
 import { HomeStoreSpotlight } from "@/components/home/HomeStoreSpotlight";
 import { HomeOffers } from "@/components/home/HomeOffers";
 import { HomeTrustStats } from "@/components/home/HomeTrustStats";
+import { CommerceJourney } from "@/components/home/CommerceJourney";
 import { HomeCompareMini } from "@/components/home/HomeCompareMini";
 import { useFeaturedProducts, useProducts, type Product } from "@/hooks/useProducts";
 import { useLatestPrices } from "@/hooks/useLatestPrices";
@@ -408,6 +408,9 @@ export function EcommerceHomeSection() {
         <HeroSection products={products} />
       )}
 
+      {/* ── GUIDED CUSTOMER JOURNEYS ──────────────────────────────────── */}
+      <CommerceJourney />
+
       {/* ── FLAGSHIP SHOWCASE (Apple + Samsung + Algorithm) ──────────────── */}
       <FlagshipShowcase />
 
@@ -456,8 +459,7 @@ export function EcommerceHomeSection() {
 
       {/* Community Poll — removed */}
 
-      {/* ── CHAT WIDGET ──────────────────────────────────────────────────── */}
-      {enabledSections.chat && <ChatWidget />}
+      {/* ChatWidget is mounted once globally in AppContent to avoid duplicate chat sessions. */}
       {/* Global mobile bottom nav (BottomNav) replaces the old homepage-only sticky CTA */}
     </div>
   );
@@ -529,7 +531,7 @@ const operationTiles = [
   { label: "Buy", value: "Live stock", href: "/buy", icon: ShoppingBag },
   { label: "Sell", value: "Instant quote", href: "/sell-your-phone", icon: CircleDollarSign },
   { label: "Repair", value: "Book service", href: "/repair", icon: Wrench },
-  { label: "Stores", value: "Verified only", href: "/stores", icon: Store },
+  { label: "Stores", value: "Compare shops", href: "/stores", icon: Store },
 ];
 
 function HeroSection({ products }: { products: Product[] }) {

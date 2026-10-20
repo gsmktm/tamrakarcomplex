@@ -4,6 +4,7 @@ import { RequireAuth } from "@/routes/RequireAuth";
 import { ParamRouteRedirect } from "@/components/routing/ParamRouteRedirect";
 import { WildcardRedirect } from "@/components/routing/WildcardRedirect";
 import { RouteFallback } from "@/components/routing/RouteFallback";
+import { buildBuyCatalogDestination } from "@/lib/catalogRoutes";
 
 // Eager load critical routes
 import Index from "@/pages/Index";
@@ -89,6 +90,12 @@ function RedirectArticleToStores() {
   return <Navigate to={slug ? `/stores/article/${slug}` : "/stores/article"} replace />;
 }
 
+/** Keep the original search, brand, price and category filters on /buy. */
+function RedirectBuyToCatalog() {
+  const location = useLocation();
+  return <Navigate to={buildBuyCatalogDestination(location.search, location.hash)} replace />;
+}
+
 function RedirectAuthAlias({ mode }: { mode: "login" | "signup" }) {
   const location = useLocation();
   const search = new URLSearchParams(location.search);
@@ -163,7 +170,7 @@ export const publicRoutes = (
     <Route path="/repair/custom" element={withSuspense(CustomRepairRequest)} />
     <Route path="/news" element={<Navigate to="/stores/article" replace />} />
     <Route path="/reviews" element={withSuspense(Reviews)} />
-    <Route path="/buy" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
+    <Route path="/buy" element={<RedirectBuyToCatalog />} />
     <Route path="/products" element={<Navigate to="/cat/mobiles?tab=buy" replace />} />
     <Route path="/brands" element={withSuspense(Brands)} />
     <Route path="/cat/mobiles" element={withSuspense(MobileCategoryPage)} />
