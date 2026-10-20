@@ -1,0 +1,46 @@
+name: Live public read-only smoke
+
+on:
+  push:
+    branches:
+      - redesign/2026-10-premium-commerce
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-smoke:
+    name: Public route and browser checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test deployed public sites (GET/navigation only)
+        run: node scripts/live-smoke.cjs
+
+      - name: Upload report and homepage screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tamrakar-live-public-smoke
+          path: artifacts/live-smoke/
+          if-no-files-found: warn
+          retention-days: 7
