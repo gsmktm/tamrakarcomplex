@@ -1,5 +1,9 @@
 # Tamrakar Complex — Premium Homepage 2026
 
+## Visual reference
+
+[View the homepage design blueprint](./homepage-2026-design.svg). This is a self-contained vector wireframe, not a capture of live production UI.
+
 ## Scope
 
 This branch implements the approved navy/orange electronics marketplace direction in the **existing React + Vite application**. It is an implementation, not just an image or static HTML export.
