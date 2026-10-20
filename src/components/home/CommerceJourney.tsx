@@ -80,7 +80,7 @@ const journeys = [
       { title: "Connect", detail: "Ask the store about stock and fulfilment", icon: ArrowRight },
     ],
     primary: { label: "Browse stores", href: "/stores" },
-    secondary: { label: "Register a store", href: "/store/apply" },
+    secondary: { label: "Register a store", href: "/stores/apply" },
     note: "Store profiles and verification indicators reflect available platform records, not an independent guarantee.",
   },
 ] as const;
