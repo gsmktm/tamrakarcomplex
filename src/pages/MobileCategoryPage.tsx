@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/layout/Header";
+import { CampaignBanner } from "@/components/campaigns/CampaignBanner";
 import { Footer } from "@/components/layout/Footer";
 import { ModelCard } from "@/components/mobile/ModelCard";
 import { ProductCard } from "@/components/products/ProductCard";
@@ -249,6 +250,7 @@ export default function MobileCategoryPage() {
       />
 
       <Header />
+      <CampaignBanner placement="category_top" variant="compact" limit={1} />
 
       <div className="min-h-screen bg-[linear-gradient(to_bottom,hsl(var(--muted)/.35),hsl(var(--background))_34rem)]">
         <section className="relative isolate overflow-hidden bg-slate-950 text-white">
