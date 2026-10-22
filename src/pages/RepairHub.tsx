@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, BadgeCheck, Box, CheckCircle2, Clock3, LayoutGrid, Search, ShieldCheck, Smartphone, Sparkles, Star, Wrench, Zap } from "lucide-react";
+import { ArrowRight, BadgeCheck, Box, CheckCircle2, Clock3, LayoutGrid, Search, ShieldCheck, Smartphone, Sparkles, Wrench, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Header } from "@/components/layout/Header";
+import { CampaignBanner } from "@/components/campaigns/CampaignBanner";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { SafeImage } from "@/components/common/SafeImage";
@@ -22,7 +23,7 @@ const steps = [
 const faqs = [
   ["How do I track my repair?", "Open Repair Tracking and enter the Repair ID or phone number used during booking."],
   ["What devices do you repair?", "We support smartphones, tablets, laptops, and accessories from major brands."],
-  ["Is there a repair warranty?", "Eligible completed repairs include a 90-day service warranty confirmed before work begins."],
+  ["Is there a repair warranty?", "Warranty and eligible repairs vary by store. Request the store's written terms before approving any work."],
 ] as const;
 
 export default function RepairHub() {
@@ -70,16 +71,17 @@ export default function RepairHub() {
               <Button size="lg" variant="outline" className="h-13 rounded-xl border-white/25 bg-white/5 px-7 font-bold text-white hover:bg-white/10 hover:text-white" onClick={() => document.getElementById("diagnostics")?.scrollIntoView({ behavior: "smooth" })}>Diagnose first <Search className="ml-2 h-4 w-4" /></Button>
               <Button size="lg" variant="ghost" className="h-13 text-white/75 hover:bg-white/10 hover:text-white" asChild><Link to="/repair/track">Track repair</Link></Button>
             </div>
-            <ul className="mt-8 flex flex-wrap gap-5 text-sm text-white/65"><li className="flex gap-2"><BadgeCheck className="h-4 w-4 text-[#d8ff3e]" />Verified technicians</li><li className="flex gap-2"><Clock3 className="h-4 w-4 text-[#d8ff3e]" />Typical response within 24 hours</li><li className="flex gap-2"><ShieldCheck className="h-4 w-4 text-[#d8ff3e]" />90-day eligible warranty</li></ul>
+            <ul className="mt-8 flex flex-wrap gap-5 text-sm text-white/65"><li className="flex gap-2"><BadgeCheck className="h-4 w-4 text-[#d8ff3e]" />Verified technicians</li><li className="flex gap-2"><Clock3 className="h-4 w-4 text-[#d8ff3e]" />Ask for response time</li><li className="flex gap-2"><ShieldCheck className="h-4 w-4 text-[#d8ff3e]" />Confirm warranty with store</li></ul>
           </div>
           <div className="rounded-[2rem] border border-white/12 bg-white/[.06] p-6 shadow-2xl backdrop-blur">
             <div className="flex items-center justify-between border-b border-white/10 pb-5"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-[#d8ff3e]">Repair desk</p><p className="mt-1 text-lg font-bold">Choose your starting point</p></div><Wrench className="h-6 w-6 text-[#d8ff3e]" /></div>
             <div className="mt-5 grid gap-3">{[["I know my device", "Browse models and services", "#catalog", Smartphone], ["I only know the symptom", "Use smart diagnostics", "#diagnostics", Search], ["I have a Repair ID", "Check live progress", "/repair/track", Clock3]].map(([title, copy, href, Icon]) => <Link key={String(title)} to={String(href)} className="group flex min-h-16 items-center gap-4 rounded-xl border border-white/10 bg-black/15 p-4 hover:border-[#d8ff3e]/40 focus-visible:ring-2 focus-visible:ring-[#d8ff3e]"><Icon className="h-5 w-5 text-[#d8ff3e]" /><span className="flex-1"><b className="block">{title}</b><span className="text-sm text-white/50">{copy}</span></span><ArrowRight className="h-4 w-4 text-white/35 group-hover:text-[#d8ff3e]" /></Link>)}</div>
-            <div className="mt-5 flex items-center gap-3 rounded-xl bg-[#d8ff3e]/10 p-3 text-sm text-white/70"><span className="flex text-[#d8ff3e]" aria-label="4.9 out of 5 stars">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-3.5 w-3.5 fill-current" />)}</span>4.9/5 customer rating</div>
+            <div className="mt-5 flex items-center gap-3 rounded-xl bg-[#d8ff3e]/10 p-3 text-sm text-white/70"><ShieldCheck className="h-4 w-4 shrink-0 text-[#d8ff3e]" />Ask the store for written repair terms and warranty details before booking.</div>
           </div>
         </div>
       </section>
 
+      <CampaignBanner placement="repair_top" variant="compact" limit={1} />
       <section className="border-b border-border bg-card py-10" aria-labelledby="journey-title"><div className="container"><p className="text-xs font-bold uppercase tracking-[.16em] text-primary">One connected journey</p><h2 id="journey-title" className="mt-2 text-2xl font-black md:text-3xl">How your repair moves</h2><ol className="mt-7 grid gap-4 md:grid-cols-3">{steps.map(([number, title, copy, Icon]) => <li key={number} className="rounded-2xl border border-border bg-background p-5"><div className="mb-5 flex justify-between"><span className="text-xs font-black text-primary">STEP {number}</span><Icon className="h-5 w-5 text-muted-foreground" /></div><h3 className="font-bold">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{copy}</p></li>)}</ol></div></section>
 
       <section id="diagnostics" className="scroll-mt-28 py-16 md:py-20" aria-labelledby="diagnostic-title"><div className="container"><div className="mb-8 max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.16em] text-primary">Smart diagnostic</p><h2 id="diagnostic-title" className="mt-2 text-3xl font-black md:text-4xl">Start with what you notice.</h2><p className="mt-3 text-muted-foreground">Choose the closest symptom to see common causes, estimates, and the correct booking route.</p></div><div className="rounded-[2rem] border border-border bg-card p-5 shadow-sm md:p-8"><DiagnosticsFlow /></div></div></section>

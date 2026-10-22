@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/layout/Header";
+import { CampaignBanner } from "@/components/campaigns/CampaignBanner";
 import { Footer } from "@/components/layout/Footer";
 import { ModelCard } from "@/components/mobile/ModelCard";
 import { ProductCard } from "@/components/products/ProductCard";
@@ -298,6 +299,7 @@ export default function MobileCategoryPage() {
           </div>
         </div>
 
+        <CampaignBanner placement="category_top" variant="compact" limit={1} />
         <div className="max-w-7xl mx-auto px-4 py-10 space-y-6">
 
           {/* Main tabs */}

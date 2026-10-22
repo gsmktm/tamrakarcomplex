@@ -1,0 +1,23 @@
+/* Scoped promotion UI: avoid animation/carousel disruption, preserve accessibility. */
+.tc-campaign-section{width:min(100% - 48px,1320px);margin:24px auto 35px}
+.tc-campaign-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.tc-campaign-grid--compact{gap:12px}
+.tc-campaign__link{display:block;min-width:0;border-radius:18px;overflow:hidden;color:#fff;text-decoration:none;outline-offset:4px}
+.tc-campaign__link:focus-visible{outline:3px solid #ff9b58}
+.tc-campaign{min-height:213px;border-radius:18px;position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(120deg,#071629,#132b49 67%,#72361a);display:flex;align-items:center;color:#fff}
+.tc-campaign--festival{background:radial-gradient(circle at 85% 35%,#aa5432 0%,#5b251a 28%,#0b1930 80%)}
+.tc-campaign--strip{min-height:180px}
+.tc-campaign--compact{min-height:146px}
+.tc-campaign__art{position:absolute;inset:0 0 0 auto;width:55%;height:100%;object-fit:cover;opacity:.75;z-index:-2}
+.tc-campaign__overlay{position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,15,29,.98),rgba(7,19,36,.88) 45%,rgba(7,19,36,.15));z-index:-1}
+.tc-campaign__body{width:min(100%,550px);padding:25px 32px;position:relative;z-index:2}
+.tc-campaign__eyebrow{display:inline-flex;align-items:center;gap:7px;color:#ffba82;text-transform:uppercase;font-size:10px;font-weight:850;letter-spacing:.15em;margin-bottom:10px}
+.tc-campaign h3{font-family:Syne,Manrope,sans-serif;font-size:clamp(21px,2.2vw,32px);line-height:1.15;letter-spacing:-.04em;font-weight:850;margin:0 0 9px;color:#fff;max-width:490px}
+.tc-campaign p{color:#ebedf3;font-size:13px;line-height:1.55;max-width:430px;margin:0}
+.tc-campaign__cta{display:inline-flex;align-items:center;gap:11px;margin-top:19px;border-radius:8px;padding:10px 13px;font-weight:850;font-size:12px;color:#172234;background:#fff}
+.tc-campaign__decoration{position:absolute;right:12%;top:9%;font-size:140px;opacity:.12;transform:rotate(-22deg);pointer-events:none}
+.tc-campaign__link:hover .tc-campaign__cta{background:#ff681d;color:#fff}
+.tc-campaign__link:hover .tc-campaign__art{transform:scale(1.03);transition:transform .35s ease}
+.tc-campaign-grid--compact .tc-campaign h3{font-size:clamp(19px,1.9vw,26px)}
+@media(max-width:650px){.tc-campaign-section{width:calc(100% - 28px);margin:17px auto 24px}.tc-campaign-grid{grid-template-columns:1fr;gap:10px}.tc-campaign{min-height:170px}.tc-campaign__body{padding:23px}.tc-campaign h3{font-size:22px}.tc-campaign p{font-size:12px}.tc-campaign__art{width:65%}}
+@media(prefers-reduced-motion:reduce){.tc-campaign__link:hover .tc-campaign__art{transform:none;transition:none}}

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { storeDirectoryService } from "@/services/storeDirectoryService";
 import { Header } from "@/components/layout/Header";
+import { CampaignBanner } from "@/components/campaigns/CampaignBanner";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { useStoreDirectory } from "@/hooks/useStoreDirectory";
@@ -771,6 +772,7 @@ export default function Stores() {
         structuredData={[breadcrumbSchema, localBusinessList]}
       />
       <Header />
+      <CampaignBanner placement="store_directory" variant="compact" limit={1} />
 
       <main className="flex-1">
         {/* ── Hero ──────────────────────────────────────────────────────── */}

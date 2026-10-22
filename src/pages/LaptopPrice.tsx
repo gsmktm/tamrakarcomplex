@@ -1,4 +1,5 @@
 import { Header } from "@/components/layout/Header";
+import { CampaignBanner } from "@/components/campaigns/CampaignBanner";
 import { Footer } from "@/components/layout/Footer";
 import { useBrandsByCategory, useProductsByCategoryQuery } from "@/hooks/useProducts";
 import type { ProductSortKey } from "@/hooks/useProducts";
@@ -109,6 +110,7 @@ export default function LaptopPrice() {
         url="/laptop-price"
       />
       <Header />
+      <CampaignBanner placement="category_top" variant="compact" limit={1} />
       
       <main className="flex-1">
         {/* Page Header */}
@@ -125,7 +127,7 @@ export default function LaptopPrice() {
                 </h1>
                 <p className="text-muted-foreground mt-2 max-w-2xl">
                    Discover the best laptops for gaming, programming, and office work. 
-                   Official warranty and best price guarantee.
+                   Confirm warranty, availability, and final prices with individual stores.
                 </p>
               </div>
               

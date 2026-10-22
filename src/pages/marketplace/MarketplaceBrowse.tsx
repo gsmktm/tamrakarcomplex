@@ -15,6 +15,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { isAdminRole } from "@/lib/roles";
 
 import { Header } from "@/components/layout/Header";
+import { CampaignBanner } from "@/components/campaigns/CampaignBanner";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { SafeImage } from "@/components/common/SafeImage";
@@ -503,6 +504,7 @@ export default function MarketplaceBrowse() {
         </div>
       </section>
 
+      <CampaignBanner placement="marketplace_top" variant="compact" limit={1} />
       <div className="container py-12 flex-1 space-y-16">
         {storeFilterId ? (
           <div className="flex flex-col gap-3 rounded-2xl border bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">

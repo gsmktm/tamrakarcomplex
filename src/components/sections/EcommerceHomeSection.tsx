@@ -49,7 +49,7 @@ import { PhoneFinderQuiz } from "@/components/home/PhoneFinderQuiz";
 import { HomeMarketplaceFeed } from "@/components/home/HomeMarketplaceFeed";
 import { HomeRepairMiniForm } from "@/components/home/HomeRepairMiniForm";
 import { HomeStoreSpotlight } from "@/components/home/HomeStoreSpotlight";
-import { HomeOffers } from "@/components/home/HomeOffers";
+// Legacy HomeOffers used hardcoded discounts; admin-approved campaign placements now handle promotions.
 import { HomeTrustStats } from "@/components/home/HomeTrustStats";
 import { HomeCompareMini } from "@/components/home/HomeCompareMini";
 import { useFeaturedProducts, useProducts, type Product } from "@/hooks/useProducts";
@@ -66,6 +66,7 @@ import type { SectionConfig } from "@/types/app";
 import { formatDistanceToNow } from "date-fns";
 import { FlagshipShowcase } from "@/components/sections/FlagshipShowcase";
 import { Reveal } from "@/components/home/Reveal";
+import { PremiumHomepage2026 } from "@/components/sections/PremiumHomepage2026";
 
 type HomeStore = {
   id: string;
@@ -405,20 +406,20 @@ export function EcommerceHomeSection() {
     <div className="home-world pb-20">
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       {(enabledSections.hero || enabledSections.search_box) && (
-        <HeroSection products={products} />
+        <PremiumHomepage2026 />
       )}
 
       {/* ── FLAGSHIP SHOWCASE (Apple + Samsung + Algorithm) ──────────────── */}
-      <FlagshipShowcase />
+      {enabledSections.legacy_flagship && <FlagshipShowcase />}
 
       {/* ── OFFERS & DEALS ───────────────────────────────────────────────── */}
-      {enabledSections.offers && <HomeOffers />}
+      {/* Promotions are rendered in the premium homepage from approved campaigns only. */}
 
       {/* ── PRICE FINDER ─────────────────────────────────────────────────── */}
       {enabledSections.price_finder && <HomePriceFinder />}
 
       {/* ── SERVICE MATRIX ───────────────────────────────────────────────── */}
-      {enabledSections.serviceMatrix && <ServiceMatrix />}
+      {enabledSections.legacy_services && <ServiceMatrix />}
 
       {/* ── MARKETPLACE FEED ─────────────────────────────────────────────── */}
       {enabledSections.marketplace_feed && <HomeMarketplaceFeed />}
@@ -427,10 +428,10 @@ export function EcommerceHomeSection() {
       {enabledSections.phone_finder && <PhoneFinderQuiz />}
 
       {/* ── PRICE DISCOVERY DESK (OLD) ────────────────────────────────────── */}
-      {enabledSections.priceDesk && <PriceDesk allProducts={allProductsList} />}
+      {enabledSections.legacy_price_desk && <PriceDesk allProducts={allProductsList} />}
 
       {/* ── FEATURED PRODUCTS ────────────────────────────────────────────── */}
-      {enabledSections.featured && (
+      {enabledSections.legacy_featured && (
         <FeaturedSection products={allProductsList} isLoading={latestProductsLoading} />
       )}
 
@@ -449,15 +450,15 @@ export function EcommerceHomeSection() {
       {/* Store Spotlight — removed */}
 
       {/* ── TRUST STATS ──────────────────────────────────────────────────── */}
-      {enabledSections.trust_stats && <HomeTrustStats />}
+      {enabledSections.legacy_trust_stats && <HomeTrustStats />}
 
       {/* ── SELL CTA BANNER ──────────────────────────────────────────────── */}
-      <SellCtaBanner />
+      {enabledSections.legacy_sell_cta && <SellCtaBanner />}
 
       {/* Community Poll — removed */}
 
       {/* ── CHAT WIDGET ──────────────────────────────────────────────────── */}
-      {enabledSections.chat && <ChatWidget />}
+      {enabledSections.legacy_chat && <ChatWidget />}
       {/* Global mobile bottom nav (BottomNav) replaces the old homepage-only sticky CTA */}
     </div>
   );
