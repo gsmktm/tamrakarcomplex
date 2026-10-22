@@ -49,7 +49,7 @@ import { PhoneFinderQuiz } from "@/components/home/PhoneFinderQuiz";
 import { HomeMarketplaceFeed } from "@/components/home/HomeMarketplaceFeed";
 import { HomeRepairMiniForm } from "@/components/home/HomeRepairMiniForm";
 import { HomeStoreSpotlight } from "@/components/home/HomeStoreSpotlight";
-import { HomeOffers } from "@/components/home/HomeOffers";
+// Legacy HomeOffers used hardcoded discounts; admin-approved campaign placements now handle promotions.
 import { HomeTrustStats } from "@/components/home/HomeTrustStats";
 import { HomeCompareMini } from "@/components/home/HomeCompareMini";
 import { useFeaturedProducts, useProducts, type Product } from "@/hooks/useProducts";
@@ -413,7 +413,7 @@ export function EcommerceHomeSection() {
       <FlagshipShowcase />
 
       {/* ── OFFERS & DEALS ───────────────────────────────────────────────── */}
-      {enabledSections.offers && <HomeOffers />}
+      {/* Promotions are rendered in the premium homepage from approved campaigns only. */}
 
       {/* ── PRICE FINDER ─────────────────────────────────────────────────── */}
       {enabledSections.price_finder && <HomePriceFinder />}
