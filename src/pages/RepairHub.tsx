@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, BadgeCheck, Box, CheckCircle2, Clock3, LayoutGrid, Search, ShieldCheck, Smartphone, Sparkles, Star, Wrench, Zap } from "lucide-react";
+import { ArrowRight, BadgeCheck, Box, CheckCircle2, Clock3, LayoutGrid, Search, ShieldCheck, Smartphone, Sparkles, Wrench, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Header } from "@/components/layout/Header";
@@ -23,7 +23,7 @@ const steps = [
 const faqs = [
   ["How do I track my repair?", "Open Repair Tracking and enter the Repair ID or phone number used during booking."],
   ["What devices do you repair?", "We support smartphones, tablets, laptops, and accessories from major brands."],
-  ["Is there a repair warranty?", "Eligible completed repairs include a 90-day service warranty confirmed before work begins."],
+  ["Is there a repair warranty?", "Warranty and eligible repairs vary by store. Request the store's written terms before approving any work."],
 ] as const;
 
 export default function RepairHub() {
