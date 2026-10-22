@@ -4,6 +4,7 @@ import { ArrowRight, BadgeCheck, Box, CheckCircle2, Clock3, LayoutGrid, Search, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Header } from "@/components/layout/Header";
+import { CampaignBanner } from "@/components/campaigns/CampaignBanner";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { SafeImage } from "@/components/common/SafeImage";
@@ -57,6 +58,7 @@ export default function RepairHub() {
   return <div className="min-h-screen bg-background text-foreground">
     <SEO title="Device Repair in Kathmandu | Instant Quote & Tracking" description="Diagnose device problems, compare transparent repair estimates, book certified technicians, and track repairs online." url="/repair" structuredData={{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faqs.map(([question, answer]) => ({ "@type": "Question", name: question, acceptedAnswer: { "@type": "Answer", text: answer } })) }} />
     <Header />
+    <CampaignBanner placement="repair_top" variant="compact" limit={1} />
     <main>
       <section className="relative overflow-hidden bg-[#0d120f] text-white" aria-labelledby="repair-title">
         <div className="absolute -left-24 top-20 h-72 w-72 rounded-full bg-[#d8ff3e]/15 blur-3xl" aria-hidden />
