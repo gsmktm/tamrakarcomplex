@@ -127,7 +127,7 @@ export default function LaptopPrice() {
                 </h1>
                 <p className="text-muted-foreground mt-2 max-w-2xl">
                    Discover the best laptops for gaming, programming, and office work. 
-                   Official warranty and best price guarantee.
+                   Confirm warranty, availability, and final prices with individual stores.
                 </p>
               </div>
               
