@@ -65,7 +65,11 @@ export function calculateEmiQuote(input: EmiQuoteInput): EmiQuote {
 
   // Round the displayed installment to paisa, and derive totals from it.
   const installmentPaisa = Math.max(0, toPaisa(installment));
-  // Preserve the total principal even when rounding would leave the final\n  // scheduled installment short by one or more paisa.\n  const installmentsPaisa = Math.max(principalPaisa, toPaisa(installment * months));\n  const finalPaymentPaisa = installmentsPaisa - installmentPaisa * (months - 1);\n  const totalInterestPaisa = installmentsPaisa - principalPaisa;
+  // Preserve the total principal even when rounding would leave the final
+  // scheduled installment short by one or more paisa.
+  const installmentsPaisa = Math.max(principalPaisa, toPaisa(installment * months));
+  const finalPaymentPaisa = installmentsPaisa - installmentPaisa * (months - 1);
+  const totalInterestPaisa = installmentsPaisa - principalPaisa;
 
   return {
     productPrice: toNpr(pricePaisa),
