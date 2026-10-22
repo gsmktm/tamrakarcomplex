@@ -402,7 +402,7 @@ export default function MarketplaceBrowse() {
       <Header />
       <CampaignBanner placement="marketplace_top" variant="compact" limit={1} />
 
-      {/* Hero Section */
+      {/* Hero Section */}
       <section className="relative overflow-hidden bg-slate-950 dark:bg-slate-950 border-b">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute top-0 right-0 h-[600px] w-[600px] rounded-full bg-primary/10 blur-[120px] translate-x-1/3 -translate-y-1/3" />
