@@ -15,6 +15,14 @@ describe("calculateEmiQuote", () => {
     expect(quote.totalPayable).toBe(120000);
   });
 
+  it("balances a rounded last installment without underpaying the principal", () => {
+    const quote = calculateEmiQuote({ productPrice: 1000, downPayment: 0, annualInterestRate: 0, months: 3 });
+    expect(quote.monthlyPayment).toBe(333.33);
+    expect(quote.finalPayment).toBe(333.34);
+    expect(quote.totalInstallments).toBe(1000);
+    expect(quote.totalPayable).toBe(1000);
+  });
+
   it("uses amortized balance for a nonzero APR", () => {
     const quote = calculateEmiQuote({
       productPrice: 100000,
