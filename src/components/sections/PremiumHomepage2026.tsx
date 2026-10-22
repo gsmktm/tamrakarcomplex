@@ -15,6 +15,7 @@ import { SafeImage } from "@/components/common/SafeImage";
 import { getPublicStorePath } from "@/lib/storeRoutes";
 import heroPhone from "@/assets/hero-phone.jpg";
 import "@/styles/homepage-2026.css";
+import { CampaignBanner } from "@/components/campaigns/CampaignBanner";
 
 // Curated navigation labels, never fabricated inventory or prices.
 const categories = [
@@ -144,6 +145,8 @@ export function PremiumHomepage2026() {
         </div>
       </section>
 
+      <CampaignBanner placement="home_hero" variant="feature" />
+
       <section className="tc26-container tc26-brands" aria-label="Explore technology brands">
         <Headline eyebrow="THE BRANDS YOU KNOW" title="Find your favorite brand" href="/brands" action="View all brands" />
         <div className="tc26-brand-grid">
@@ -174,6 +177,8 @@ export function PremiumHomepage2026() {
           <div className="tc26-empty"><ScanSearch size={30} aria-hidden /><strong>{productsError ? "Products are temporarily unavailable" : "No matching products right now"}</strong><p>Browse the full catalog or choose a different category.</p><Link to="/buy">Browse catalog <ArrowRight size={16} /></Link></div>
         )}
       </section>
+
+      <CampaignBanner placement="home_mid" variant="strip" />
 
       <section className="tc26-container tc26-store-section" aria-label="Discover local electronics stores">
         <Headline eyebrow="PEOPLE BEHIND THE PRODUCTS" title="Discover stores at Tamrakar Complex" note="Connect directly with shops and specialists in New Road, Kathmandu." href="/stores" action="View store directory" />
@@ -228,6 +233,8 @@ export function PremiumHomepage2026() {
           ))}
         </div>
       </section>
+
+      <CampaignBanner placement="home_footer" variant="strip" limit={1} />
 
       <section className="tc26-container tc26-reassure" aria-label="Why choose Tamrakar Complex">
         {[
