@@ -1,5 +1,6 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
+import { CampaignBanner } from "@/components/campaigns/CampaignBanner";
 import { Footer } from "@/components/layout/Footer";
 import { useProduct, useFeaturedProducts } from "@/hooks/useProducts";
 import {
@@ -872,6 +873,7 @@ export default function ProductDetail() {
               </div>
             </section>
           )}
+          <CampaignBanner placement="product_inline" variant="compact" limit={1} />
         </main>
 
         <Footer />
