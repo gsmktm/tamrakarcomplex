@@ -400,7 +400,6 @@ export default function MarketplaceBrowse() {
         keywords={["marketplace Nepal", "mobile marketplace", "laptop marketplace", "used phones Nepal", "sell tech", "buy gadgets"]}
       />
       <Header />
-      <CampaignBanner placement="marketplace_top" variant="compact" limit={1} />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-slate-950 dark:bg-slate-950 border-b">
@@ -505,6 +504,7 @@ export default function MarketplaceBrowse() {
         </div>
       </section>
 
+      <CampaignBanner placement="marketplace_top" variant="compact" limit={1} />
       <div className="container py-12 flex-1 space-y-16">
         {storeFilterId ? (
           <div className="flex flex-col gap-3 rounded-2xl border bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
