@@ -152,7 +152,10 @@ export default function EmiCalculator() {
                 <p className="mt-3 text-4xl font-bold text-[#D8FF3E] tabular-nums">
                   {quote.value ? formatEmiNpr(quote.value.monthlyPayment) : "—"}
                 </p>
-                <p className="mt-2 text-sm text-white/70">Over {months} months, subject to lender terms</p>\n                {quote.value && quote.value.finalPayment !== quote.value.monthlyPayment && (\n                  <p className="mt-1 text-xs text-white/65">Final payment adjusted for rounding: {formatEmiNpr(quote.value.finalPayment)}</p>\n                )}
+                <p className="mt-2 text-sm text-white/70">Over {months} months, subject to lender terms</p>
+                {quote.value && quote.value.finalPayment !== quote.value.monthlyPayment && (
+                  <p className="mt-1 text-xs text-white/65">Final payment adjusted for rounding: {formatEmiNpr(quote.value.finalPayment)}</p>
+                )}
               </div>
               <CardContent className="space-y-3 pt-5">
                 {quote.value ? (
