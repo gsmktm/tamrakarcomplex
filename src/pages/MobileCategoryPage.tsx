@@ -250,7 +250,6 @@ export default function MobileCategoryPage() {
       />
 
       <Header />
-      <CampaignBanner placement="category_top" variant="compact" limit={1} />
 
       <div className="min-h-screen bg-[linear-gradient(to_bottom,hsl(var(--muted)/.35),hsl(var(--background))_34rem)]">
         <section className="relative isolate overflow-hidden bg-slate-950 text-white">
@@ -300,6 +299,7 @@ export default function MobileCategoryPage() {
           </div>
         </div>
 
+        <CampaignBanner placement="category_top" variant="compact" limit={1} />
         <div className="max-w-7xl mx-auto px-4 py-10 space-y-6">
 
           {/* Main tabs */}
