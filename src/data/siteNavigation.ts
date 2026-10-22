@@ -37,6 +37,7 @@ export const siteNavigationGroups: SiteNavGroup[] = [
       { name: "Mobile Price", href: "/cat/mobiles", description: "Current phone prices and Nepal market references" },
       { name: "Laptop Price", href: "/laptop-price", description: "Laptop price lists for work, study, and gaming" },
       { name: "Compare", href: "/compare", description: "Side-by-side comparisons before you buy" },
+      { name: "EMI Calculator", href: "/emi", description: "Estimate down payment, interest, and monthly installments; confirm terms with a lender" },
       { name: "Stores", href: "/stores", description: "Verified stores, distributors, and repair partners" },
       { name: "Marketplace", href: "/marketplace", description: "Buy directly from community and store listings" },
       { name: "Services", href: "/services", description: "Repair, unlocking, and professional device services" },
