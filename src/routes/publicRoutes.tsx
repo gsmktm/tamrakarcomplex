@@ -25,6 +25,7 @@ const MobileGuides = lazy(() => import("@/pages/MobileGuides"));
 const LaptopGuides = lazy(() => import("@/pages/LaptopGuides"));
 const LaptopTrend = lazy(() => import("@/pages/LaptopTrend"));
 const Compare = lazy(() => import("@/pages/Compare"));
+const EmiCalculator = lazy(() => import("@/pages/EmiCalculator"));
 const MarketplaceBrowse = lazy(() => import("@/pages/marketplace/MarketplaceBrowse"));
 const SellWizard = lazy(() => import("@/pages/marketplace/SellWizard"));
 const ListingDetail = lazy(() => import("@/pages/marketplace/ListingDetail"));
@@ -183,6 +184,8 @@ export const publicRoutes = (
     <Route path="/laptop-trends" element={withSuspense(LaptopTrend)} />
     <Route path="/laptops/trend" element={withSuspense(LaptopTrend)} />
     <Route path="/compare" element={withSuspense(Compare)} />
+    <Route path="/emi" element={withSuspense(EmiCalculator)} />
+    <Route path="/emi-calculator" element={withSuspense(EmiCalculator)} />
     
     {/* Content Pages */}
     <Route path="/privacy-policy" element={
