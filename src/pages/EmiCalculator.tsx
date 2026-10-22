@@ -152,7 +152,7 @@ export default function EmiCalculator() {
                 <p className="mt-3 text-4xl font-bold text-[#D8FF3E] tabular-nums">
                   {quote.value ? formatEmiNpr(quote.value.monthlyPayment) : "—"}
                 </p>
-                <p className="mt-2 text-sm text-white/70">Over {months} months, subject to lender terms</p>
+                <p className="mt-2 text-sm text-white/70">Over {months} months, subject to lender terms</p>\n                {quote.value && quote.value.finalPayment !== quote.value.monthlyPayment && (\n                  <p className="mt-1 text-xs text-white/65">Final payment adjusted for rounding: {formatEmiNpr(quote.value.finalPayment)}</p>\n                )}
               </div>
               <CardContent className="space-y-3 pt-5">
                 {quote.value ? (
@@ -177,9 +177,11 @@ export default function EmiCalculator() {
                 <div className="rounded-lg bg-muted/70 p-3 text-xs leading-relaxed text-muted-foreground">
                   <Info className="mb-1 inline h-4 w-4" /> Illustrative calculation only. Confirm lender availability, eligibility, effective APR, fees, product price and repayment schedule. No payment or loan application is submitted here.
                 </div>
-                <Button asChild className="w-full" disabled={!quote.value}>
-                  <Link to="/contact-us">Ask about actual financing <ArrowRight className="ml-2 h-4 w-4" /></Link>
-                </Button>
+                {quote.value ? (
+                  <Button asChild className="w-full"><Link to="/contact-us">Ask about actual financing <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+                ) : (
+                  <Button className="w-full" disabled>Correct inputs to continue</Button>
+                )}
               </CardContent>
             </Card>
             <Card>
