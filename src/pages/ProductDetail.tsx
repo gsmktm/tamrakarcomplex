@@ -21,6 +21,7 @@ import { AeoFaq } from "@/components/common/AeoFaq";
 import { breadcrumbSchema, faqSchema } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { normalizeProductSlug } from "@/lib/productSlug";
+import { buildEmiCalculatorPath } from "@/lib/emiCalculator";
 import { SafeImage } from "@/components/common/SafeImage";
 import { getProductAvailability, resolveProductDetailImage } from "@/lib/productPresentation";
 import { Card, CardContent } from "@/components/ui/card";
@@ -555,7 +556,7 @@ export default function ProductDetail() {
                           </div>
                           <div>
                             <p className="font-semibold text-sm sm:text-base">Easy EMI Plans</p>
-                            <p className="text-xs text-muted-foreground">Preview installments · No extra cost</p>
+                            <p className="text-xs text-muted-foreground">Illustrative 0% examples · lender terms may vary</p>
                           </div>
                         </div>
                         <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-300 group-data-[state=open]:rotate-180" />
@@ -579,7 +580,7 @@ export default function ProductDetail() {
                         ))}
                       </div>
                       <div className="px-4 sm:px-5 pb-4 sm:pb-5">
-                        <Link to="/emi-calculator" className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-primary hover:underline font-medium">
+                        <Link to={buildEmiCalculatorPath({ name: product.name, price: numericPrice })} className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-primary hover:underline font-medium">
                           <Calculator className="h-3.5 w-3.5" />
                           Open full EMI calculator
                           <ChevronRight className="h-3.5 w-3.5" />
