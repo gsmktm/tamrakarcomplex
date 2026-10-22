@@ -410,7 +410,7 @@ export function EcommerceHomeSection() {
       )}
 
       {/* ── FLAGSHIP SHOWCASE (Apple + Samsung + Algorithm) ──────────────── */}
-      <FlagshipShowcase />
+      {enabledSections.legacy_flagship && <FlagshipShowcase />}
 
       {/* ── OFFERS & DEALS ───────────────────────────────────────────────── */}
       {/* Promotions are rendered in the premium homepage from approved campaigns only. */}
@@ -419,7 +419,7 @@ export function EcommerceHomeSection() {
       {enabledSections.price_finder && <HomePriceFinder />}
 
       {/* ── SERVICE MATRIX ───────────────────────────────────────────────── */}
-      {enabledSections.serviceMatrix && <ServiceMatrix />}
+      {enabledSections.legacy_services && <ServiceMatrix />}
 
       {/* ── MARKETPLACE FEED ─────────────────────────────────────────────── */}
       {enabledSections.marketplace_feed && <HomeMarketplaceFeed />}
@@ -428,10 +428,10 @@ export function EcommerceHomeSection() {
       {enabledSections.phone_finder && <PhoneFinderQuiz />}
 
       {/* ── PRICE DISCOVERY DESK (OLD) ────────────────────────────────────── */}
-      {enabledSections.priceDesk && <PriceDesk allProducts={allProductsList} />}
+      {enabledSections.legacy_price_desk && <PriceDesk allProducts={allProductsList} />}
 
       {/* ── FEATURED PRODUCTS ────────────────────────────────────────────── */}
-      {enabledSections.featured && (
+      {enabledSections.legacy_featured && (
         <FeaturedSection products={allProductsList} isLoading={latestProductsLoading} />
       )}
 
@@ -450,15 +450,15 @@ export function EcommerceHomeSection() {
       {/* Store Spotlight — removed */}
 
       {/* ── TRUST STATS ──────────────────────────────────────────────────── */}
-      {enabledSections.trust_stats && <HomeTrustStats />}
+      {enabledSections.legacy_trust_stats && <HomeTrustStats />}
 
       {/* ── SELL CTA BANNER ──────────────────────────────────────────────── */}
-      <SellCtaBanner />
+      {enabledSections.legacy_sell_cta && <SellCtaBanner />}
 
       {/* Community Poll — removed */}
 
       {/* ── CHAT WIDGET ──────────────────────────────────────────────────── */}
-      {enabledSections.chat && <ChatWidget />}
+      {enabledSections.legacy_chat && <ChatWidget />}
       {/* Global mobile bottom nav (BottomNav) replaces the old homepage-only sticky CTA */}
     </div>
   );
