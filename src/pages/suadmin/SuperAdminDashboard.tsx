@@ -169,6 +169,7 @@ const SuperAdminDashboard = () => {
     { label: "Store Applications", href: "/suadmin/store-network?tab=applications", icon: FileText },
     { label: "Catalog Overview", href: "/suadmin/catalog", icon: Database },
     { label: "Team Access", href: "/suadmin/team-access", icon: ShieldAlert },
+    { label: "Unified Workflows", href: "/suadmin/workflows", icon: Wrench },
     { label: "System Overview", href: "/suadmin/system", icon: SettingsIcon },
     { label: "Customers", href: "/suadmin/customers", icon: Users },
     { label: "Service Desk", href: "/suadmin/service-desk", icon: Wrench },
