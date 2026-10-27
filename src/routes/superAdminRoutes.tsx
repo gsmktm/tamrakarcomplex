@@ -10,6 +10,7 @@ const w = (C: React.ComponentType) => (
 
 // Dashboard & Profile
 const CommandCenterHub = lazy(() => import("@/pages/suadmin/SuperAdminSectionHubs").then((m) => ({ default: m.CommandCenterHub })));
+const UnifiedOperationsBoard = lazy(() => import("@/pages/suadmin/UnifiedOperationsBoard"));
 
 // Staff control
 const TeamAccessManager = lazy(() => import("@/pages/suadmin/TeamAccessManager"));
@@ -28,6 +29,7 @@ const UserDeepProfile = lazy(() => import("@/pages/suadmin/UserDeepProfile"));
 export const superAdminRoutes = [
   { path: "/suadmin", element: w(CommandCenterHub) },
   { path: "/suadmin/me", element: w(CommandCenterHub) },
+  { path: "/suadmin/workflows", element: w(UnifiedOperationsBoard) },
 
   // Staff control
   { path: "/suadmin/team-access", element: w(TeamAccessManager) },
