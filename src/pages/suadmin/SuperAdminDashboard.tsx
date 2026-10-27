@@ -28,7 +28,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type DashboardMetric = {
@@ -41,10 +40,10 @@ type DashboardMetric = {
 };
 
 type SystemHealth = {
-  database: "healthy" | "warning" | "error";
-  api: "healthy" | "warning" | "error";
-  storage: "healthy" | "warning" | "error";
-  uptime: number;
+  database: "connected" | "check required";
+  api: "not monitored";
+  storage: "not monitored";
+  uptime: null;
 };
 
 const countTable = async (table: string, filter?: (q: any) => any) => {
@@ -56,7 +55,7 @@ const countTable = async (table: string, filter?: (q: any) => any) => {
     return count ?? 0;
   } catch (error) {
     console.warn(`Unable to count ${table}`, error);
-    return 0;
+    return null;
   }
 };
 
@@ -77,51 +76,65 @@ const SuperAdminDashboard = () => {
         pendingRepairs,
         pendingUnlocks,
         pendingApplications,
+        unreadMessages,
+        pendingOrders,
+        pendingLeads,
+        openStaffTasks,
+        orders24h,
+        listings24h,
+        repairs24h,
       ] = await Promise.all([
         countTable("products"),
         countTable("orders"),
         countTable("community_listings"),
         countTable("repair_requests"),
-        countTable("unlocking_requests"),
+        countTable("unlock_requests"),
         countTable("stores"),
         countTable("profiles"),
-        countTable("repair_requests", (q) => q.eq("status", "pending")),
-        countTable("unlocking_requests", (q) => q.eq("status", "pending")),
+        countTable("repair_requests", (q) => q.in("status", ["new", "pending", "assigned", "inspection", "repairing", "in_progress"])),
+        countTable("unlock_requests", (q) => q.in("status", ["pending", "processing"])),
         countTable("store_applications", (q) => q.eq("status", "pending")),
+        countTable("contact_messages", (q) => q.eq("is_read", false)),
+        countTable("orders", (q) => q.in("order_status", ["pending", "confirmed", "processing", "packed", "shipped"])),
+        countTable("sell_phone_leads", (q) => q.eq("status", "new")),
+        countTable("admin_tasks", (q) => q.eq("assigned_role_type", "staffadmin").in("status", ["pending", "in_progress", "overdue"])),
+        countTable("orders", (q) => q.gte("created_at", new Date(Date.now() - 86_400_000).toISOString())),
+        countTable("community_listings", (q) => q.gte("created_at", new Date(Date.now() - 86_400_000).toISOString())),
+        countTable("repair_requests", (q) => q.gte("created_at", new Date(Date.now() - 86_400_000).toISOString())),
       ]);
 
+      // A successful database query proves data access, not platform-wide uptime.
+      // API availability, storage health, and uptime require server-side monitors.
       const systemHealth: SystemHealth = {
-        database: "healthy",
-        api: "healthy",
-        storage: "healthy",
-        uptime: 99.9,
+        database: productsCount === null ? "check required" : "connected",
+        api: "not monitored",
+        storage: "not monitored",
+        uptime: null,
       };
+      const dataAccessErrors = [
+        productsCount, ordersCount, listingsCount, repairsCount, unlocksCount,
+        storesCount, profilesCount, pendingRepairs, pendingUnlocks,
+        pendingApplications, unreadMessages, pendingOrders, pendingLeads,
+        openStaffTasks, orders24h, listings24h, repairs24h,
+      ].some((value) => value === null);
 
       const metrics = [
-        { title: "Total Products", value: productsCount, link: "/suadmin/catalog?tab=products", icon: Package, error: false },
-        { title: "Total Orders", value: ordersCount, link: "/suadmin/commerce?tab=orders", icon: ShoppingBag, error: false },
-        { title: "Active Listings", value: listingsCount, link: "/suadmin/commerce?tab=listings", icon: TrendingUp, error: false },
-        { title: "Repair Requests", value: repairsCount, link: "/suadmin/service-desk?tab=repairs", icon: Wrench, error: false },
-        { title: "Unlocking Requests", value: unlocksCount, link: "/suadmin/service-desk?tab=unlocking", icon: Unlock, error: false },
-        { title: "Active Stores", value: storesCount, link: "/suadmin/store-network?tab=stores", icon: Store, error: false },
-        { title: "Registered Users", value: profilesCount, link: "/suadmin/customers?tab=users", icon: Users, error: false },
-        { title: "Pending Stores", value: pendingApplications, link: "/suadmin/store-network?tab=applications", icon: FileText, error: false },
+        { title: "Total Products", value: productsCount ?? 0, link: "/suadmin/catalog?tab=products", icon: Package, error: productsCount === null },
+        { title: "Total Orders", value: ordersCount ?? 0, link: "/suadmin/commerce?tab=orders", icon: ShoppingBag, error: ordersCount === null },
+        { title: "Active Listings", value: listingsCount ?? 0, link: "/suadmin/commerce?tab=listings", icon: TrendingUp, error: listingsCount === null },
+        { title: "Repair Requests", value: repairsCount ?? 0, link: "/suadmin/service-desk?tab=repairs", icon: Wrench, error: repairsCount === null },
+        { title: "Unlocking Requests", value: unlocksCount ?? 0, link: "/suadmin/service-desk?tab=unlocking", icon: Unlock, error: unlocksCount === null },
+        { title: "Active Stores", value: storesCount ?? 0, link: "/suadmin/store-network?tab=stores", icon: Store, error: storesCount === null },
+        { title: "Registered Users", value: profilesCount ?? 0, link: "/suadmin/customers?tab=users", icon: Users, error: profilesCount === null },
+        { title: "Pending Stores", value: pendingApplications ?? 0, link: "/suadmin/store-network?tab=applications", icon: FileText, error: pendingApplications === null },
+        { title: "Open Staff Tasks", value: openStaffTasks ?? 0, link: "/suadmin/team-access?tab=tasks", icon: ShieldAlert, error: openStaffTasks === null },
       ] satisfies DashboardMetric[];
 
       return {
         metrics,
-        recentActivity: {
-          orders24h: 0,
-          listings24h: 0,
-          repairs24h: 0,
-        },
-        alerts: {
-          unreadMessages: 0,
-          pendingRepairs: pendingRepairs,
-          pendingOrders: 0,
-          pendingUnlocks: pendingUnlocks,
-          pendingLeads: 0,
-        },
+        recentActivity: { orders24h, listings24h, repairs24h },
+        alerts: { unreadMessages, pendingRepairs, pendingOrders, pendingUnlocks, pendingLeads },
+        dataAccessErrors,
         systemHealth,
       };
     },
@@ -177,14 +190,14 @@ const SuperAdminDashboard = () => {
           </CardHeader>
         </Card>
 
-        <Card className="border-green-500/20 bg-green-500/5">
+        <Card className="border-border/60">
           <CardHeader className="flex flex-row items-center gap-4">
             <div className="rounded-full bg-green-500/10 p-2">
-              <CheckCircle className="h-6 w-6 text-green-500" />
+              <CheckCircle className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-lg">System Health</CardTitle>
-              <p className="text-sm text-muted-foreground">All systems operational</p>
+              <CardTitle className="text-lg">Database Access</CardTitle>
+              <p className="text-sm text-muted-foreground">{data?.systemHealth.database ?? "not checked"}</p>
             </div>
           </CardHeader>
         </Card>
@@ -195,8 +208,8 @@ const SuperAdminDashboard = () => {
               <Activity className="h-6 w-6 text-blue-500" />
             </div>
             <div>
-              <CardTitle className="text-lg">Platform Uptime</CardTitle>
-              <p className="text-sm text-muted-foreground">{data?.systemHealth.uptime}% this month</p>
+              <CardTitle className="text-lg">Monitoring Coverage</CardTitle>
+              <p className="text-sm text-muted-foreground">API, storage and uptime monitors not configured</p>
             </div>
           </CardHeader>
         </Card>
@@ -209,7 +222,7 @@ const SuperAdminDashboard = () => {
             <div>
               <CardTitle className="text-lg">Active Alerts</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {alertTotal > 0 ? `${alertTotal} items need attention` : "All clear!"}
+                {data?.dataAccessErrors ? "Some queues could not be checked" : alertTotal > 0 ? `${alertTotal} items need attention` : "No open alerts in monitored queues"}
               </p>
             </div>
           </CardHeader>
@@ -289,10 +302,10 @@ const SuperAdminDashboard = () => {
         <Card className="border-border/60">
           <CardHeader>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Platform Overview</div>
-            <CardTitle className="text-3xl">System Metrics</CardTitle>
+            <CardTitle className="text-3xl">Live Operational Queues</CardTitle>
           </CardHeader>
           <CardContent className="text-muted-foreground">
-            Comprehensive view of all platform operations, user activity, and system performance. Monitor key metrics and take action on critical alerts.
+            Database-backed counts for catalog, orders, stores, service cases and team tasks. Unavailable data is shown as an error, never as an invented zero.
           </CardContent>
         </Card>
 
@@ -303,15 +316,15 @@ const SuperAdminDashboard = () => {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm">New Orders</span>
-              <Badge variant="secondary">{data?.recentActivity.orders24h ?? 0}</Badge>
+              <Badge variant="secondary">{data?.recentActivity.orders24h ?? "Unavailable"}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">New Listings</span>
-              <Badge variant="secondary">{data?.recentActivity.listings24h ?? 0}</Badge>
+              <Badge variant="secondary">{data?.recentActivity.listings24h ?? "Unavailable"}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Repair Requests</span>
-              <Badge variant="secondary">{data?.recentActivity.repairs24h ?? 0}</Badge>
+              <Badge variant="secondary">{data?.recentActivity.repairs24h ?? "Unavailable"}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -341,52 +354,26 @@ const SuperAdminDashboard = () => {
         })}
       </div>
 
-      {/* System Health Details */}
+      {/* Observed state only: do not invent uptime or storage health. */}
       <Card className="border-border/60">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Server className="h-5 w-5 text-primary" />
-            System Health Monitor
+            Monitoring & Data Integrity
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Database</span>
-              <Badge variant={data?.systemHealth.database === "healthy" ? "secondary" : "destructive"}>
-                {data?.systemHealth.database}
-              </Badge>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Database query", value: data?.systemHealth.database ?? "not checked" },
+            { label: "API monitoring", value: "not monitored" },
+            { label: "Storage monitoring", value: "not monitored" },
+            { label: "Uptime monitoring", value: "not monitored" },
+          ].map((check) => (
+            <div key={check.label} className="flex items-center justify-between gap-3 rounded-xl border p-4">
+              <span className="text-sm font-medium">{check.label}</span>
+              <Badge variant={check.value === "connected" ? "secondary" : "outline"}>{check.value}</Badge>
             </div>
-            <Progress value={95} className="h-2" />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">API Services</span>
-              <Badge variant={data?.systemHealth.api === "healthy" ? "secondary" : "destructive"}>
-                {data?.systemHealth.api}
-              </Badge>
-            </div>
-            <Progress value={98} className="h-2" />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Storage</span>
-              <Badge variant={data?.systemHealth.storage === "healthy" ? "secondary" : "destructive"}>
-                {data?.systemHealth.storage}
-              </Badge>
-            </div>
-            <Progress value={87} className="h-2" />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Uptime</span>
-              <Badge variant="secondary">{data?.systemHealth.uptime}%</Badge>
-            </div>
-            <Progress value={data?.systemHealth.uptime || 0} className="h-2" />
-          </div>
+          ))}
         </CardContent>
       </Card>
     </div>
