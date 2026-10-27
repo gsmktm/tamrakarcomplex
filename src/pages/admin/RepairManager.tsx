@@ -62,42 +62,31 @@ const RepairManager = () => {
   const queryClient = useQueryClient();
 
   const { data: repairs, isLoading, error: repairsError } = useQuery({
-    queryKey: ["admin_repairs", user?.id, role, page, search],
+    queryKey: ["admin_repairs", user?.id, role, myStoreIds.join(","), page, search],
     queryFn: async () => {
       try {
         const from = page * PAGINATION.PAGE_SIZE_SMALL;
         const to = from + PAGINATION.PAGE_SIZE_SMALL - 1;
         const cols = REPAIR_REQUESTS_COLUMNS.join(",");
 
+        // Do not inner-join stores: new or unassigned repairs must remain visible.
+        // Scope every store-admin request before it leaves the browser.
+        if (isStoreAdmin && myStoreIds.length === 0) return [];
         let query = supabase
           .from("repair_requests")
-          .select(`${cols}, stores!inner(name, package_slug)`)
+          .select(cols)
           .order("created_at", { ascending: false })
           .range(from, to);
 
-        if (isStoreAdmin) {
-          if (myStoreIds.length === 0) return [];
-          query = query.in("assigned_store_id", myStoreIds);
-        }
+        if (isStoreAdmin) query = query.in("assigned_store_id", myStoreIds);
 
-        const joined = await query;
-        if (!joined.error) return joined.data ?? [];
-
-        // Relationship missing or schema behind: fallback to explicit columns
-        if (isSchemaMissingError(joined.error)) {
-          const base = await supabase
-            .from("repair_requests")
-            .select(cols)
-            .order("created_at", { ascending: false })
-            .range(from, to);
-          if (base.error) throw base.error;
-          return base.data ?? [];
-        }
-
-        throw joined.error;
+        const { data, error } = await query;
+        if (error) throw error;
+        return data ?? [];
       } catch (err) {
         handleSupabaseError(err, "RepairManager: Failed to fetch repairs");
-        return [];
+        // The UI must distinguish database failure from a genuinely empty queue.
+        throw err;
       }
     },
     retry: 1,

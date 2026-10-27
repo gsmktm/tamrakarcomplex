@@ -198,8 +198,9 @@ export const STORE_SETTINGS_COLUMNS = [
 ] as const;
 
 export const ADMIN_TASKS_COLUMNS = [
-  "id", "title", "description", "assigned_role_type", "status",
-  "priority", "created_by", "assigned_to", "due_date", "completed_at",
+  "id", "title", "description", "assigned_role_type", "assigned_to_user_id",
+  "module_key", "target_store_id", "target_user_id", "status", "priority",
+  "created_by", "updated_by", "due_date", "completed_at",
   "created_at", "updated_at",
 ] as const;
 
