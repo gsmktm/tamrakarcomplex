@@ -103,19 +103,14 @@ export default function StaffTaskManager() {
     enabled: isSuperAdmin,
   });
 
-  const { data: tasks, isLoading } = useQuery({
+  const { data: tasks, isLoading, isError, error: taskLoadError } = useQuery({
     queryKey: ["staff-tasks", role, user?.id],
     queryFn: async () => {
-      try {
-        let query = supabase.from("admin_tasks").select(ADMIN_TASKS_COLUMNS.join(",")).eq("assigned_role_type", "staffadmin");
-        if (!isSuperAdmin) query = query.eq("assigned_to_user_id", user?.id);
-        const { data, error } = await query.order("created_at", { ascending: false });
-        if (error) throw error;
-        return (data ?? []) as AdminTask[];
-      } catch (error) {
-        console.warn("Unable to load staff tasks", error);
-        return [] as AdminTask[];
-      }
+      let query = supabase.from("admin_tasks").select(ADMIN_TASKS_COLUMNS.join(",")).eq("assigned_role_type", "staffadmin");
+      if (!isSuperAdmin) query = query.eq("assigned_to_user_id", user?.id);
+      const { data, error } = await query.order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as AdminTask[];
     },
     enabled: !!user?.id,
   });
@@ -253,6 +248,12 @@ export default function StaffTaskManager() {
                 <TableRow>
                   <TableCell colSpan={isSuperAdmin ? 6 : 5} className="h-24 text-center">
                     <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+                  </TableCell>
+                </TableRow>
+              ) : isError ? (
+                <TableRow>
+                  <TableCell colSpan={isSuperAdmin ? 6 : 5} className="h-24 text-center text-destructive">
+                    Unable to load tasks: {getErrorMessage(taskLoadError)}
                   </TableCell>
                 </TableRow>
               ) : tasks?.length ? (
