@@ -3,6 +3,7 @@ import {
   BarChart3,
   Calculator,
   Calendar,
+  ClipboardList,
   CheckCircle,
   Database,
   LayoutDashboard,
@@ -52,6 +53,7 @@ export const PANEL_NAVIGATION: Record<string, NavGroup[]> = {
       title: "Command Center",
       items: [
         { label: "Command Center", href: "/suadmin", icon: LayoutDashboard, requiredRole: "suadmin", enabled: true },
+        { label: "Unified Workflows", href: "/suadmin/workflows", icon: ClipboardList, requiredRole: "suadmin", enabled: true },
       ],
     },
     {
