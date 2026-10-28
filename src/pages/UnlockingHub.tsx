@@ -47,6 +47,7 @@ export default function UnlockingHub() {
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedModelForRequest, setSelectedModelForRequest] = useState<string | null>(null);
+  const [selectedBrandForRequest, setSelectedBrandForRequest] = useState<string | null>(null);
   const [selectedServiceForRequest, setSelectedServiceForRequest] = useState<string | null>(null);
   const [selectedOfferForRequest, setSelectedOfferForRequest] = useState<UnlockingServiceOffer | null>(null);
   const [selectedServiceCategory, setSelectedServiceCategory] = useState<UnlockingServiceCategory | "all">("all");
@@ -132,7 +133,8 @@ export default function UnlockingHub() {
   }, [featureFilteredModels, currentPage]);
 
   const handleRequestUnlock = (model: string, brand: string, feature: string, offer?: UnlockingServiceOffer) => {
-    setSelectedModelForRequest(`${brand} ${model}`);
+    setSelectedModelForRequest(model);
+    setSelectedBrandForRequest(brand);
     setSelectedServiceForRequest(offer?.name || feature);
     setSelectedOfferForRequest(offer || null);
     setRequestDialogOpen(true);
@@ -140,7 +142,8 @@ export default function UnlockingHub() {
 
   const handleBuyService = (offer: UnlockingServiceOffer) => {
     const firstTag = offer.tags.find((tag) => ["iPhone", "Samsung", "Tecno", "Infinix", "iTel", "Verizon", "T-Mobile"].includes(tag));
-    setSelectedModelForRequest(firstTag ? `${firstTag} Device` : "Customer Device");
+    setSelectedModelForRequest("Customer Device");
+    setSelectedBrandForRequest(firstTag && ["iPhone", "Samsung", "Tecno", "Infinix", "iTel"].includes(firstTag) ? firstTag : "Unspecified");
     setSelectedServiceForRequest(offer.name);
     setSelectedOfferForRequest(offer);
     setRequestDialogOpen(true);
@@ -152,8 +155,10 @@ export default function UnlockingHub() {
     
     setIsSubmitting(true);
     try {
-      const [brand, ...modelParts] = selectedModelForRequest.split(" ");
-      const model = modelParts.join(" ");
+      // A brand can contain multiple words (e.g. Black Shark).
+      // Keep explicit values; never split brand and model on whitespace.
+      const brand = selectedBrandForRequest || "Unspecified";
+      const model = selectedModelForRequest;
 
       await createUnlockRequest({
         user_id: user?.id || null,
@@ -753,7 +758,7 @@ export default function UnlockingHub() {
             </DialogTitle>
             <DialogDescription className="text-sm leading-5">
               {selectedOfferForRequest ? "Create a verified service order. Staff confirms eligibility and payment before processing." : (
-                <>Submit a request for <strong>{selectedModelForRequest}</strong> - <strong>{selectedServiceForRequest}</strong>.</>
+                <>Submit a request for <strong>{selectedBrandForRequest} {selectedModelForRequest}</strong> - <strong>{selectedServiceForRequest}</strong>.</>
               )}
             </DialogDescription>
           </DialogHeader>
