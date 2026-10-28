@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
-import { useUnlockCatalog, createUnlockRequest } from "@/hooks/useRepair";
+import { createUnlockRequest } from "@/hooks/useRepair";
+import { useUnlockingDeviceModels } from "@/hooks/useUnlockingDeviceModels";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -29,10 +30,10 @@ const ITEMS_PER_PAGE = 20;
 const SERVICES_PER_PAGE = 12;
 
 const FEATURES = [
-  { id: "frp", label: "FRP Bypass", icon: Key, color: "text-red-500 bg-red-500/10", description: "Factory Reset Protection removal for locked Google/Samsung accounts", models: 81 },
-  { id: "imei", label: "IMEI Repair", icon: Cpu, color: "text-blue-500 bg-blue-500/10", description: "Restore your IMEI number after hardware issues", models: 41 },
-  { id: "network", label: "Network Unlock", icon: RefreshCw, color: "text-emerald-500 bg-emerald-500/10", description: "Unlock your phone from carrier network restrictions", models: 83 },
-  { id: "root", label: "Root Access", icon: Zap, color: "text-amber-500 bg-amber-500/10", description: "Get root access for full system control and customization", models: 8 },
+  { id: "frp", label: "Account Recovery", icon: Key, color: "text-red-500 bg-red-500/10", description: "Owner-verified FRP and account recovery assistance" },
+  { id: "imei", label: "IMEI Diagnostics", icon: Cpu, color: "text-blue-500 bg-blue-500/10", description: "IMEI validation, registration and repair diagnostics" },
+  { id: "network", label: "Network Unlock", icon: RefreshCw, color: "text-emerald-500 bg-emerald-500/10", description: "Check carrier unlocking eligibility for your phone" },
+  { id: "root", label: "Software Service", icon: Zap, color: "text-amber-500 bg-amber-500/10", description: "Authorized software and bootloader consultation" },
 ];
 
 export default function UnlockingHub() {
@@ -61,7 +62,8 @@ export default function UnlockingHub() {
     notes: ""
   });
 
-  const { data: allModels, isLoading } = useUnlockCatalog(selectedBrand || undefined);
+  const { data: allModels, isLoading, isFetching, isError, refetch } = useUnlockingDeviceModels();
+  const brands = useMemo(() => Array.from(new Set((allModels || []).map(item => item.brand))).sort((a, b) => a.localeCompare(b)), [allModels]);
 
   // Set initial form data if user is logged in
   React.useEffect(() => {
@@ -79,39 +81,26 @@ export default function UnlockingHub() {
     if (!allModels) return [];
     
     return allModels.filter((item) => {
-      const matchesSearch = item.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           item.brand.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
+      const query = searchQuery.trim().toLowerCase();
+      const matchesSearch = [item.model, item.brand, item.model_number || ""].some(value => value.toLowerCase().includes(query));
+      const matchesBrand = !selectedBrand || item.brand.toLowerCase() === selectedBrand.toLowerCase();
+      return matchesSearch && matchesBrand;
     });
-  }, [allModels, searchQuery]);
+  }, [allModels, searchQuery, selectedBrand]);
 
+  // Keep every known model visible, even when a feature has not been verified.
+  // Known catalog matches appear first; selecting a feature is not an assertion
+  // of provider support for any particular phone.
   const featureFilteredModels = useMemo(() => {
     if (!showFeatureDetail) return filteredModels;
-    
-    return filteredModels.filter((item) => {
-      const featureLower = showFeatureDetail.toLowerCase();
-      if (featureLower.includes('frp')) {
-        return item.supported_features.some(f => f.toLowerCase().includes('frp'));
-      }
-      if (featureLower.includes('imei')) {
-        return item.supported_features.some(f => f.toLowerCase().includes('imei') || f.toLowerCase().includes('repair imei'));
-      }
-      if (featureLower.includes('network') || featureLower.includes('unlock')) {
-        return item.supported_features.some(f => 
-          f.toLowerCase().includes('network') || 
-          f.toLowerCase().includes('direct unlock') ||
-          f.toLowerCase().includes('bootloader unlock')
-        );
-      }
-      if (featureLower.includes('root')) {
-        return item.supported_features.some(f => 
-          f.toLowerCase().includes('root') || 
-          f.toLowerCase().includes('magisk') || 
-          f.toLowerCase().includes('superuser')
-        );
-      }
-      return true;
-    });
+    const feature = showFeatureDetail.toLowerCase();
+    const aliases = feature.includes("account") ? ["frp", "account"] :
+      feature.includes("imei") ? ["imei"] :
+      feature.includes("network") ? ["network", "carrier", "direct unlock"] :
+      ["root", "bootloader", "software"];
+    const hasListing = (item: (typeof filteredModels)[number]) =>
+      item.supported_features.some(value => aliases.some(alias => value.toLowerCase().includes(alias)));
+    return [...filteredModels].sort((a, b) => Number(hasListing(b)) - Number(hasListing(a)));
   }, [filteredModels, showFeatureDetail]);
 
   const filteredServiceOffers = useMemo(() => {
@@ -303,7 +292,7 @@ export default function UnlockingHub() {
     <div className="min-h-screen flex flex-col bg-background">
       <SEO
         title="Phone Unlocking Services in Nepal - iPhone, Samsung FRP, MDM, IMEI"
-        description="Buy or request phone unlocking services in Kathmandu: iPhone carrier unlock, Samsung FRP, MDM remove, iCloud bypass tools, IMEI checks, unbarring, and Android software service."
+        description="Browse all mobile brands and models, request carrier unlocking eligibility checks, authorized account recovery and IMEI diagnostics in Nepal."
         url="/unlocking"
         keywords={["phone unlocking Nepal", "iPhone unlock Kathmandu", "Samsung FRP Nepal", "MDM remove Nepal", "IMEI check Nepal", "Tamrakar unlocking"]}
         structuredData={[breadcrumbSchema, serviceCatalogSchema, faqSchema]}
@@ -327,7 +316,7 @@ export default function UnlockingHub() {
               <span className="text-primary">Unlocking.</span>
             </h1>
             <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-              Advanced software services for all major brands. FRP bypass, IMEI repair, network unlock, and root access.
+              Explore every model from our live device catalog. Request verified carrier unlocks, diagnostics and authorized recovery services.
             </p>
             <div className="relative max-w-2xl mx-auto group">
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 h-6 w-6 group-focus-within:text-primary transition-all" />
@@ -503,7 +492,7 @@ export default function UnlockingHub() {
                     <h3 className="font-bold text-foreground mb-1">{feature.label}</h3>
                     <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{feature.description}</p>
                     <Badge variant="secondary" className="text-xs font-bold">
-                      {feature.models} Models
+                      {count} catalog matches
                     </Badge>
                   </button>
                 );
@@ -519,7 +508,7 @@ export default function UnlockingHub() {
                   <ArrowLeft className="h-4 w-4" /> Back to All Services
                 </Button>
                 <div className="h-8 w-px bg-slate-200" />
-                <h2 className="text-2xl font-bold text-foreground">{showFeatureDetail} Supported Devices</h2>
+                <h2 className="text-2xl font-bold text-foreground">{showFeatureDetail} – All Devices</h2>
                 <Badge variant="outline" className="text-sm font-bold">
                   {featureFilteredModels.length} devices
                 </Badge>
@@ -550,6 +539,18 @@ export default function UnlockingHub() {
             </div>
           )}
 
+          {/* Automatically synced brand and model catalog */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
+            <div>
+              <p className="font-bold text-sm">Automatic Model Catalog</p>
+              <p className="text-xs text-muted-foreground">All {allModels?.length ?? 0} models across {brands.length} brands from the device database, refreshed every five minutes. Service compatibility is checked individually.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => void refetch()} disabled={isFetching} className="gap-2">
+              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+              {isFetching ? "Syncing models" : "Refresh models"}
+            </Button>
+          </div>
+          {isError && <p role="alert" className="text-sm text-destructive">The model catalog could not be loaded. Refresh to retry.</p>}
           {/* Brand Filter */}
           <div className="flex flex-wrap gap-2 justify-center">
             <Button
@@ -577,7 +578,7 @@ export default function UnlockingHub() {
                 {f.label}
               </Button>
             ))}
-            {["Apple", "Samsung", "Xiaomi", "OnePlus", "Google", "Vivo", "Oppo", "Realme", "Motorola", "Honor"].map(brand => (
+            {brands.map(brand => (
               <Button
                 key={brand}
                 size="sm"
@@ -596,7 +597,7 @@ export default function UnlockingHub() {
           {/* Results Count */}
           <div className="text-center text-sm text-muted-foreground">
             Showing {paginatedModels.length} of {featureFilteredModels.length} devices
-            {showFeatureDetail && ` supporting ${showFeatureDetail}`}
+            {showFeatureDetail && ` for ${showFeatureDetail} — eligibility confirmed individually`}
             {selectedBrand && ` from ${selectedBrand}`}
           </div>
 
@@ -618,7 +619,7 @@ export default function UnlockingHub() {
                         {item.model}
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-slate-400 font-medium">{item.release_year}</span>
+                        <span className="text-xs text-slate-400 font-medium">{item.release_year || "Release year unconfirmed"}</span>
                         <Link to={`/mobile/${item.brand.toLowerCase()}-${item.model.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} className="text-[10px] font-bold text-primary hover:underline flex items-center gap-0.5">
                           View Full Specs <Info className="h-2.5 w-2.5" />
                         </Link>
@@ -653,7 +654,7 @@ export default function UnlockingHub() {
                     className="w-full mt-4 h-11 rounded-xl font-bold gap-2 shadow-md"
                     onClick={() => handleRequestUnlock(item.model, item.brand, showFeatureDetail || "Full Unlock Service")}
                   >
-                    Request Device Service
+                    {item.supported_features.length > 0 ? "Request Device Service" : "Check Service Eligibility"}
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </CardContent>
@@ -664,7 +665,7 @@ export default function UnlockingHub() {
                   <Search className="h-8 w-8 text-slate-300" />
                 </div>
                 <h3 className="text-xl font-bold text-foreground mb-2">No devices found</h3>
-                <p className="text-muted-foreground">Try adjusting your search or filter criteria.</p>
+                <p className="text-muted-foreground">{isError ? "Could not load the device catalog. Try refreshing." : "Try adjusting your search or filter criteria. New models appear automatically when added to the database."}</p>
               </div>
             )}
           </div>
@@ -724,7 +725,7 @@ export default function UnlockingHub() {
             <div className="max-w-4xl mx-auto text-center space-y-6">
               <h2 className="text-3xl font-black">Advanced Software Features</h2>
               <p className="text-slate-400">
-                Our lab is equipped with official licenses for ChimeraTool, Octopus Box, and Z3X, allowing us to perform deep-level software operations safely and efficiently.
+                Service availability depends on your model, ownership verification, provider eligibility and technician assessment. Listing a model is not a guarantee of unlock support.
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4">
                 {FEATURES.map((feature) => {
