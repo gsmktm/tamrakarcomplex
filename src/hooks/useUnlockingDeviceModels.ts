@@ -78,7 +78,7 @@ async function loadUnlockCatalog(): Promise<UnlockingModel[]> {
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const { data, error } = await supabase
       .from("unlock_catalog")
-      .select("*")
+      .select("id,brand,model,variant,release_year,supported_features,is_premium,created_at")
       .order("id")
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     if (error) {
