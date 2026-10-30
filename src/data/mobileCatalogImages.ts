@@ -65,7 +65,6 @@ const GSM_IMAGE_FILES: Record<string, string> = {
   "oneplus-13r": "oneplus-13r",
   "oneplus-12": "oneplus-12",
   "oneplus-11": "oneplus-11",
-  "oneplus-11-pro": "oneplus-11",
   "oneplus-15r": "oneplus-15r",
   "oneplus-15": "oneplus-15",
   "google-pixel-8-pro": "google-pixel-8-pro",

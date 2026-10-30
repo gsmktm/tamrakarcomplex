@@ -1,0 +1,26 @@
+name: Verified Device Artwork Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/data/mobileCatalogImages.ts"
+      - "src/data/mobileCatalogImages.test.ts"
+      - ".github/workflows/verified-device-artwork-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  model-exact-artwork:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verify device artwork mapping
+        run: npx vitest run src/data/mobileCatalogImages.test.ts
