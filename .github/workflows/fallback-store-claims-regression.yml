@@ -1,0 +1,26 @@
+name: Fallback Store Claims Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/services/publicFallbackData.ts"
+      - "src/services/publicFallbackData.test.ts"
+      - ".github/workflows/fallback-store-claims-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prevent-fabricated-store-claims:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verify reference store cards cannot assert merchant verification
+        run: npx vitest run src/services/publicFallbackData.test.ts
