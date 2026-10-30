@@ -1,0 +1,27 @@
+name: Marketplace Availability Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/hooks/useMarketplaceListings.ts"
+      - "src/lib/marketplaceFallbackPolicy.ts"
+      - "src/lib/marketplaceFallbackPolicy.test.ts"
+      - ".github/workflows/marketplace-availability-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  marketplace-availability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Reject fabricated marketplace offers on fallback
+        run: npx vitest run src/lib/marketplaceFallbackPolicy.test.ts
