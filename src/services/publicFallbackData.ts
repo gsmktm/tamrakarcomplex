@@ -175,9 +175,11 @@ const EXTRA_STORE_CARDS: FallbackStoreCard[] = [
   name,
   location,
   logo_url: null,
-  is_verified: true,
-  services: ["Mobile Sales", "Accessories", "Exchange", "Repair"],
-  subscription_status: "active",
+  // Reference-directory entries are not proof of merchant verification,
+  // services offered, or an active subscription.
+  is_verified: false,
+  services: null,
+  subscription_status: null,
 }));
 
 export function getFallbackStoreCards(limit = 12): FallbackStoreCard[] {
@@ -186,9 +188,11 @@ export function getFallbackStoreCards(limit = 12): FallbackStoreCard[] {
     name: store.name,
     location: store.location,
     logo_url: store.logo_url ?? null,
-    is_verified: Boolean(store.is_verified),
-    services: store.services ?? null,
-    subscription_status: store.subscription_status ?? "active",
+    // Static store seed claims must not be presented as verified/live account state.
+    // The real Supabase store query supplies those flags when available.
+    is_verified: false,
+    services: null,
+    subscription_status: null,
   }));
   return [...primary, ...EXTRA_STORE_CARDS].slice(0, limit);
 }
