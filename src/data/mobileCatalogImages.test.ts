@@ -17,6 +17,24 @@ describe("resolveMobileCatalogImage", () => {
     );
   });
 
+  it("does not substitute another model's photo for an unverified Pro variant", () => {
+    // The OnePlus 11 Pro slug has no verified matching artwork in the catalog.
+    expect(resolveMobileCatalogImage("oneplus-11-pro", "oneplus")).toBeUndefined();
+    expect(resolveMobileCatalogImage("oneplus-11", "oneplus")).toBe(
+      "https://fdn2.gsmarena.com/vv/bigpic/oneplus-11.jpg",
+    );
+  });
+
+  it("preserves a merchant-uploaded image for a model without verified artwork", () => {
+    expect(
+      resolveMobileCatalogImage(
+        "oneplus-11-pro",
+        "oneplus",
+        "https://example.com/merchant-confirmed-pro.webp",
+      ),
+    ).toBe("https://example.com/merchant-confirmed-pro.webp");
+  });
+
   it("always prefers an admin-uploaded database image", () => {
     expect(
       resolveMobileCatalogImage(
