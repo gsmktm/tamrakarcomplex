@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useCompareStore } from "@/hooks/useCompareStore";
 import { cn } from "@/lib/utils";
-import { resolveProductDetailImage } from "@/lib/productPresentation";
+import { getProductAvailability, resolveProductDetailImage } from "@/lib/productPresentation";
 
 interface ProductCardProps {
   product: Product;
@@ -50,7 +50,8 @@ export function ProductCard({ product }: ProductCardProps) {
   const navigate = useNavigate();
 
   const isComparing = items.some((item) => item.id === product.id);
-  const outOfStock = product.in_stock === false;
+  // Match product-detail checkout eligibility: missing stock or price is not a sale.
+  const outOfStock = !getProductAvailability(product).purchasable;
   const thumbnail = resolveProductDetailImage(product);
   const previousPrice = extractPreviousPrice(product);
   const specsBadges = extractSpecsBadges(product);

@@ -69,17 +69,16 @@ export function getFallbackProducts(): Product[] {
       price_value: item.retail_npr ?? null,
       image: item.image,
       images: [item.image],
-      rating: 4.5,
+      rating: null,
       reviews_count: 0,
       category: CATEGORY_BY_BRAND[item.brand] || "Smartphones",
       specs: null,
-      highlights: ["Nepal market price", "Tamrakar fallback catalog"],
-      description: `${name} Nepal market reference listing.`,
-      in_stock: true,
-      featured: item.id % 7 === 0,
+      highlights: ["Reference price only", "Merchant stock and selling offer not confirmed"],
+      description: `${name} reference catalog entry. This is not a verified merchant offer or stock confirmation.`,
+      in_stock: false,
+      featured: false,
       source_site: "local-fallback",
-      created_at: new Date(Date.now() - item.id % 30 * 86_400_000).toISOString(),
-      updated_at: new Date().toISOString(),
+      // Reference catalog entries have no verified merchant listing timestamps.
     };
   });
 }

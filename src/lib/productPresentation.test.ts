@@ -27,6 +27,10 @@ describe("product presentation", () => {
   it("only enables purchase when stock and a valid price are present", () => {
     expect(getProductAvailability({ ...product, in_stock: true }).purchasable).toBe(true);
     expect(getProductAvailability({ ...product, in_stock: true, price_value: 0 }).purchasable).toBe(false);
+    expect(getProductAvailability({ ...product, in_stock: null }).purchasable).toBe(false);
+    expect(getProductAvailability({ ...product, in_stock: undefined }).purchasable).toBe(false);
+    expect(getProductAvailability({ ...product, in_stock: true, price_value: null }).purchasable).toBe(false);
+    expect(getProductAvailability({ ...product, in_stock: true, price_value: -1 }).purchasable).toBe(false);
   });
 
   it("replaces mismatched imported artwork with verified model artwork", () => {
