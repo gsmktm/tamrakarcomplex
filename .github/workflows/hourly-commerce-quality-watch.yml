@@ -1,0 +1,127 @@
+name: Hourly Commerce Quality Watch
+
+on:
+  schedule:
+    - cron: "52 * * * *" # Every hour; GitHub cron is UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/hourly-commerce-quality-watch.yml"
+      - "scripts/audit-product-price-list.cjs"
+      - "src/data/latestMobileBuyingPrices.ts"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: tamrakar-hourly-audit
+  cancel-in-progress: false
+
+jobs:
+  read-only-quality-watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Audit static product price-list integrity
+        id: catalog
+        continue-on-error: true
+        run: |
+          node scripts/audit-product-price-list.cjs | tee product-audit.json
+          test ${PIPESTATUS[0]} -eq 0
+
+      - name: Probe public website (no credentials)
+        id: website
+        continue-on-error: true
+        shell: bash
+        run: |
+          failed=0
+          for route in / /health; do
+            status="$(curl --location --silent --show-error --max-time 20 --retry 2 --retry-delay 2 --output /dev/null --write-out '%{http_code}' "https://tamrakarcomplex.com${route}" || true)"
+            echo "GET ${route}: HTTP ${status}"
+            if [[ ! "${status}" =~ ^2[0-9][0-9]$ ]]; then failed=1; fi
+          done
+          exit "${failed}"
+
+      - name: Install dependencies
+        id: install
+        continue-on-error: true
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate static routes
+        id: routes
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check-routes
+
+      - name: Validate migration safety (static check only)
+        id: migrations
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:migrations
+
+      - name: Upload non-sensitive catalog report
+        if: always() && steps.catalog.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tamrakar-product-audit
+          path: product-audit.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Update one deduplicated GitHub incident issue
+        if: always() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        env:
+          CATALOG: ${{ steps.catalog.outcome }}
+          WEBSITE: ${{ steps.website.outcome }}
+          INSTALL: ${{ steps.install.outcome }}
+          ROUTES: ${{ steps.routes.outcome }}
+          MIGRATIONS: ${{ steps.migrations.outcome }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const title = "[Hourly watch] Tamrakar quality audit needs attention";
+            const statuses = {
+              catalog: process.env.CATALOG,
+              website: process.env.WEBSITE,
+              install: process.env.INSTALL,
+              routes: process.env.ROUTES,
+              migrations: process.env.MIGRATIONS,
+            };
+            const failed = Object.entries(statuses).filter(([, value]) => value === "failure");
+            if (!failed.length) {
+              core.info("No audit failure. Existing incident issues remain open until reviewed.");
+              return;
+            }
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              "Read-only scheduled monitoring detected a problem.",
+              "",
+              ...Object.entries(statuses).map(([name, state]) => `- ${name}: ${state}`),
+              "",
+              `Latest run: ${runUrl}`,
+              "",
+              "Important: This is not proof that all visitors see an outage. Verify via deployment logs and independent probes.",
+              "Product catalog checks read only repository data; no live prices, stock, or Supabase records were changed.",
+              "Resolve with a reviewed PR and passing CI; do not auto-merge or auto-deploy.",
+            ].join("\n");
+            const existing = (await github.paginate(github.rest.issues.listForRepo, {
+              ...context.repo, state: "open", per_page: 100,
+            })).find(item => !item.pull_request && item.title === title);
+            if (existing) {
+              await github.rest.issues.update({...context.repo, issue_number: existing.number, body});
+            } else {
+              await github.rest.issues.create({...context.repo, title, body});
+            }
+
+      - name: Mark audit failed for human review
+        if: always() && (steps.catalog.outcome == 'failure' || steps.website.outcome == 'failure' || steps.install.outcome == 'failure' || steps.routes.outcome == 'failure' || steps.migrations.outcome == 'failure')
+        run: exit 1
