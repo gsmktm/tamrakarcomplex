@@ -125,20 +125,25 @@ export function useFeaturedProducts() {
 
 export function useProduct(slug: string) {
   const fallbackProduct = getFallbackProducts().find((product) => product.slug === slug);
+  // Reference catalog data is not evidence of live merchant inventory.
+  // Fail closed even if the reference catalog has stale stock/featured flags.
+  const referenceProduct: Product | null = fallbackProduct
+    ? { ...fallbackProduct, in_stock: false, featured: false, rating: null }
+    : null;
 
-  return useQuery({
+  return useQuery<Product | null>({
     queryKey: ["product", slug],
-    staleTime: 10 * 60 * 1000, // 10 min — individual product pages
-    // Do not seed a missing fallback as `null`: React Query treats initial data
-    // as a successful, fresh result and would skip the live lookup for 10 minutes.
-    initialData: fallbackProduct,
+    staleTime: 10 * 60 * 1000, // Cache only the completed live lookup for 10 min.
+    // Unlike initialData, placeholderData does not mark the query as fresh.
+    // The live Supabase lookup starts immediately while a safe reference is shown.
+    placeholderData: referenceProduct ?? undefined,
     retry: false,
     queryFn: async () => {
       const { data, error } = await supabase.from("products").select("*").eq("slug", slug).maybeSingle();
 
-      if (error) return fallbackProduct ?? null;
+      if (error) return referenceProduct;
 
-      return (data as Product | null) ?? fallbackProduct ?? null;
+      return (data as Product | null) ?? referenceProduct;
     },
     enabled: !!slug,
   });
