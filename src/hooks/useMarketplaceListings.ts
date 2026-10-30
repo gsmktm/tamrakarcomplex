@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCrudResource } from "@/hooks/useCrudResource";
-import { getFallbackMarketplaceListings } from "@/services/publicFallbackData";
+import { assertMarketplaceSourcesAvailable, emptyMarketplaceResult } from "@/lib/marketplaceFallbackPolicy";
 import { resolveListingImage } from "@/lib/phoneImages";
 
 export type MarketplaceListingRecord = {
@@ -72,7 +72,6 @@ export function useMarketplaceListings(params: MarketplaceListingsParams = {}) {
   const query = useQuery({
     queryKey: ["marketplace-listings", params],
     staleTime: 3 * 60 * 1000, // 3 min — marketplace listings change frequently
-    placeholderData: (previous) => previous ?? getFallbackMarketplaceResult(params),
     retry: false,
     queryFn: async () => {
       let request = (supabase as any)
@@ -235,9 +234,8 @@ async function getManualUnifiedMarketplace(params: MarketplaceListingsParams) {
       .abortSignal(marketplaceRequestSignal()),
   ]);
 
-  if (storeProductsResult.error && userListingsResult.error) {
-    return getFallbackMarketplaceResult(params);
-  }
+  // Never invent merchant offers when both authoritative sources are unavailable.
+  assertMarketplaceSourcesAvailable(storeProductsResult.error, userListingsResult.error);
 
   const storeProducts = (storeProductsResult.data || []).map((item: any) => normalizeListing({
     id: item.id,
@@ -279,22 +277,13 @@ async function getManualUnifiedMarketplace(params: MarketplaceListingsParams) {
   }));
 
   let listings = [...storeProducts, ...userListings];
-  if (listings.length === 0) return getFallbackMarketplaceResult(params);
+  if (listings.length === 0) return emptyMarketplaceResult<MarketplaceListingRecord>();
 
   listings = applyUnifiedFilters(listings, params);
 
   const total = listings.length;
   const from = params.offset ?? 0;
   return { listings: listings.slice(from, from + (params.limit ?? listings.length)), total };
-}
-
-function getFallbackMarketplaceResult(params: MarketplaceListingsParams) {
-  const fallback = filterFallbackListings(params);
-  const from = params.offset ?? 0;
-  return {
-    listings: fallback.slice(from, from + (params.limit ?? fallback.length)),
-    total: fallback.length,
-  };
 }
 
 function applyUnifiedFilters(listings: MarketplaceListingRecord[], params: MarketplaceListingsParams) {
@@ -336,45 +325,5 @@ function applyUnifiedFilters(listings: MarketplaceListingRecord[], params: Marke
         if (tw !== 0) return tw;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-  }
-}
-
-function filterFallbackListings(params: MarketplaceListingsParams): MarketplaceListingRecord[] {
-  const query = params.search?.toLowerCase().trim();
-  let listings = getFallbackMarketplaceListings().map((raw) => {
-    const listing = raw as any;
-    return normalizeListing({
-      ...listing,
-      owner_user_id: listing.owner_user_id ?? listing.user_id ?? null,
-      store_id: listing.store_id ?? null,
-      verified: false,
-      featured: Boolean(listing.featured ?? listing.is_featured),
-    } as MarketplaceListingRecord);
-  });
-
-  if (params.store_id) listings = listings.filter((listing) => listing.store_id === params.store_id);
-  if (params.category && params.category !== "all") listings = listings.filter((listing) => String(listing.category ?? "").toLowerCase().includes(params.category!.toLowerCase()));
-  if (params.condition && params.condition !== "all") listings = listings.filter((listing) => listing.condition === params.condition);
-  if (params.brands?.length) listings = listings.filter((listing) => !!listing.brand && params.brands!.includes(listing.brand));
-  if (params.conditions?.length) listings = listings.filter((listing) => !!listing.condition && params.conditions!.includes(listing.condition));
-  if (params.min_price !== undefined) listings = listings.filter((listing) => Number(listing.price ?? 0) >= params.min_price!);
-  if (params.max_price !== undefined) listings = listings.filter((listing) => Number(listing.price ?? 0) <= params.max_price!);
-  if (query) {
-    listings = listings.filter((listing) =>
-      [listing.title, listing.description, listing.brand, listing.model]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(query))
-    );
-  }
-
-  switch (params.sort_by) {
-    case "price_asc":
-      return listings.sort((a, b) => Number(a.price ?? 0) - Number(b.price ?? 0));
-    case "price_desc":
-      return listings.sort((a, b) => Number(b.price ?? 0) - Number(a.price ?? 0));
-    case "oldest":
-      return listings.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    default:
-      return listings.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 }
