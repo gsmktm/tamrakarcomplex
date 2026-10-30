@@ -1,0 +1,27 @@
+name: Checkout Payment Selection Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/pages/Checkout.tsx"
+      - "src/lib/checkoutPaymentSelection.ts"
+      - "src/lib/checkoutPaymentSelection.test.ts"
+      - ".github/workflows/checkout-payment-selection-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checkout-payment-selection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verify only ready payment methods are selectable
+        run: npx vitest run src/lib/checkoutPaymentSelection.test.ts

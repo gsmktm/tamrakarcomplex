@@ -17,6 +17,7 @@ import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { getErrorMessage, parseProductPrice } from "@/lib/utils";
 import { isValidEmail, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeText } from "@/lib/security";
+import { chooseReadyPaymentMethod } from "@/lib/checkoutPaymentSelection";
 
 type CreateOrderSecureResponse = {
   success?: boolean;
@@ -52,11 +53,12 @@ export default function Checkout() {
     city: "",
   });
 
-  // Default to the first ready method (COD stays first via display_order).
+  // A provider may still exist in the registry after it becomes unready.
+  // Keep the customer's selection only while that provider can be used.
   useEffect(() => {
-    const firstReady = methods.find((m) => m.is_ready);
-    if (firstReady && !methods.some((m) => m.slug === paymentMethod)) {
-      setPaymentMethod(firstReady.slug);
+    const nextMethod = chooseReadyPaymentMethod(methods, paymentMethod);
+    if (nextMethod !== paymentMethod) {
+      setPaymentMethod(nextMethod);
     }
   }, [methods, paymentMethod]);
 
