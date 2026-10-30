@@ -173,7 +173,7 @@ export default function MarketplaceBrowse() {
     staleTime: 60_000,
   });
 
-  const { data: listingsData, loading: isListingsLoading } = useMarketplaceListings({
+  const { data: listingsData, loading: isListingsLoading, error: listingsError, refetch: refetchListings } = useMarketplaceListings({
     category: activeCategory !== "all" ? activeCategory : undefined,
     condition: activeCondition !== "all" ? activeCondition : undefined,
     min_price: priceRange[0],
@@ -654,6 +654,14 @@ export default function MarketplaceBrowse() {
                   {[...Array(6)].map((_, i) => (
                     <div key={i} className="h-[400px] rounded-2xl border bg-muted/20 animate-pulse" />
                   ))}
+                </div>
+              ) : listingsError ? (
+                <div role="alert" className="flex flex-col items-center justify-center py-16 px-4 text-center bg-card dark:bg-slate-900 rounded-2xl border border-dashed">
+                  <h3 className="text-xl font-bold mb-2">Marketplace temporarily unavailable</h3>
+                  <p className="text-muted-foreground max-w-md mb-6">
+                    We couldn't load verified live listings. Please try again shortly.
+                  </p>
+                  <Button onClick={() => void refetchListings()}>Retry loading listings</Button>
                 </div>
               ) : listings?.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
