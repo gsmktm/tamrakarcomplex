@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Product } from "@/hooks/useProducts";
 import { parseProductPrice } from "@/lib/utils";
+import { restoreCartFromStorage } from "@/lib/cartStorage";
 
 export interface CartItem {
   product: Product;
@@ -21,17 +22,16 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider = ({ children }: { children: React.ReactNode }) => {
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem("cart");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [cart, setCart] = useState<CartItem[]>(() =>
+    restoreCartFromStorage(() => localStorage.getItem("cart"))
+  );
 
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
+    try {
+      localStorage.setItem("cart", JSON.stringify(cart));
+    } catch {
+      // Private browsing or disabled storage must not crash the storefront.
+    }
   }, [cart]);
 
   const addToCart = (product: Product, quantity = 1) => {
