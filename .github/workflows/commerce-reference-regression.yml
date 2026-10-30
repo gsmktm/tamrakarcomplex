@@ -1,0 +1,28 @@
+name: Commerce Reference Catalog Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/services/publicFallbackData.ts"
+      - "src/services/publicFallbackData.test.ts"
+      - "src/components/products/ProductCard.tsx"
+      - "src/lib/productPresentation.test.ts"
+      - ".github/workflows/commerce-reference-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Reference catalog and product availability tests
+        run: npx vitest run src/services/publicFallbackData.test.ts src/lib/productPresentation.test.ts
