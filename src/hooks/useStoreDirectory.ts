@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { storeDirectoryService, type StoreDirectoryFilters, type StoreDirectoryItem } from "@/services/storeDirectoryService";
+import { getStoreDetailQueryKey, type StoreDetailIdentifier } from "./storeDetailQueryKey";
 
 // Cache TTLs (ms)
 const STORE_LIST_STALE   = 5  * 60 * 1000; // 5 min  — list changes infrequently
@@ -17,9 +18,9 @@ export function useStoreDirectory(filters?: StoreDirectoryFilters) {
   });
 }
 
-export function useStoreDetail(identifier: { type: 'id' | 'slug' | 'shop_no'; value: string; complex_zone?: string }) {
+export function useStoreDetail(identifier: StoreDetailIdentifier) {
   return useQuery({
-    queryKey: ["store-detail", identifier.type, identifier.value],
+    queryKey: getStoreDetailQueryKey(identifier),
     queryFn: () => storeDirectoryService.getStoreByIdentifier(identifier),
     enabled: !!identifier.value,
     staleTime: STORE_DETAIL_STALE,
