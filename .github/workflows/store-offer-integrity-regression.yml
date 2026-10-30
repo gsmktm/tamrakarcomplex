@@ -1,0 +1,27 @@
+name: Store Offer Integrity Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/pages/StoreDetail.tsx"
+      - "src/lib/storeOfferIntegrity.ts"
+      - "src/lib/storeOfferIntegrity.test.ts"
+      - ".github/workflows/store-offer-integrity-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fail-closed-store-offers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verify store inventory and services cannot be fabricated
+        run: npx vitest run src/lib/storeOfferIntegrity.test.ts

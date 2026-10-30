@@ -54,7 +54,7 @@ import type { SellListingRow, StorePageRow, StoreRow } from "@/types/app";
 import { sanitizeThemeForPackage } from "@/lib/storeThemeBuilder";
 import { absoluteUrl, breadcrumbSchema } from "@/lib/seo";
 import { getPublicStoreSlug } from "@/lib/storeRoutes";
-import { LATEST_MOBILE_BUYING_PRICES } from "@/data/latestMobileBuyingPrices";
+import { isDatabaseStoreId, requireAuthoritativeStoreRows } from "@/lib/storeOfferIntegrity";
 import { isValidEmail, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeOptionalText, sanitizeText } from "@/lib/security";
 
 type StoreDetailRow = StoreRow & {
@@ -77,58 +77,6 @@ type StoreDetailRow = StoreRow & {
 
 function normalizeStoreIdentifier(value: unknown) {
   return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function defaultInventoryForStore(storeId: string, storeName: string) {
-  const preferredBrand = /apple|iphone|i-fix/i.test(storeName) ? "Apple" : null;
-  const preferred = preferredBrand ? LATEST_MOBILE_BUYING_PRICES.filter((item) => item.brand === preferredBrand) : [];
-  const diverse = ["Samsung", "Apple", "Xiaomi", "Vivo", "OnePlus"]
-    .map((brand) => LATEST_MOBILE_BUYING_PRICES.find((item) => item.brand === brand))
-    .filter(Boolean);
-  return [...preferred, ...diverse]
-    .filter((item, index, all) => all.findIndex((candidate) => candidate?.brand === item?.brand && candidate?.model === item?.model) === index)
-    .slice(0, 5)
-    .map((item, index) => ({
-      id: `default-${storeId}-phone-${index}`,
-      store_id: storeId,
-      title: `${item!.brand} ${item!.model}`,
-      brand: item!.brand,
-      model: item!.model,
-      product_type: "new_phone",
-      condition: "new",
-      storage: item!.model.match(/\(([^)]*(?:GB|TB)[^)]*)\)/i)?.[1] || null,
-      price: item!.price,
-      discount_price: item!.previousPrice ? item!.price : null,
-      price_mrp: item!.previousPrice || item!.price,
-      stock_quantity: 1,
-      stock: 1,
-      images: [],
-      status: "active",
-      description: "Current Nepal buying-price reference. Confirm final price, color, warranty and stock with the store.",
-      is_default_inventory: true,
-    }));
-}
-
-function defaultAccessoriesForStore(storeId: string) {
-  return [
-    ["20W USB-C Fast Charger", "Chargers", 1999],
-    ["USB-C Fast Charging Cable", "Cables", 799],
-    ["Tempered Glass Installation", "Protection", 499],
-    ["Protective Phone Case", "Cases", 999],
-  ].map(([title, category, price], index) => ({ id: `default-${storeId}-accessory-${index}`, store_id: storeId, title, category, brand: "Universal", price, stock_quantity: 5, images: [], status: "active" }));
-}
-
-function defaultServicesForStore(storeId: string) {
-  return [
-    ["Device diagnostic assessment", "Smartphone Repair", 500, "30–60 minutes"],
-    ["Screen replacement assessment", "Smartphone Repair", null, "Same day estimate"],
-    ["Battery replacement assessment", "Smartphone Repair", null, "Same day estimate"],
-    ["Legal carrier unlock assessment", "Network Unlocking", null, "1–3 business days"],
-    ["Account and activation-lock guidance", "Unlocking Guidance", null, "By assessment"],
-  ].map(([service_name, device_type, estimated_price, estimated_time], index) => ({
-    id: `default-${storeId}-service-${index}`, store_id: storeId, service_name, device_type, estimated_price, estimated_time,
-    description: String(device_type).includes("Unlock") ? "Eligibility-based, lawful service only. Ownership and carrier requirements apply." : "Professional assessment with a confirmed quote before work begins.", status: "active",
-  }));
 }
 
 const serviceAccents = [
@@ -470,8 +418,7 @@ export default function StoreDetail() {
     queryKey: ["store_inventory", store?.id],
     queryFn: async () => {
       if (!store?.id) return [];
-      const fallback = defaultInventoryForStore(store.id, store.name);
-      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(store.id)) return fallback;
+      if (!isDatabaseStoreId(store.id)) return [];
       const { data, error } = await supabase
         .from("store_products")
         .select("*")
@@ -479,8 +426,7 @@ export default function StoreDetail() {
         .eq("status", "active")
         .gt("stock_quantity", 0)
         .order("created_at", { ascending: false });
-      if (error) return fallback;
-      return data?.length ? data : fallback;
+      return requireAuthoritativeStoreRows(data, error);
     },
     enabled: !!store?.id,
     staleTime: 3 * 60 * 1000, // 3 min
@@ -512,16 +458,14 @@ export default function StoreDetail() {
     queryKey: ["store_accessories", store?.id],
     queryFn: async () => {
       if (!store?.id) return [];
-      const fallback = defaultAccessoriesForStore(store.id);
-      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(store.id)) return fallback;
+      if (!isDatabaseStoreId(store.id)) return [];
       const { data, error } = await supabase
         .from("store_accessories")
         .select("*")
         .eq("store_id", store.id)
         .eq("status", "active")
         .order("created_at", { ascending: false });
-      if (error) return fallback;
-      return data?.length ? data : fallback;
+      return requireAuthoritativeStoreRows(data, error);
     },
     enabled: !!store?.id,
     staleTime: 10 * 60 * 1000, // 10 min — accessories catalogue is stable
@@ -531,16 +475,14 @@ export default function StoreDetail() {
     queryKey: ["store_repair_services", store?.id],
     queryFn: async () => {
       if (!store?.id) return [];
-      const fallback = defaultServicesForStore(store.id);
-      if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(store.id)) return fallback;
+      if (!isDatabaseStoreId(store.id)) return [];
       const { data, error } = await supabase
         .from("store_repair_services")
         .select("*")
         .eq("store_id", store.id)
         .eq("status", "active")
         .order("created_at", { ascending: false });
-      if (error) return fallback;
-      return data?.length ? data : fallback;
+      return requireAuthoritativeStoreRows(data, error);
     },
     enabled: !!store?.id,
     staleTime: 10 * 60 * 1000, // 10 min — repair catalogue is stable
