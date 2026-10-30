@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "src/hooks/useMarketplaceListings.ts"
+      - "src/pages/marketplace/MarketplaceBrowse.tsx"
       - "src/lib/marketplaceFallbackPolicy.ts"
       - "src/lib/marketplaceFallbackPolicy.test.ts"
       - ".github/workflows/marketplace-availability-regression.yml"
