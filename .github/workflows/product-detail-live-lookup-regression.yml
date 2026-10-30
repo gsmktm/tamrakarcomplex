@@ -1,0 +1,26 @@
+name: Product Detail Live Lookup Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/hooks/useProducts.ts"
+      - "src/hooks/useProducts.liveLookup.test.tsx"
+      - ".github/workflows/product-detail-live-lookup-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  product-detail-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Live detail lookup and safe reference fallback
+        run: npx vitest run src/hooks/useProducts.liveLookup.test.tsx
