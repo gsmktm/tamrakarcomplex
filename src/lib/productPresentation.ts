@@ -32,7 +32,12 @@ export function resolveProductDetailImage(product: Product) {
 
   const verified = resolveMobileCatalogImage(name, brand);
   if (verified) return verified;
-  return isTrustedProductImage(product, product.image) ? product.image : "/default-product.svg";
+
+  // A GSMArena image matching only the BRAND is not proof that it shows
+  // the correct MODEL. Imported records can carry another model's artwork.
+  // Unknown catalog images must not bypass the exact-model verified map.
+  // First-party/merchant-uploaded images are already handled above.
+  return "/default-product.svg";
 }
 
 export function getProductAvailability(product: Pick<Product, "in_stock" | "price_value" | "price">) {
