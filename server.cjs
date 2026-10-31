@@ -481,6 +481,12 @@ app.use(
 
 // 5. SPA fallback — all unmatched routes → index.html
 app.get("*", (req, res) => {
+  // Missing Vite assets are not SPA routes. Returning index.html with HTTP 200
+  // would hide broken deploys and cause browser MIME-type failures.
+  if (req.path.startsWith("/assets/")) {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(404).type("text/plain").send("Asset not found.");
+  }
   res.sendFile(INDEX);
 });
 
