@@ -17,7 +17,7 @@ function resolveBuildEnvironment(buildEnv = {}, fileEnv = {}) {
     const value = source[key];
     return typeof value !== "string" ||
       !value.trim() ||
-      /your-|replace|example|<|>/i.test(value);
+      /your[-_]|replace|example|<|>/i.test(value);
   });
   return { source: hasBuildEnv ? "environment" : "file", missing };
 }
