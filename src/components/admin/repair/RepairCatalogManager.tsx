@@ -398,7 +398,7 @@ function GuideEditorDialog({
     queryKey: ["admin-repair-guide-full", guideId],
     enabled: open && !!guideId,
     queryFn: async () => {
-      const { data, error } = await sb
+      const { data, error } = await supabase
         .from("repair_guides")
         .select(
           `
@@ -1058,7 +1058,7 @@ export function RepairCatalogManager() {
     queryKey: ["admin-repair-devices"],
     enabled: !schemaMissing,
     queryFn: async () => {
-      const { data, error } = await sb
+      const { data, error } = await supabase
         .from("repair_devices")
         .select("*, repair_categories(id,name,slug)")
         .order("name");
@@ -1071,7 +1071,7 @@ export function RepairCatalogManager() {
     queryKey: ["admin-repair-guides"],
     enabled: !schemaMissing,
     queryFn: async () => {
-      const { data, error } = await sb
+      const { data, error } = await supabase
         .from("repair_guides")
         .select("*, repair_devices(id,name,brand,slug)")
         .order("created_at", { ascending: false });
