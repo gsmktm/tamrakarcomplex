@@ -6,6 +6,7 @@
 //  · Static assets → cache-first with background refresh. Vite emits
 //                    content-hashed filenames, so cached copies are immutable
 //                    and safe to serve instantly.
+//  · Mutable PWA manifest → network-first, fall back to last cached copy offline.
 //  · Cross-origin  → never intercepted (Supabase buckets, CDNs, fonts).
 //  · Only `GET` requests pass through; admin sessions and POST flows are
 //    never cached.
@@ -17,7 +18,6 @@ const CACHEABLE_DESTINATIONS = new Set([
   "style",
   "image",
   "font",
-  "manifest",
   "worker",
 ]);
 
@@ -62,6 +62,23 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => caches.match(SHELL_URL)),
+    );
+    return;
+  }
+
+  // The manifest has a stable URL. Never return an older cached copy while
+  // online: the HTTP revalidation policy alone cannot override SW cache-first.
+  if (request.destination === "manifest") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request)),
     );
     return;
   }
