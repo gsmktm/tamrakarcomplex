@@ -1,0 +1,24 @@
+name: Sitemap XML Escaping Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "server.cjs"
+      - "tests/sitemap-xml.test.cjs"
+      - ".github/workflows/sitemap-xml-regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sitemap-xml:
+    name: Sitemap XML escaping (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run isolated regression tests
+        run: node --test tests/sitemap-xml.test.cjs
