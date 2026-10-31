@@ -1,0 +1,24 @@
+name: Repair Catalog Client Binding Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/components/admin/repair/RepairCatalogManager.tsx"
+      - "tests/repair-catalog-client-binding.test.cjs"
+      - ".github/workflows/repair-catalog-regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  repair-catalog-client:
+    name: Repair catalog query binding (no database access)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run isolated regression tests
+        run: node --test tests/repair-catalog-client-binding.test.cjs
