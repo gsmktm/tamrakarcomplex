@@ -235,9 +235,10 @@ async function supabaseRpc(functionName) {
   return rows;
 }
 
-function urlEntry(loc, changefreq, priority, lastmod) {
-  const lastmodTag = lastmod ? `<lastmod>${lastmod.slice(0, 10)}</lastmod>` : "";
-  return `  <url><loc>${BASE_URL}${loc}</loc>${lastmodTag}<changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`;
+function urlEntry(loc, changefreq, priority, lastmod, absolute = false) {
+  const lastmodTag = lastmod ? `<lastmod>${escapeXml(String(lastmod).slice(0, 10))}</lastmod>` : "";
+  const url = absolute ? loc : `${BASE_URL}${loc}`;
+  return `  <url><loc>${escapeXml(url)}</loc>${lastmodTag}<changefreq>${escapeXml(changefreq)}</changefreq><priority>${escapeXml(priority)}</priority></url>`;
 }
 
 let sitemapCache = null;
@@ -260,10 +261,9 @@ app.get("/sitemap.xml", async (req, res) => {
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
         ...rpcRows.map((row) => {
           const loc = String(row.loc || "").startsWith("http") ? row.loc : `${BASE_URL}${row.loc || "/"}`;
-          const lastmodTag = row.lastmod ? `<lastmod>${String(row.lastmod).slice(0, 10)}</lastmod>` : "";
           const changefreq = row.changefreq || "weekly";
           const priority = Number(row.priority || 0.5).toFixed(1);
-          return `  <url><loc>${loc}</loc>${lastmodTag}<changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`;
+          return urlEntry(loc, changefreq, priority, row.lastmod, true);
         }),
         "</urlset>",
       ];
