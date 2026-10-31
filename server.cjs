@@ -470,10 +470,14 @@ app.use(
     etag: true,
     immutable: true,
     setHeaders(res, filePath) {
-      if (path.basename(filePath) === "index.html") {
+      const filename = path.basename(filePath);
+      if (filename === "index.html") {
         res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         res.setHeader("Pragma", "no-cache");
         res.setHeader("Expires", "0");
+      } else if (filename === "robots.txt" || filename === "manifest.webmanifest") {
+        // Mutable crawl/PWA metadata must revalidate after each release.
+        res.setHeader("Cache-Control", "no-cache, must-revalidate");
       }
     },
   })

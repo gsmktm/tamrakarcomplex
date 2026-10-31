@@ -1,0 +1,24 @@
+name: Mutable Static Metadata Cache Regression
+
+on:
+  pull_request:
+    paths:
+      - "server.cjs"
+      - "tests/mutable-static-metadata-cache.test.cjs"
+      - ".github/workflows/mutable-static-metadata-cache.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify static metadata caching offline
+        run: node --test tests/mutable-static-metadata-cache.test.cjs
