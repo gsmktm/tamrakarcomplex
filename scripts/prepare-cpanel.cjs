@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
+const { resolveBuildEnvironment } = require("./deploy-env.cjs");
 
 const root = path.resolve(__dirname, "..");
 const dist = path.join(root, "dist");
@@ -32,11 +33,12 @@ function parseEnv(file) {
 }
 
 const productionEnv = parseEnv(path.join(root, ".env.production"));
-for (const key of ["VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"]) {
-  const value = productionEnv[key];
-  if (!value || /your-|replace|example|<|>/i.test(value)) {
-    fail(`${key} is missing or still a placeholder in .env.production`);
-  }
+const buildEnvValidation = resolveBuildEnvironment(process.env, productionEnv);
+for (const key of buildEnvValidation.missing) {
+  const source = buildEnvValidation.source === "environment"
+    ? "build environment"
+    : ".env.production";
+  fail(`${key} is missing or still a placeholder in ${source}`);
 }
 
 if (!fs.existsSync(path.join(dist, "index.html"))) {
