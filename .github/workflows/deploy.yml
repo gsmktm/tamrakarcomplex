@@ -38,6 +38,10 @@ jobs:
 
       - name: Prepare cPanel bundle
         run: node scripts/prepare-cpanel.cjs
+        env:
+          # Public Vite build config; never print values or commit an env file.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
       - name: Deploy to cPanel via SFTP
         uses: appleboy/scp-action@v0.1.7

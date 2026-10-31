@@ -1,0 +1,30 @@
+name: cPanel Bundle Preflight Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy.yml"
+      - ".github/workflows/deploy-preflight.yml"
+      - "scripts/prepare-cpanel.cjs"
+      - "scripts/deploy-env.cjs"
+      - "tests/deploy-env.test.cjs"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-preflight:
+    name: Public build environment regression (no deploy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test deployment configuration validation
+        run: node --test tests/deploy-env.test.cjs
