@@ -91,6 +91,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL |
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_4-Yq_PD4j8sVEsn1ZM1-Mw_ZDPUAd5v";
 const BASE_URL = (process.env.SITE_URL || "https://tamrakarcomplex.com").replace(/\/$/, "");
 const SUPABASE_REQUEST_TIMEOUT_MS = 5000;
+// Keep customer submissions below the 15s HTTP response timeout.
+const SUPABASE_SUBMISSION_TIMEOUT_MS = 10000;
 
 // 4. Security headers (applied to ALL responses)
 app.use((req, res, next) => {
@@ -379,6 +381,7 @@ app.post("/api/contact", createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 })
       `${SUPABASE_URL}/rest/v1/contact_messages`,
       {
         method: "POST",
+        signal: AbortSignal.timeout(SUPABASE_SUBMISSION_TIMEOUT_MS),
         headers: {
           apikey: SUPABASE_KEY,
           Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -392,8 +395,11 @@ app.post("/api/contact", createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 })
       return apiError(res, 502, "CONTACT_SUBMISSION_FAILED", "Failed to submit contact form.");
     }
     res.status(201).json({ data: { success: true }, error: null });
-  } catch {
-    apiError(res, 500, "INTERNAL_ERROR", "Internal server error.");
+  } catch (error) {
+    if (error?.name === "AbortError" || error?.name === "TimeoutError") {
+      return apiError(res, 503, "UPSTREAM_TIMEOUT", "Submission service timed out.");
+    }
+    return apiError(res, 502, "UPSTREAM_UNAVAILABLE", "Submission service unavailable.");
   }
 });
 
@@ -417,6 +423,7 @@ app.post("/api/repair-requests", createRateLimiter({ windowMs: 60 * 60 * 1000, m
       `${SUPABASE_URL}/rest/v1/repair_requests`,
       {
         method: "POST",
+        signal: AbortSignal.timeout(SUPABASE_SUBMISSION_TIMEOUT_MS),
         headers: {
           apikey: SUPABASE_KEY,
           Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -440,8 +447,11 @@ app.post("/api/repair-requests", createRateLimiter({ windowMs: 60 * 60 * 1000, m
       return apiError(res, 502, "REPAIR_SUBMISSION_FAILED", "Failed to submit repair request.");
     }
     res.status(201).json({ data: { success: true }, error: null });
-  } catch {
-    apiError(res, 500, "INTERNAL_ERROR", "Internal server error.");
+  } catch (error) {
+    if (error?.name === "AbortError" || error?.name === "TimeoutError") {
+      return apiError(res, 503, "UPSTREAM_TIMEOUT", "Submission service timed out.");
+    }
+    return apiError(res, 502, "UPSTREAM_UNAVAILABLE", "Submission service unavailable.");
   }
 });
 
