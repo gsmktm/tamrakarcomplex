@@ -187,10 +187,10 @@ async function supabaseFetch(table, select, filters, { strict = false } = {}) {
   });
 }
 
-async function supabaseRpcPage(functionName, from = 0, to = 999) {
+async function supabaseRpcPage(functionName, from = 0, to = 999, { strict = false } = {}) {
   const https = require("https");
   const url = `${SUPABASE_URL}/rest/v1/rpc/${functionName}`;
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const req = https.request(url, {
       method: "POST",
       headers: {
@@ -208,27 +208,33 @@ async function supabaseRpcPage(functionName, from = 0, to = 999) {
       let raw = "";
       res.on("data", (chunk) => { raw += chunk; });
       res.on("end", () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          return strict ? reject(new Error("Supabase RPC upstream HTTP failure")) : resolve([]);
+        }
         try {
           const parsed = JSON.parse(raw);
+          if (strict && !Array.isArray(parsed)) {
+            return reject(new Error("Supabase RPC returned non-array JSON"));
+          }
           resolve(Array.isArray(parsed) ? parsed : []);
         } catch {
-          resolve([]);
+          strict ? reject(new Error("Supabase RPC returned invalid JSON")) : resolve([]);
         }
       });
     });
     req.setTimeout(SUPABASE_REQUEST_TIMEOUT_MS, () => req.destroy(new Error("Supabase RPC timed out")));
-    req.on("error", () => resolve([]));
+    req.on("error", () => strict ? reject(new Error("Supabase RPC request failed")) : resolve([]));
     req.write("{}");
     req.end();
   });
 }
 
-async function supabaseRpc(functionName) {
+async function supabaseRpc(functionName, { strict = false } = {}) {
   const pageSize = 1000;
   const rows = [];
   const seen = new Set();
   for (let offset = 0; offset < 10000; offset += pageSize) {
-    const page = await supabaseRpcPage(functionName, offset, offset + pageSize - 1);
+    const page = await supabaseRpcPage(functionName, offset, offset + pageSize - 1, { strict });
     if (!page.length) break;
     const before = rows.length;
     for (const row of page) {
@@ -261,7 +267,13 @@ app.get("/sitemap.xml", async (req, res) => {
   }
 
   try {
-    const rpcRows = await supabaseRpc("generate_seo_sitemap");
+    // An RPC error is recoverable only if every fallback table read succeeds.
+    let rpcRows;
+    try {
+      rpcRows = await supabaseRpc("generate_seo_sitemap", { strict: true });
+    } catch {
+      rpcRows = [];
+    }
     if (rpcRows.length > 0) {
       const lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -283,11 +295,11 @@ app.get("/sitemap.xml", async (req, res) => {
     }
 
     const [products, devices, articles, guides, stores] = await Promise.all([
-      supabaseFetch("products", "slug,updated_at", "in_stock=eq.true&order=updated_at.desc&limit=2000"),
-      supabaseFetch("device_catalog", "canonical_slug,brand,updated_at", "order=updated_at.desc&limit=2000"),
-      supabaseFetch("articles", "slug,updated_at", "published=eq.true&order=updated_at.desc&limit=500"),
-      supabaseFetch("guides", "slug,updated_at", "is_published=eq.true&order=updated_at.desc&limit=500"),
-      supabaseFetch("stores", "slug,updated_at", "is_active=eq.true&order=updated_at.desc&limit=500"),
+      supabaseFetch("products", "slug,updated_at", "in_stock=eq.true&order=updated_at.desc&limit=2000", { strict: true }),
+      supabaseFetch("device_catalog", "canonical_slug,brand,updated_at", "order=updated_at.desc&limit=2000", { strict: true }),
+      supabaseFetch("articles", "slug,updated_at", "published=eq.true&order=updated_at.desc&limit=500", { strict: true }),
+      supabaseFetch("guides", "slug,updated_at", "is_published=eq.true&order=updated_at.desc&limit=500", { strict: true }),
+      supabaseFetch("stores", "slug,updated_at", "is_active=eq.true&order=updated_at.desc&limit=500", { strict: true }),
     ]);
 
     const lines = [
@@ -334,9 +346,11 @@ app.get("/sitemap.xml", async (req, res) => {
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(xml);
   } catch (err) {
-    console.error("[sitemap] error:", err.message);
-    // Fallback to static sitemap
-    res.sendFile(path.join(DIST, "sitemap.xml"));
+    console.error("[sitemap] upstream unavailable:", err.message);
+    // Never cache a partial/static-only sitemap as a successful catalog snapshot.
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Retry-After", "60");
+    return res.status(503).send("Sitemap temporarily unavailable");
   }
 });
 
