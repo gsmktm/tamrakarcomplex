@@ -1,0 +1,24 @@
+name: Submission Upstream Timeout Regression
+
+on:
+  pull_request:
+    paths:
+      - "server.cjs"
+      - "tests/submission-upstream-timeout.test.cjs"
+      - ".github/workflows/submission-upstream-timeout.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submission-timeout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify contact and repair upstream timeout handling
+        run: node --test tests/submission-upstream-timeout.test.cjs
