@@ -37,8 +37,17 @@ const repairRequestSchema = z.object({
 
 function createRateLimiter({ windowMs, max }) {
   const buckets = new Map();
+  // Expired IP buckets must not accumulate for the lifetime of the server.
+  // Sweep at most once per window to avoid scanning the map on every request.
+  let nextSweepAt = Date.now() + windowMs;
   return (req, res, next) => {
     const now = Date.now();
+    if (now >= nextSweepAt) {
+      for (const [address, bucket] of buckets) {
+        if (bucket.resetAt <= now) buckets.delete(address);
+      }
+      nextSweepAt = now + windowMs;
+    }
     const key = req.ip || req.socket.remoteAddress || "unknown";
     const current = buckets.get(key);
     if (!current || current.resetAt <= now) {
