@@ -1,0 +1,24 @@
+name: Merchant Feed Upstream Failure Regression
+
+on:
+  pull_request:
+    paths:
+      - server.cjs
+      - scripts/tests/merchant-feed-upstream.test.cjs
+      - .github/workflows/merchant-feed-regression.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  merchant-feed-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify merchant feed failure isolation
+        run: node --test scripts/tests/merchant-feed-upstream.test.cjs

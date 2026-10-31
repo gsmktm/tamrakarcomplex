@@ -154,11 +154,11 @@ function escapeXml(value) {
     .replace(/'/g, "&apos;");
 }
 
-async function supabaseFetch(table, select, filters) {
+async function supabaseFetch(table, select, filters, { strict = false } = {}) {
   const https = require("https");
   let url = `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}`;
   if (filters) url += `&${filters}`;
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const req = https.get(url, {
       headers: {
         apikey: SUPABASE_KEY,
@@ -170,12 +170,20 @@ async function supabaseFetch(table, select, filters) {
       let raw = "";
       res.on("data", (chunk) => { raw += chunk; });
       res.on("end", () => {
-        if (res.statusCode < 200 || res.statusCode >= 300) return resolve([]);
-        try { resolve(JSON.parse(raw)); } catch { resolve([]); }
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          return strict ? reject(new Error("Supabase upstream HTTP failure")) : resolve([]);
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          if (strict && !Array.isArray(parsed)) return reject(new Error("Supabase upstream returned non-array JSON"));
+          resolve(parsed);
+        } catch {
+          strict ? reject(new Error("Supabase upstream returned invalid JSON")) : resolve([]);
+        }
       });
     });
     req.setTimeout(SUPABASE_REQUEST_TIMEOUT_MS, () => req.destroy(new Error("Supabase request timed out")));
-    req.on("error", () => resolve([]));
+    req.on("error", () => strict ? reject(new Error("Supabase upstream request failed")) : resolve([]));
   });
 }
 
@@ -333,11 +341,19 @@ app.get("/sitemap.xml", async (req, res) => {
 });
 
 app.get("/merchant-center.xml", async (req, res) => {
-  const products = await supabaseFetch(
-    "products",
-    "id,slug,name,description,brand,image,price_value,in_stock",
-    "in_stock=eq.true&price_value=gt.0&image=not.is.null&slug=not.is.null&order=updated_at.desc&limit=5000",
-  );
+  let products;
+  try {
+    products = await supabaseFetch(
+      "products",
+      "id,slug,name,description,brand,image,price_value,in_stock",
+      "in_stock=eq.true&price_value=gt.0&image=not.is.null&slug=not.is.null&order=updated_at.desc&limit=5000",
+      { strict: true },
+    );
+  } catch {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Retry-After", "60");
+    return res.status(503).send("Merchant feed temporarily unavailable");
+  }
   const items = (Array.isArray(products) ? products : [])
     .filter((p) => p.id && p.slug && p.name && p.image && Number(p.price_value) > 0)
     .map((p) => `    <item>
