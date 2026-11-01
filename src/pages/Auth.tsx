@@ -11,29 +11,7 @@ import { SEO } from "@/components/common/SEO";
 import { getErrorMessage } from "@/lib/utils";
 import { normalizeEmail, normalizePhone, sanitizeText } from "@/lib/security";
 import { getDashboardPathForRole, getPostLoginRedirectPath, getSafeLocalRedirectPath } from "@/lib/authRedirects";
-
-const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const AUTH_RATE_LIMIT_MAX_ATTEMPTS = 8;
-
-function checkAuthRateLimit(identifier: string) {
-  if (typeof window === "undefined") return true;
-
-  const key = `tc_auth_attempts:${identifier}`;
-  const now = Date.now();
-  const raw = window.localStorage.getItem(key);
-  let current: { count: number; startedAt: number } | null = null;
-  try {
-    current = raw ? JSON.parse(raw) as { count: number; startedAt: number } : null;
-  } catch {
-    current = null;
-  }
-  const next = !current || now - current.startedAt > AUTH_RATE_LIMIT_WINDOW_MS
-    ? { count: 1, startedAt: now }
-    : { count: current.count + 1, startedAt: current.startedAt };
-
-  window.localStorage.setItem(key, JSON.stringify(next));
-  return next.count <= AUTH_RATE_LIMIT_MAX_ATTEMPTS;
-}
+import { checkAuthRateLimit, readOAuthRedirect, saveOAuthRedirect, clearOAuthRedirect } from "@/lib/authClientStorage";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -81,8 +59,8 @@ export default function Auth() {
   useEffect(() => {
     // Wait for BOTH user and role to be present before auto-redirecting from Auth page
     if (user && !authLoading && role && !isRecoveryMode) {
-      const storedRedirect = getSafeLocalRedirectPath(window.localStorage.getItem("tc_oauth_redirect"));
-      if (storedRedirect) window.localStorage.removeItem("tc_oauth_redirect");
+      const storedRedirect = getSafeLocalRedirectPath(readOAuthRedirect());
+      if (storedRedirect) clearOAuthRedirect();
       console.info("Auth: Redirecting user based on role.", { email: user.email, role, from: storedRedirect ?? from });
       const targetPath = getPostLoginRedirectPath(role, storedRedirect ?? from);
       console.info("Auth: Target path resolved to:", targetPath);
@@ -291,11 +269,11 @@ export default function Auth() {
                 onClick={async () => {
                   try {
                     setLoading(true);
-                    window.localStorage.setItem("tc_oauth_redirect", from);
+                    saveOAuthRedirect(from);
                     const redirectTo = `${window.location.origin}/auth`;
                     await signInWithProvider("google", redirectTo);
                   } catch (error: unknown) {
-                    window.localStorage.removeItem("tc_oauth_redirect");
+                    clearOAuthRedirect();
                     toast({
                       title: "Google Login Failed",
                       description: getErrorMessage(error, "An error occurred while connecting to Google."),
