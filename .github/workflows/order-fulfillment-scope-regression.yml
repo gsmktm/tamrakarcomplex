@@ -1,0 +1,28 @@
+name: Order Fulfillment Scope Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/pages/admin/OrderManager.tsx"
+      - "src/lib/orderFulfillmentScope.ts"
+      - "src/test/orderFulfillmentScope.test.ts"
+      - ".github/workflows/order-fulfillment-scope-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fulfillment-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify single-target fulfillment guard
+        run: npx vitest run src/test/orderFulfillmentScope.test.ts
