@@ -1,0 +1,26 @@
+name: Store Credit History Read Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/components/admin/console/StoreCreditsModule.tsx"
+      - "tests/store-credit-history-client-binding.test.cjs"
+      - ".github/workflows/store-credit-history-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  credit-history-read:
+    name: Read-only store credit history binding
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run isolated source-level regression tests (no Supabase access)
+        run: node --test tests/store-credit-history-client-binding.test.cjs
