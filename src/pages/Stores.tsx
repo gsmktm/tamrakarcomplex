@@ -685,7 +685,7 @@ export default function Stores() {
   const [floorFilter, setFloorFilter] = useState("all");
   const [blockFilter, setBlockFilter] = useState("all");
 
-  const { data: storesResponse, isLoading } = useStoreDirectory({ search: search.trim() || undefined, package_slug: tierFilter !== 'all' ? tierFilter : undefined, limit: 100 });
+  const { data: storesResponse, isLoading, isError, refetch } = useStoreDirectory({ search: search.trim() || undefined, package_slug: tierFilter !== 'all' ? tierFilter : undefined, limit: 100 });
   const stores = useMemo(() => storesResponse?.data ?? [], [storesResponse?.data]);
   const { user, role } = useAuth();
   const isAdmin = isAdminRole(role);
@@ -904,6 +904,12 @@ export default function Stores() {
         <div className="container py-10 space-y-14">
           {isLoading ? (
             <LoadingSkeleton />
+          ) : isError ? (
+            <div role="alert" className="text-center py-24 border rounded-2xl bg-card/50 border-dashed">
+              <h3 className="text-lg font-semibold mb-2">Store directory temporarily unavailable</h3>
+              <p className="text-muted-foreground text-sm mb-4">We could not verify the current store listings. Please try again.</p>
+              <Button onClick={() => { void refetch(); }}>Retry loading stores</Button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-24 border rounded-2xl bg-card/50 border-dashed">
               <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
