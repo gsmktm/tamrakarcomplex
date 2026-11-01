@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useStoreMembership } from "@/hooks/useStoreMembership";
 import { getSingleAuthorizedFulfillment } from "@/lib/orderFulfillmentScope";
+import { requireOrderQueryData } from "@/lib/orderQueryResult";
 import { getErrorMessage } from "@/lib/utils";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { PAGINATION } from "@/lib/supabaseColumnMaps";
@@ -98,12 +99,15 @@ export default function OrderManager() {
           }
 
           // Filter orders where any order_item.store_id is in myStoreIds
-          const { data: relevantOrderIds, error: orderError } = await supabase
-            .from("order_items")
-            .select("order_id")
-            .in("store_id", myStoreIds);
+          const relevantOrderIds = requireOrderQueryData(
+            await supabase
+              .from("order_items")
+              .select("order_id")
+              .in("store_id", myStoreIds),
+            "Store order lookup",
+          );
 
-          if (orderError || !relevantOrderIds?.length) {
+          if (relevantOrderIds.length === 0) {
             return [];
           }
 
@@ -121,12 +125,11 @@ export default function OrderManager() {
           query = query.ilike("id", `%${filters.search}%`);
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
+        const data = requireOrderQueryData(await query, "Order list");
         return data as Order[];
       } catch (err) {
-        handleSupabaseError(err, "OrderManager: Failed to fetch orders list");
-        return [];
+        handleSupabaseError(err, "OrderManager: Failed to fetch orders list", false);
+        throw err;
       }
     },
     retry: 1,
