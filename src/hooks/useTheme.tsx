@@ -16,8 +16,14 @@ const isTheme = (value: unknown): value is Theme => value === "light" || value =
 function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "light";
 
-  const stored = window.localStorage.getItem("theme");
-  if (isTheme(stored)) return stored;
+  // Browser privacy settings can make storage inaccessible (SecurityError).
+  // Theme selection must never prevent the storefront from mounting.
+  try {
+    const stored = window.localStorage.getItem("theme");
+    if (isTheme(stored)) return stored;
+  } catch {
+    // Fall back to the system preference without persistent storage.
+  }
 
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
@@ -30,7 +36,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.classList.remove("light", "dark");
     root.classList.add(theme);
     root.style.colorScheme = theme;
-    window.localStorage.setItem("theme", theme);
+    try {
+      window.localStorage.setItem("theme", theme);
+    } catch {
+      // Keep in-memory theme toggling functional when storage is blocked.
+    }
   }, [theme]);
 
   useEffect(() => {
