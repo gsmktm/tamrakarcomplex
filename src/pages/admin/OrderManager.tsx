@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useStoreMembership } from "@/hooks/useStoreMembership";
+import { getSingleAuthorizedFulfillment } from "@/lib/orderFulfillmentScope";
 import { getErrorMessage } from "@/lib/utils";
 import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { PAGINATION } from "@/lib/supabaseColumnMaps";
@@ -137,12 +138,30 @@ export default function OrderManager() {
       order_status?: string;
       payment_status?: string;
     }) => {
-      if (isStoreAdmin && !isPlatformAdmin && order_status) {
-        const { error: fulfillmentError } = await (supabase as any)
+      if (isStoreAdmin && !isPlatformAdmin) {
+        if (!order_status || payment_status) {
+          throw new Error("Store admins may update fulfillment status only.");
+        }
+
+        // An order can contain multiple stores. Never update by order_id alone.
+        // Until a per-store selector exists, refuse ambiguous updates.
+        const order = orders?.find((candidate) => candidate.id === id);
+        const fulfillment = getSingleAuthorizedFulfillment(order?.store_order_fulfillments, myStoreIds);
+        if (!fulfillment) {
+          throw new Error("Select a single authorized store fulfillment before updating.");
+        }
+
+        const { data, error: fulfillmentError } = await (supabase as any)
           .from("store_order_fulfillments")
           .update({ status: order_status, updated_at: new Date().toISOString() })
-          .eq("order_id", id);
+          .eq("id", fulfillment.id)
+          .eq("order_id", id)
+          .eq("store_id", fulfillment.store_id)
+          .select("id");
         if (fulfillmentError) throw fulfillmentError;
+        if (data?.length !== 1) {
+          throw new Error("No authorized fulfillment was updated.");
+        }
         return;
       }
 
@@ -193,8 +212,11 @@ export default function OrderManager() {
     }
   };
 
-  const getEffectiveOrderStatus = (order: Order) =>
-    isStoreAdmin ? order.store_order_fulfillments?.[0]?.status || order.order_status : order.order_status;
+  const getEffectiveOrderStatus = (order: Order) => {
+    if (!isStoreAdmin || isPlatformAdmin) return order.order_status;
+    return getSingleAuthorizedFulfillment(order.store_order_fulfillments, myStoreIds)?.status
+      ?? "store_scope_required";
+  };
 
   if (isLoading) {
     return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -339,7 +361,9 @@ export default function OrderManager() {
                   </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(getEffectiveOrderStatus(order))}>
-                      {getEffectiveOrderStatus(order)}
+                      {getEffectiveOrderStatus(order) === "store_scope_required"
+                        ? "Store selection required"
+                        : getEffectiveOrderStatus(order)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -501,7 +525,12 @@ export default function OrderManager() {
                   <p>Payment: {selectedOrder.payment_method} - {selectedOrder.payment_status}</p>
                 </div>
                 <div className="flex gap-2">
-                  {selectedOrder.order_status === 'pending' && (
+                  {isStoreAdmin && !isPlatformAdmin && getEffectiveOrderStatus(selectedOrder) === "store_scope_required" && (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      Multiple or unavailable store fulfillments: status updates are disabled until a store is selected.
+                    </p>
+                  )}
+                  {getEffectiveOrderStatus(selectedOrder) === 'pending' && (
                     <Button
                       onClick={() => updateOrderStatusMutation.mutate({
                         id: selectedOrder.id,
@@ -511,7 +540,7 @@ export default function OrderManager() {
                       Confirm Order
                     </Button>
                   )}
-                  {selectedOrder.order_status === 'confirmed' && selectedOrder.payment_status === 'paid' && (
+                  {getEffectiveOrderStatus(selectedOrder) === 'confirmed' && selectedOrder.payment_status === 'paid' && (
                     <Button
                       onClick={() => updateOrderStatusMutation.mutate({
                         id: selectedOrder.id,
