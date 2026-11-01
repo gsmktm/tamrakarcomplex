@@ -1,0 +1,28 @@
+name: Order Query Error-State Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/pages/admin/OrderManager.tsx"
+      - "src/lib/orderQueryResult.ts"
+      - "src/test/orderQueryResult.test.ts"
+      - ".github/workflows/order-query-error-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  order-query-errors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify query error propagation and genuine empty results
+        run: npx vitest run src/test/orderQueryResult.test.ts
