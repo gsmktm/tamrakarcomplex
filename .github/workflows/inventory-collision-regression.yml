@@ -1,0 +1,21 @@
+name: Inventory Collision Regression
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "src/services/inventoryService.ts"
+      - "src/services/inventoryService.test.ts"
+      - ".github/workflows/inventory-collision-regression.yml"
+
+jobs:
+  inventory-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run src/services/inventoryService.test.ts
