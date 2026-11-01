@@ -1,0 +1,28 @@
+name: CMS Default Draft Safety Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/pages/admin/ContentManager.tsx"
+      - "src/lib/defaultCmsDraft.ts"
+      - "src/test/defaultCmsDraft.test.ts"
+      - ".github/workflows/cms-default-draft-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cms-default-drafts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify CMS draft claims and publication guard
+        run: npx vitest run src/test/defaultCmsDraft.test.ts
