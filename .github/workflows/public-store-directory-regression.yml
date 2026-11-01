@@ -1,0 +1,28 @@
+name: Public Store Directory Visibility Regression
+
+on:
+  pull_request:
+    paths:
+      - "src/services/storeDirectoryService.ts"
+      - "src/pages/Stores.tsx"
+      - "src/test/publicStoreDirectoryFailClosed.test.ts"
+      - ".github/workflows/public-store-directory-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  directory-visibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify public directory fail-closed behavior
+        run: npx vitest run src/test/publicStoreDirectoryFailClosed.test.ts
