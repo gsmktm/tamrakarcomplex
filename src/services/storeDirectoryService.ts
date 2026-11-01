@@ -295,30 +295,13 @@ export const storeDirectoryService = {
     }
 
     const { data, error, count } = await withStoreQueryTimeout(query);
-    if (error) {
-      let legacyQuery = supabase
-        .from("stores")
-        .select("*")
-        .order("is_verified", { ascending: false })
-        .order("name", { ascending: true });
+    // A failed public read is not an empty directory. Never retry without
+    // visibility predicates or inject locally seeded merchant claims.
+    if (error) throw error;
 
-      if (filters?.search) {
-        legacyQuery = legacyQuery.ilike("name", `%${filters.search}%`);
-      }
-
-      const legacy = await withStoreQueryTimeout(legacyQuery);
-      if (!legacy.error && legacy.data && legacy.data.length > 0) {
-        const normalizedLegacyStores = mergeRepairPartnerStores((legacy.data || []).map((store) => normalizeStore(store)));
-        const filteredLegacyStores = applyLegacyStoreFilters(sortStoresByPackage(normalizedLegacyStores), filters);
-        return { data: filteredLegacyStores, count: normalizedLegacyStores.length };
-      }
-
-      const fallbackStores = applyLegacyStoreFilters(sortStoresByPackage(mergeRepairPartnerStores([])), filters);
-      return { data: fallbackStores, count: fallbackStores.length };
-    }
-
-    // Add entitlements and sort by package priority
-    const storesWithEntitlements = mergeRepairPartnerStores((data || []).map((store) => normalizeStore(store)));
+    // Only the active/published rows returned by the scoped database query
+    // are eligible for the public directory. Synthetic seeds are not offers.
+    const storesWithEntitlements = (data || []).map((store) => normalizeStore(store));
 
     // Sort by sort_order descending (diamond first), then by name
     sortStoresByPackage(storesWithEntitlements);
