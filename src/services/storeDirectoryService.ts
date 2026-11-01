@@ -330,28 +330,34 @@ export const storeDirectoryService = {
     return this.getStoresForDirectory(filters);
   },
 
+  /**
+   * Public routes must only resolve active, published database stores.
+   * Keep getStoreByIdentifier for separately authorized admin workflows.
+   * Exact .eq() lookups also avoid injecting a route slug into PostgREST .or().
+   */
+  async getPublicStoreByIdentifier(identifier: { type: "id" | "slug" | "shop_no"; value: string; complex_zone?: string }) {
+    const find = async (column: "id" | "seo_slug" | "slug" | "shop_no") => {
+      const { data, error } = await supabase
+        .from("stores")
+        .select("*, package:store_packages(*)")
+        .eq("status", "active")
+        .eq("public_status", "published")
+        .eq(column, identifier.value)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    };
+
+    // Prefer canonical SEO slug, then the legacy slug. Neither branch may
+    // broaden visibility or fall back to unverified local merchant profiles.
+    const data = identifier.type === "slug"
+      ? (await find("seo_slug")) ?? (await find("slug"))
+      : await find(identifier.type);
+    return data ? normalizeStore(data) : null;
+  },
+
   async getPublicStoreBySlug(slug: string) {
-    const { data, error } = await supabase
-      .from("stores")
-      .select(`
-        *,
-        store_packages(*),
-        store_accessories(*),
-        store_repair_services(*),
-        store_reviews(*)
-      `)
-      .or(`seo_slug.eq.${slug},slug.eq.${slug}`)
-      .eq("status", "active")
-      .eq("public_status", "published")
-      .single();
-
-    if (error && !String(error.message || "").includes("Could not find a relationship")) throw error;
-    if (data) return normalizeStore({ ...data, package: (data as any).store_packages });
-
-    const local = findLocalStoreFallback({ type: "slug", value: slug });
-    if (local) return normalizeStore(local);
-
-    return this.getStoreByIdentifier({ type: "slug", value: slug });
+    return this.getPublicStoreByIdentifier({ type: "slug", value: slug });
   },
 
   // Get store by various identifiers
