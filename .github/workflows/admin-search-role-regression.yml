@@ -1,0 +1,26 @@
+name: Admin Search Role Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/components/admin/AdminGlobalSearch.tsx"
+      - "src/types/app.ts"
+      - "src/lib/roles.ts"
+      - "tests/admin-global-search-role.test.cjs"
+      - ".github/workflows/admin-search-role-regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  role-regression:
+    name: Store-admin quick actions (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify normalized store-admin role and quick-action guards
+        run: node --test tests/admin-global-search-role.test.cjs
