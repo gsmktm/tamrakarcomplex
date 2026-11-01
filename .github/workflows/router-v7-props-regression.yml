@@ -1,0 +1,24 @@
+name: Router v7 Props Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/App.tsx"
+      - "tests/router-v7-props.test.cjs"
+      - ".github/workflows/router-v7-props-regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  router-props:
+    name: BrowserRouter v7 compatibility (offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify router props and route nesting
+        run: node --test tests/router-v7-props.test.cjs
