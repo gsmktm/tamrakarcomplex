@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   assertCmsDraftPublicationReady,
@@ -23,7 +24,7 @@ describe("default CMS editorial drafts", () => {
   });
 
   it("is wired into CMS saves and keeps new default pages unpublished", () => {
-    const source = readFileSync(new URL("../pages/admin/ContentManager.tsx", import.meta.url), "utf8");
+    const source = readFileSync(resolve(process.cwd(), "src/pages/admin/ContentManager.tsx"), "utf8");
     expect(source).toContain("assertCmsDraftPublicationReady(values.content, values.is_published)");
     expect(source).toMatch(/content:\s*buildDefaultCmsDraft\(page\.title \|\| ""\),\s*is_published:\s*false/);
     expect(source).not.toContain("getPageTemplate(");
