@@ -40,28 +40,40 @@ export function AdminGlobalSearch() {
   }, []);
 
   useEffect(() => {
-    if (!query || query.length < 2) {
-      setResults([]);
-      return;
+    // A previous RPC may still resolve after its debounce timer is cleared.
+    // Never show results from an old query or a closed dialog.
+    let cancelled = false;
+    setResults([]);
+    setIsLoading(false);
+
+    if (!open || query.trim().length < 2) {
+      return () => { cancelled = true; };
     }
 
     const timer = setTimeout(async () => {
+      if (cancelled) return;
       setIsLoading(true);
       try {
         const { data, error } = await supabase.rpc("admin_global_search", {
           p_query: query,
         });
         if (error) throw error;
-        setResults(data || []);
+        if (!cancelled) setResults(data || []);
       } catch (err) {
-        console.error("Search error:", err);
+        if (!cancelled) {
+          setResults([]);
+          console.error("Search error:", err);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }, 300);
 
-    return () => clearTimeout(timer);
-  }, [query]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, open]);
 
   const handleSelect = (link: string) => {
     setOpen(false);
