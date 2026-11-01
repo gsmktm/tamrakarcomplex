@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   assertCmsDraftPublicationReady,
@@ -19,6 +20,13 @@ describe("default CMS editorial drafts", () => {
     expect(html).toContain(CMS_UNVERIFIED_DRAFT_MARKER);
     expect(html).toContain("not approved for publication");
     expect(html).not.toMatch(/0%|7[-–]10\s+business\s+days|Rs\.?\s*5,?000|same-day delivery|30-day warranty/i);
+  });
+
+  it("is wired into CMS saves and keeps new default pages unpublished", () => {
+    const source = readFileSync(new URL("../pages/admin/ContentManager.tsx", import.meta.url), "utf8");
+    expect(source).toContain("assertCmsDraftPublicationReady(values.content, values.is_published)");
+    expect(source).toMatch(/content:\s*buildDefaultCmsDraft\(page\.title \|\| ""\),\s*is_published:\s*false/);
+    expect(source).not.toContain("getPageTemplate(");
   });
 
   it("escapes dynamic headings instead of injecting HTML", () => {
