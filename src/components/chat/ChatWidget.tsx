@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Send, Bot, CheckCircle2, ShoppingBag, IndianRupee, ChevronDown, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { readChatProfile, readChatSession, saveChatProfile, saveChatSession } from "@/lib/chatClientStorage";
 
 interface ChatWidgetProps {
   settings?: { position?: "bottom-right" | "bottom-left" };
@@ -21,9 +22,6 @@ type UiMessage = {
   payload?: ChatbotAnswer;
   ts: number;
 };
-
-const STORAGE_PROFILE = "tamrakar-chat-profile";
-const STORAGE_SESSION = "tamrakar-chat-session-id";
 
 const QUICK_CHIPS = [
   { label: "📱 Buy Phone", q: "mobile phone price list" },
@@ -46,15 +44,6 @@ const formatMoney = (value: unknown) => {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number") return `Rs. ${value.toLocaleString("en-IN")}`;
   return String(value);
-};
-
-const readProfile = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_PROFILE);
-    return raw ? (JSON.parse(raw) as { name?: string; email?: string }) : {};
-  } catch {
-    return {};
-  }
 };
 
 const TypingDots = () => (
@@ -100,10 +89,10 @@ export const ChatWidget = ({ settings: propSettings = {} }: ChatWidgetProps) => 
   const config = useMemo(() => normalizeChatbotConfig(configRaw), [configRaw]);
 
   useEffect(() => {
-    const profile = readProfile();
+    const profile = readChatProfile();
     setName(profile.name || user?.user_metadata?.full_name || "");
     setEmail(profile.email || user?.email || "");
-    setSessionId(localStorage.getItem(STORAGE_SESSION));
+    setSessionId(readChatSession());
   }, [user]);
 
   useEffect(() => {
@@ -125,7 +114,7 @@ export const ChatWidget = ({ settings: propSettings = {} }: ChatWidgetProps) => 
 
   const saveProfile = () => {
     const next = { name: name.trim(), email: email.trim() };
-    localStorage.setItem(STORAGE_PROFILE, JSON.stringify(next));
+    saveChatProfile(next);
     setShowProfile(false);
   };
 
@@ -152,7 +141,7 @@ export const ChatWidget = ({ settings: propSettings = {} }: ChatWidgetProps) => 
 
       if (answer.session_id) {
         setSessionId(answer.session_id);
-        localStorage.setItem(STORAGE_SESSION, answer.session_id);
+        saveChatSession(answer.session_id);
       }
 
       const botMsg: UiMessage = {
