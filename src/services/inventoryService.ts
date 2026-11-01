@@ -47,19 +47,24 @@ export const inventoryService = {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
-    const { data: existing } = await supabase
+    // A model-title slug is not a unique inventory identity: different variants,
+    // conditions and individual used devices can share it. Until an approved
+    // variant-aware, atomic database operation exists, never merge or reprice.
+    const { data: existing, error: lookupError } = await supabase
       .from('store_products')
-      .select('id, stock_quantity')
+      .select('id')
       .eq('store_id', item.store_id)
       .eq('slug', slug)
       .maybeSingle();
 
+    if (lookupError) throw lookupError;
+
     if (existing) {
-      // Update stock instead of creating new
-      return this.updateInventoryItem(existing.id, {
-        stock_quantity: (existing.stock_quantity || 0) + item.stock_quantity,
-        price: item.price // Update to latest price
-      });
+      throw new Error(
+        "A product with this listing slug already exists in this store. " +
+        "Inventory was not changed. Review the existing listing; " +
+        "variant-specific additions require a verified inventory identity."
+      );
     }
 
     const { data, error } = await supabase
