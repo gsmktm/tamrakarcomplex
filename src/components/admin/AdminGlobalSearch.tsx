@@ -26,7 +26,7 @@ export function AdminGlobalSearch() {
   const { role } = useAuth();
 
   const isSuAdmin = role === 'suadmin';
-  const isStoreAdmin = role === 'store_owner';
+  const isStoreAdmin = role === 'storeadmin';
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
