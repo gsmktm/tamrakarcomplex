@@ -44,9 +44,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyStores } from "@/hooks/useMyStores";
-import { STORES } from "@/data/storeData";
-import { BASIC_TAMRAKAR_STORES } from "@/data/basicStoreData";
-import { SEEDED_FALLBACK_STORES, storeDirectoryService, type StoreDirectoryItem } from "@/services/storeDirectoryService";
+import { storeDirectoryService, type StoreDirectoryItem } from "@/services/storeDirectoryService";
 import { SEO } from "@/components/common/SEO";
 import { isAdminRole } from "@/lib/roles";
 import { cn, getErrorMessage } from "@/lib/utils";
@@ -75,9 +73,6 @@ type StoreDetailRow = StoreRow & {
   meta_keywords?: string | null;
 };
 
-function normalizeStoreIdentifier(value: unknown) {
-  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-}
 
 function defaultInventoryForStore(storeId: string, storeName: string) {
   const preferredBrand = /apple|iphone|i-fix/i.test(storeName) ? "Apple" : null;
@@ -385,29 +380,6 @@ export default function StoreDetail() {
   const lookupType = isInsideRoute ? 'shop_no' : isOutsideRoute ? 'slug' : 'id_or_slug';
   const isUuid = id ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) : false;
 
-  const localStoreFallback = [...STORES, ...SEEDED_FALLBACK_STORES, ...BASIC_TAMRAKAR_STORES].find((item) =>
-    item.id === id ||
-    item.slug === id ||
-    (lookupType === "shop_no" && item.shop_no === id) ||
-    item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === id ||
-    (lookupType !== "shop_no" && normalizeStoreIdentifier(item.name) === normalizeStoreIdentifier(id))
-  );
-
-  const toLocalStoreFallback = (
-    item: (typeof STORES)[number] | (typeof SEEDED_FALLBACK_STORES)[number] | (typeof BASIC_TAMRAKAR_STORES)[number],
-  ): StoreDetailRow => ({
-    ...(item as unknown as StoreRow),
-    slug: item.slug || item.id || "",
-    seo_slug: item.slug || item.id || "",
-    public_status: "published",
-    shop_number: item.shop_no || null,
-    banner_url: item.cover_image_url,
-    cover_image_url: item.cover_image_url,
-    subscription_tier: item.package_slug,
-    subscription_status: item.subscription_status,
-    subscription_end_date: null,
-  });
-
   const toStoreDetailFallback = (item: StoreDirectoryItem): StoreDetailRow => ({
     ...(item as unknown as StoreRow),
     slug: item.slug || item.seo_slug || item.id,
@@ -425,19 +397,13 @@ export default function StoreDetail() {
     queryKey: ["store", lookupType, id],
     queryFn: async () => {
       if (!id) throw new Error("missing_store_id");
-      try {
-        const identifierType = lookupType === "shop_no" ? "shop_no" : isUuid ? "id" : "slug";
-        const serviceStore = await storeDirectoryService.getStoreByIdentifier({
-          type: identifierType,
-          value: id,
-          complex_zone: lookupType === "shop_no" ? "inside" : undefined,
-        });
-        if (serviceStore) return toStoreDetailFallback(serviceStore);
-      } catch {
-        // The local fallback below keeps seeded profiles available offline.
-      }
-
-      if (localStoreFallback) return toLocalStoreFallback(localStoreFallback);
+      const identifierType = lookupType === "shop_no" ? "shop_no" : isUuid ? "id" : "slug";
+      const serviceStore = await storeDirectoryService.getPublicStoreByIdentifier({
+        type: identifierType,
+        value: id,
+        complex_zone: lookupType === "shop_no" ? "inside" : undefined,
+      });
+      if (serviceStore) return toStoreDetailFallback(serviceStore);
       throw new Error("Store not found");
     },
     enabled: !!id,
