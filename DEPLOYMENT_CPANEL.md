@@ -46,6 +46,7 @@ Upload these items to your application root (`tamrakar-main/` on the server):
 |---|---|
 | `dist/` | YES — entire folder |
 | `server.cjs` | YES |
+| `supabase-runtime-config.cjs` | YES — required by `server.cjs` |
 | `package.json` | YES |
 | `package-lock.json` | YES |
 | `node_modules/` | NO — install on server via cPanel |
@@ -82,6 +83,7 @@ In **cPanel → Setup Node.js App**:
 
 The `VITE_*` values are baked into the browser bundle. The runtime `SUPABASE_*`
 values above are used by Node routes such as the sitemap and contact proxy.
+Missing or malformed runtime Supabase settings now leave the static storefront and `/health` available but make dependent endpoints return an uncached HTTP 503; there is no hard-coded project fallback. Confirm both runtime settings in cPanel before approving deployment.
 
 ---
 
