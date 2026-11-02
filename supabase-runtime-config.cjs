@@ -16,7 +16,7 @@ function resolveSupabaseRuntimeConfig(env) {
   } catch {
     // Invalid or missing URL: do not select any implicit project.
   }
-  return { url, key, valid: validUrl && key.length > 0 && !/\\s/.test(key) };
+  return { url, key, valid: validUrl && key.length > 0 && !/\s/.test(key) };
 }
 
 module.exports = { resolveSupabaseRuntimeConfig };
