@@ -57,6 +57,7 @@ for (const entry of fs.readdirSync(path.join(output, "dist"), { recursive: true 
   }
 }
 fs.copyFileSync(path.join(root, "server.cjs"), path.join(output, "server.cjs"));
+fs.copyFileSync(path.join(root, "supabase-runtime-config.cjs"), path.join(output, "supabase-runtime-config.cjs"));
 
 const rootPackage = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const runtimePackage = {
