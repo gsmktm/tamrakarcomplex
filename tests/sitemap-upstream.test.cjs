@@ -22,7 +22,9 @@ function harness(initialSteps) {
   const steps = [...initialSteps];
   let handler;
   let calls = 0;
+  const requests = [];
   function issue(method, url, callback) {
+    requests.push({ method, url });
     const step = steps.shift();
     assert.ok(step, "unexpected upstream " + method + " " + url);
     calls++;
@@ -76,6 +78,7 @@ function harness(initialSteps) {
   return {
     add(...next) { steps.push(...next); },
     calls() { return calls; },
+    requests() { return requests; },
     remaining() { return steps.length; },
     async request() {
       const res = {
@@ -156,4 +159,16 @@ test("failed second RPC page is not silently accepted as complete", async () => 
   const h = harness([ok(page), fail(), ...Array.from({ length: 5 }, () => fail())]);
   assertUnavailable(await h.request());
   assert.equal(h.calls(), 7);
+});
+
+test("fallback store lookup requires active and published visibility", async () => {
+  const h = harness([ok(), ...emptyFallback()]);
+  const res = await h.request();
+  assert.equal(res.statusCode, 200);
+  const storeRequests = h.requests().filter(({ method, url }) => method === "GET" && url.includes("/rest/v1/stores?"));
+  assert.equal(storeRequests.length, 1);
+  const filters = new URL(storeRequests[0].url).searchParams;
+  assert.equal(filters.get("is_active"), "eq.true");
+  assert.equal(filters.get("status"), "eq.active");
+  assert.equal(filters.get("public_status"), "eq.published");
 });
