@@ -3,6 +3,7 @@ const compression = require("compression");
 const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
+const { resolveSupabaseRuntimeConfig } = require("./supabase-runtime-config.cjs");
 const { z } = require("zod");
 
 const app = express();
@@ -87,14 +88,22 @@ app.get("/health", (req, res) => {
 });
 
 // 3. Constants
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://tvgmnjuexdgtgtqhrjok.supabase.co";
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_4-Yq_PD4j8sVEsn1ZM1-Mw_ZDPUAd5v";
+const { url: SUPABASE_URL, key: SUPABASE_KEY, valid: SUPABASE_CONFIGURED } = resolveSupabaseRuntimeConfig(process.env);
+if (!SUPABASE_CONFIGURED) console.error("[config] Supabase runtime configuration missing or invalid; dependent endpoints disabled.");
+
+function requireSupabaseConfiguration(res) {
+  if (SUPABASE_CONFIGURED) return true;
+  res.setHeader("Cache-Control", "no-store");
+  apiError(res, 503, "SERVICE_UNAVAILABLE", "This service is temporarily unavailable.");
+  return false;
+}
 const BASE_URL = (process.env.SITE_URL || "https://tamrakarcomplex.com").replace(/\/$/, "");
 const SUPABASE_REQUEST_TIMEOUT_MS = 5000;
 
 // 4. Security headers (applied to ALL responses)
 app.use((req, res, next) => {
-  const supabaseHost = new URL(SUPABASE_URL).hostname;
+  const supabaseOrigin = SUPABASE_CONFIGURED ? new URL(SUPABASE_URL).origin : "";
+  const supabaseWebSocketOrigin = supabaseOrigin.replace(/^http/, "ws");
 
   // Content Security Policy — strict but compatible with the SPA's resource graph
   const csp = [
@@ -103,7 +112,7 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
     "font-src 'self' https://fonts.gstatic.com",
-    `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://*.supabase.co wss://*.supabase.co https://*.supabase.in`,
+    `connect-src 'self' ${supabaseOrigin} ${supabaseWebSocketOrigin} https://*.supabase.co wss://*.supabase.co https://*.supabase.in`,
     "media-src 'self' https:",
     "worker-src 'self' blob:",
     "frame-src 'self' https://*.supabase.co https://*.esewa.com https://*.khalti.com",
@@ -155,6 +164,7 @@ function escapeXml(value) {
 }
 
 async function supabaseFetch(table, select, filters) {
+  if (!SUPABASE_CONFIGURED) return [];
   const https = require("https");
   let url = `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}`;
   if (filters) url += `&${filters}`;
@@ -180,6 +190,7 @@ async function supabaseFetch(table, select, filters) {
 }
 
 async function supabaseRpcPage(functionName, from = 0, to = 999) {
+  if (!SUPABASE_CONFIGURED) return [];
   const https = require("https");
   const url = `${SUPABASE_URL}/rest/v1/rpc/${functionName}`;
   return new Promise((resolve) => {
@@ -245,6 +256,7 @@ let sitemapCachedAt = 0;
 const SITEMAP_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 app.get("/sitemap.xml", async (req, res) => {
+  if (!requireSupabaseConfiguration(res)) return;
   const now = Date.now();
   if (sitemapCache && now - sitemapCachedAt < SITEMAP_TTL_MS) {
     res.setHeader("Content-Type", "application/xml; charset=utf-8");
@@ -333,6 +345,7 @@ app.get("/sitemap.xml", async (req, res) => {
 });
 
 app.get("/merchant-center.xml", async (req, res) => {
+  if (!requireSupabaseConfiguration(res)) return;
   const products = await supabaseFetch(
     "products",
     "id,slug,name,description,brand,image,price_value,in_stock",
@@ -371,6 +384,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // API: Contact form submission (proxied to Supabase to avoid exposing anon key)
 app.post("/api/contact", createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 }), async (req, res) => {
+  if (!requireSupabaseConfiguration(res)) return;
   try {
     const parsed = contactSchema.safeParse(req.body);
     if (!parsed.success) return apiError(res, 422, "INVALID_CONTACT", parsed.error.issues[0].message);
@@ -409,6 +423,7 @@ app.post("/api/orders", async (req, res) => {
 
 // API: Repair request submission (proxied to Supabase)
 app.post("/api/repair-requests", createRateLimiter({ windowMs: 60 * 60 * 1000, max: 4 }), async (req, res) => {
+  if (!requireSupabaseConfiguration(res)) return;
   try {
     const parsed = repairRequestSchema.safeParse(req.body);
     if (!parsed.success) return apiError(res, 422, "INVALID_REPAIR_REQUEST", parsed.error.issues[0].message);
