@@ -1,0 +1,109 @@
+name: Main Compile and Route Diagnostics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/main-compile-routes.yml"
+      - "src/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "tsconfig*.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-compile-routes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  route-contracts:
+    name: Route and API contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check all declared links and server routes
+        run: node scripts/check-routes.cjs
+
+  typescript:
+    name: TypeScript (full diagnostic report)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-fund
+      - name: Check all application and Edge Function types
+        shell: bash
+        run: |
+          set -o pipefail
+          npx tsc -p tsconfig.app.json --noEmit --pretty false 2>&1 | tee typescript-diagnostics.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-typescript-diagnostics
+          path: typescript-diagnostics.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  production-build:
+    name: Production Vite build (independent of TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-fund
+      - name: Production build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_REQUIRE_SUBSCRIPTION: "true"
+          SITE_URL: ${{ secrets.SITE_URL }}
+          NODE_ENV: production
+
+  unit-tests:
+    name: Unit tests (independent of TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-fund
+      - run: npm test
+
+  lint:
+    name: ESLint (independent of TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-fund
+      - run: npm run lint
+
+  migration-safety:
+    name: Static migration safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm run check:migrations
