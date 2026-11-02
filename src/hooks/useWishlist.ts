@@ -3,6 +3,11 @@ import type { Product } from "@/hooks/useProducts";
 
 const WISHLIST_STORAGE_KEY = "tamrakar:wishlist";
 
+// Private, tab-local fallback for browsers that deny access to localStorage.
+// It is intentionally not persisted or synchronized across browser tabs.
+let sessionWishlist: Product[] = [];
+let storageUnavailable = false;
+
 function readWishlist(): Product[] {
   if (typeof window === "undefined") {
     return [];
@@ -11,7 +16,7 @@ function readWishlist(): Product[] {
   try {
     const raw = window.localStorage.getItem(WISHLIST_STORAGE_KEY);
     if (!raw) {
-      return [];
+      return storageUnavailable ? sessionWishlist : [];
     }
 
     const parsed = JSON.parse(raw) as Product[];
@@ -21,7 +26,8 @@ function readWishlist(): Product[] {
 
     return parsed.filter((item) => Boolean(item?.id && item?.slug && item?.name));
   } catch {
-    return [];
+    storageUnavailable = true;
+    return sessionWishlist;
   }
 }
 
@@ -30,7 +36,14 @@ function writeWishlist(items: Product[]) {
     return;
   }
 
-  window.localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items));
+  sessionWishlist = items;
+  try {
+    window.localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(items));
+    storageUnavailable = false;
+  } catch {
+    // Keep wishlist actions functional for this tab when storage is blocked.
+    storageUnavailable = true;
+  }
   window.dispatchEvent(new CustomEvent("wishlist-update"));
 }
 
