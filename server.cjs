@@ -299,7 +299,7 @@ app.get("/sitemap.xml", async (req, res) => {
       supabaseFetch("device_catalog", "canonical_slug,brand,updated_at", "order=updated_at.desc&limit=2000", { strict: true }),
       supabaseFetch("articles", "slug,updated_at", "published=eq.true&order=updated_at.desc&limit=500", { strict: true }),
       supabaseFetch("guides", "slug,updated_at", "is_published=eq.true&order=updated_at.desc&limit=500", { strict: true }),
-      supabaseFetch("stores", "slug,updated_at", "is_active=eq.true&order=updated_at.desc&limit=500", { strict: true }),
+      supabaseFetch("stores", "slug,updated_at", "is_active=eq.true&status=eq.active&public_status=eq.published&order=updated_at.desc&limit=500", { strict: true }),
     ]);
 
     const lines = [
