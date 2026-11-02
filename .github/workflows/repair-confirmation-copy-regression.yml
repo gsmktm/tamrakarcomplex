@@ -1,0 +1,20 @@
+name: Repair Confirmation Copy Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/pages/BookingSuccess.tsx"
+      - "scripts/tests/repair-confirmation-claims.test.cjs"
+      - ".github/workflows/repair-confirmation-copy-regression.yml"
+
+jobs:
+  repair-copy-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check customer-facing repair promises
+        run: node --test scripts/tests/repair-confirmation-claims.test.cjs
