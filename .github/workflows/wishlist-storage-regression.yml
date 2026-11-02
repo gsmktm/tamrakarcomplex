@@ -1,0 +1,24 @@
+name: Wishlist Storage Resilience Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/hooks/useWishlist.ts"
+      - "src/hooks/useWishlist.test.tsx"
+      - ".github/workflows/wishlist-storage-regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  wishlist-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run src/hooks/useWishlist.test.tsx
