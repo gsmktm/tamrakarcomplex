@@ -17,6 +17,7 @@ import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { getErrorMessage, parseProductPrice } from "@/lib/utils";
 import { isValidEmail, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeText } from "@/lib/security";
+import { PaymentMethodsLoadError } from "@/components/checkout/PaymentMethodsLoadError";
 
 type CreateOrderSecureResponse = {
   success?: boolean;
@@ -43,7 +44,7 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const checkoutIdempotencyKey = useRef(crypto.randomUUID());
   const [paymentMethod, setPaymentMethod] = useState<string>("cod");
-  const { data: methods = [], isLoading: methodsLoading } = usePaymentMethods();
+  const { data: methods = [], isLoading: methodsLoading, isError: methodsError, isFetching: methodsFetching, refetch: refetchMethods } = usePaymentMethods();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -280,6 +281,11 @@ export default function Checkout() {
             <CardContent>
               {methodsLoading ? (
                 <p className="text-sm text-muted-foreground">Loading payment options…</p>
+              ) : methodsError ? (
+                <PaymentMethodsLoadError
+                  retrying={methodsFetching}
+                  onRetry={() => { void refetchMethods(); }}
+                />
               ) : (
                 <RadioGroup value={paymentMethod} onValueChange={(value) => setPaymentMethod(value)} className="space-y-3">
                   {selectableMethods.map((method) => (
@@ -350,7 +356,7 @@ export default function Checkout() {
                 form="checkout-form"
                 className="w-full mt-4"
                 size="lg"
-                disabled={loading || methodsLoading || !selectedMethod}
+                disabled={loading || methodsLoading || methodsError || !selectedMethod}
               >
                 {loading ? "Processing..." : `Place Order (NPR ${cartTotal.toLocaleString()})`}
               </Button>
