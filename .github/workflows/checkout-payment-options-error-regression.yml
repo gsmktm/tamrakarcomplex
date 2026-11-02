@@ -1,0 +1,23 @@
+name: Checkout Payment Options Error Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/pages/Checkout.tsx"
+      - "src/components/checkout/PaymentMethodsLoadError.tsx"
+      - "src/components/checkout/PaymentMethodsLoadError.test.tsx"
+      - ".github/workflows/checkout-payment-options-error-regression.yml"
+
+jobs:
+  provider-error-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Verify checkout provider error and retry UI
+        run: npx vitest run src/components/checkout/PaymentMethodsLoadError.test.tsx
