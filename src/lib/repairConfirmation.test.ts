@@ -13,6 +13,9 @@ describe("repair success confirmation", () => {
       issue: "screen", estimatedCost: 3500,
     });
   });
+  it("accepts the single-object response form from the tracking RPC", () => {
+    expect(parseConfirmedRepair(serverRecord, "TR-ABC123")?.trackingId).toBe("TR-ABC123");
+  });
   it("does not treat an arbitrary or missing tracking ID as a confirmed booking", () => {
     expect(parseConfirmedRepair([serverRecord], "TR-FAKE")).toBeNull();
     expect(parseConfirmedRepair([serverRecord], "")).toBeNull();
