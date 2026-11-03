@@ -9,8 +9,9 @@ export type ConfirmedRepair = {
 
 export function parseConfirmedRepair(data: unknown, requestedId: string): ConfirmedRepair | null {
   const expected = requestedId.trim().toUpperCase();
-  if (!expected || !Array.isArray(data) || data.length !== 1) return null;
-  const row = data[0];
+  if (!expected) return null;
+  // The tracking RPC may return either a one-row array or a single object.
+  const row = Array.isArray(data) ? (data.length === 1 ? data[0] : null) : data;
   if (!row || typeof row !== "object" || Array.isArray(row)) return null;
   const fields = row as Record<string, unknown>;
   if (typeof fields.tracking_id !== "string") return null;
