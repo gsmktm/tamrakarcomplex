@@ -84,7 +84,7 @@ export default function StoreAnalytics() {
     { title: "Repair Jobs", value: analytics?.repairs || 0, icon: Wrench, description: "Service requests" },
     { title: "Exchange Deals", value: analytics?.exchanges || 0, icon: RefreshCw, description: "Trade-in requests" },
     { title: "Store Rating", value: analytics?.reviews || 0, icon: Star, description: "Verified reviews" },
-    { title: "Growth Score", value: "84%", icon: TrendingUp, description: "Performance vs last month" },
+    { title: "Growth Score", value: "Not available", icon: TrendingUp, description: "Month-over-month growth is not yet calculated" },
   ];
 
   return (
