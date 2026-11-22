@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Product } from "@/hooks/useProducts";
 import { parseProductPrice } from "@/lib/utils";
+import { isValidCartQuantity, sanitizePersistedCart } from "@/lib/cartQuantity";
 
 export interface CartItem {
   product: Product;
@@ -24,7 +25,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem("cart");
-      return saved ? JSON.parse(saved) : [];
+      return saved ? sanitizePersistedCart<CartItem>(JSON.parse(saved)) : [];
     } catch {
       return [];
     }
@@ -35,9 +36,17 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   }, [cart]);
 
   const addToCart = (product: Product, quantity = 1) => {
+    if (!isValidCartQuantity(quantity)) {
+      toast.error("Invalid cart quantity");
+      return;
+    }
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
+        if (!isValidCartQuantity(existing.quantity + quantity)) {
+          toast.error("Invalid cart quantity");
+          return prev;
+        }
         toast.success("Updated quantity in cart");
         return prev.map((item) =>
           item.product.id === product.id
@@ -56,8 +65,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity < 1) {
+    if (quantity === 0) {
       removeFromCart(productId);
+      return;
+    }
+    if (!isValidCartQuantity(quantity)) {
+      toast.error("Invalid cart quantity");
       return;
     }
     setCart((prev) =>
