@@ -91,7 +91,13 @@ function dumpDom(url) {
       };
     }
   } finally {
-    rmSync(profileDir, { recursive: true, force: true });
+    // A headless Chrome descendant can still hold or rewrite profile files.
+    // Retry transient ENOTEMPTY and EBUSY cleanup races without losing DOM results.
+    try {
+      rmSync(profileDir, { recursive: true, force: true, maxRetries: 12, retryDelay: 250 });
+    } catch (error) {
+      console.warn("Chrome profile cleanup warning:", error.message);
+    }
   }
 }
 
