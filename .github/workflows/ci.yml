@@ -27,22 +27,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Keep checks independent so an existing type failure cannot hide later
+      # test, lint or migration results. The final gate still fails the job.
       - name: Type-check
+        id: typecheck
+        continue-on-error: true
         run: npx tsc -p tsconfig.app.json --noEmit
 
       - name: Lint
+        id: lint
+        continue-on-error: true
         run: npm run lint
 
       - name: Unit tests
+        id: tests
+        continue-on-error: true
         run: npm test
 
       - name: Route consistency check
+        id: routes
+        continue-on-error: true
         run: npm run check-routes
 
       - name: Migration safety check
+        id: migrations
+        continue-on-error: true
         run: npm run check:migrations
 
       - name: Build
+        id: build
+        continue-on-error: true
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -52,7 +66,34 @@ jobs:
           NODE_ENV: production
 
       - name: Chrome smoke check
+        id: browser
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
         run: npm run chrome:check
+
+      - name: Enforce every quality gate
+        if: always()
+        env:
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          ROUTES: ${{ steps.routes.outcome }}
+          MIGRATIONS: ${{ steps.migrations.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          BROWSER: ${{ steps.browser.outcome }}
+        run: |
+          failed=0
+          for name in TYPECHECK LINT TESTS ROUTES MIGRATIONS BUILD BROWSER; do
+            status="${!name}"
+            echo "${name}: ${status}"
+            if [ "${status}" != "success" ]; then
+              failed=1
+            fi
+          done
+          if [ "${failed}" -ne 0 ]; then
+            echo "::error::One or more required quality gates failed or were skipped."
+            exit 1
+          fi
 
       - name: Upload build artifact
         if: github.ref == 'refs/heads/main'

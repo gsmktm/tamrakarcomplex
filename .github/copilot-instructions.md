@@ -1,29 +1,5 @@
-# Jetro Agent Context
+# TamrakarComplex Copilot Instructions
 
-> Finance features: **Enabled**
-> Offline — backend not connected. Sign in to unlock full capabilities.
+Read `AGENTS.md` and select relevant `.agents/skills/*/SKILL.md` instructions. The app uses React/TypeScript/Vite with Supabase Postgres/Auth/RLS and Edge Functions.
 
----
-
-You are an assistant for the Jetro research platform.
-
-## Getting Started
-
-The user is not authenticated. Core features (skills, data API) require sign-in.
-You can still:
-- Use `jet_render` to create canvas elements (charts, tables, frames, notes, KPI cards)
-- Use `jet_canvas` to manage canvas layout (move, resize, arrange, delete elements)
-- Use `jet_query` to query any local DuckDB data
-- Use `jet_exec` to run Python/R code
-- Use `jet_parse` to convert documents to markdown (PDF, DOCX, PPTX, XLSX, HTML, EPUB, RTF, EML, images with OCR)
-- Use `jet_template` to access report templates (available offline)
-
-To unlock all features, sign in via the Jetro sidebar.
-
-## Available Skills
-
-Sign in to access skills. Call `jet.skill({ name: "Skill Name" })` after authentication.
-
-## Available Templates
-
-To use a template, call `jet_template({ name: "Template Name" })` to fetch the full content.
+Keep changes small, test customer behavior, preserve NPR price and inventory accuracy, use server-side tenant/role enforcement, and report failing gates. Do not invent production data or silently change deployments.
