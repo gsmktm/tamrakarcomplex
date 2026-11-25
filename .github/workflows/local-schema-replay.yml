@@ -1,0 +1,68 @@
+name: Local Supabase migration replay (isolated)
+
+on:
+  push:
+    branches: [experiment/local-schema-20261125]
+
+permissions:
+  contents: read
+
+jobs:
+  migration-replay:
+    name: Local-only migration replay and schema type generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Supabase CLI help and version
+        run: |
+          npx --yes supabase@2.122.1 --version
+          npx --yes supabase@2.122.1 start --help
+          npx --yes supabase@2.122.1 db reset --help
+          npx --yes supabase@2.122.1 gen types --help
+
+      - name: Boot disposable local Supabase only
+        run: npx --yes supabase@2.122.1 start
+        timeout-minutes: 12
+        env:
+          SUPABASE_ACCESS_TOKEN: ""
+
+      - name: Replay only local migrations
+        run: npx --yes supabase@2.122.1 db reset --local --yes
+        timeout-minutes: 8
+        env:
+          SUPABASE_ACCESS_TOKEN: ""
+
+      - name: Generate local-only TypeScript schema (not canonical remote types)
+        run: |
+          npx --yes supabase@2.122.1 gen types typescript --local --schema public > local-database.types.ts
+          test -s local-database.types.ts
+          echo 'Local schema output generated.'
+          wc -l local-database.types.ts
+
+      - name: Save evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-schema-replay
+          path: local-database.types.ts
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Clean up Docker local environment
+        if: always()
+        run: npx --yes supabase@2.122.1 stop --no-backup || true
+        timeout-minutes: 2
