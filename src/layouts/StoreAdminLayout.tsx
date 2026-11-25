@@ -18,24 +18,19 @@ import { AdminGlobalSearch } from "@/components/admin/AdminGlobalSearch";
 
 export default function StoreAdminLayout() {
   const location = useLocation();
-  const { signOut, role } = useAuth();
-  const { permissions, storeAdminPermissions, storeAdminPermissionsLoaded } = usePermissions();
+  const { signOut } = useAuth();
+  const { storeAdminPermissions, storeAdminPermissionsLoaded } = usePermissions();
   const [navQuery, setNavQuery] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const panelRole: AppRole = "storeadmin";
-  // Once grants are loaded, filter menu items by the granted module keys;
-  // while loading, pass undefined so gated items stay visible (no flash).
+  // Keep protected module links hidden while grants are loading.
   const effectiveStorePerms = panelRole === "storeadmin" && storeAdminPermissionsLoaded
     ? storeAdminPermissions
     : undefined;
   const menuGroups = useMemo(
-    () => getFilteredMenu(
-      panelRole,
-      panelRole === "staffadmin" && role === "staffadmin" ? permissions : null,
-      effectiveStorePerms
-    ),
-    [panelRole, role, permissions, effectiveStorePerms]
+    () => getFilteredMenu(panelRole, null, effectiveStorePerms),
+    [panelRole, effectiveStorePerms]
   );
 
   const filteredGroups = useMemo(() => {

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { normalizeRole } from "@/lib/roles";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -99,7 +100,7 @@ export default function UserManager() {
       const stats = {
         total: count || 0,
         admins: roles?.filter(r => ['suadmin', 'staffadmin', 'admin'].includes(r.role)).length || 0,
-        merchants: roles?.filter(r => r.role === 'storeadmin').length || 0,
+        merchants: roles?.filter(r => normalizeRole(r.role) === "storeadmin").length || 0,
         active_24h: 0 // Placeholder
       };
 
