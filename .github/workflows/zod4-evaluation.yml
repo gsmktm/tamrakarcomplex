@@ -1,0 +1,83 @@
+name: Zod 4 compatibility experiment
+
+on:
+  push:
+    branches: [experiment/zod4-20261125]
+
+permissions:
+  contents: read
+
+jobs:
+  zod4-evaluation:
+    name: Zod 4 security + compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install current lockfile
+        run: npm ci
+
+      - name: Upgrade only Zod in isolated candidate
+        run: |
+          npm install --save-exact zod@4.6.7 --package-lock-only --ignore-scripts
+          git diff --stat -- package.json package-lock.json
+          npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_REQUIRE_SUBSCRIPTION: "true"
+          SITE_URL: ${{ secrets.SITE_URL }}
+          NODE_ENV: production
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Type diagnostics (report only; baseline tracked in issue 101)
+        if: always()
+        run: |
+          set +e
+          npx tsc -p tsconfig.app.json --noEmit > "$RUNNER_TEMP/type-diagnostics.log" 2>&1
+          code=$?
+          set -e
+          echo "Typecheck exit status: $code"
+          node scripts/summarize-ts-errors.cjs "$RUNNER_TEMP/type-diagnostics.log" >> "$GITHUB_STEP_SUMMARY"
+          grep -c 'error TS' "$RUNNER_TEMP/type-diagnostics.log" || true
+          grep -E 'zod|resolver|react-hook-form' "$RUNNER_TEMP/type-diagnostics.log" | head -30 || true
+
+      - name: Save Zod candidate manifests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zod4-candidate
+          path: |
+            package.json
+            package-lock.json
+          retention-days: 3
+
+      - name: Print candidate manifests for connector review
+        if: always()
+        run: |
+          for file in package.json package-lock.json; do
+            if test -s "$file"; then
+              echo "MANIFEST_BEGIN:$file"
+              base64 -w0 "$file" | fold -w 1024 | sed 's/^/MANIFEST_CHUNK:/'
+              echo
+              echo "MANIFEST_END:$file"
+            fi
+          done
