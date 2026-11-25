@@ -26,7 +26,7 @@ jobs:
 
       - name: Upgrade only Zod in isolated candidate
         run: |
-          npm install --save-exact zod@4.6.7 @hookform/resolvers@5.4.3 --package-lock-only --ignore-scripts
+          npm install --save-exact zod@4.6.7 @hookform/resolvers@5.5.8 --package-lock-only --ignore-scripts
           git diff --stat -- package.json package-lock.json
           npm ci
 
