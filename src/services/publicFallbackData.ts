@@ -175,9 +175,10 @@ const EXTRA_STORE_CARDS: FallbackStoreCard[] = [
   name,
   location,
   logo_url: null,
-  is_verified: true,
-  services: ["Mobile Sales", "Accessories", "Exchange", "Repair"],
-  subscription_status: "active",
+  // Static directory candidates cannot be presented as verified merchants.
+  is_verified: false,
+  services: null,
+  subscription_status: null,
 }));
 
 export function getFallbackStoreCards(limit = 12): FallbackStoreCard[] {
@@ -186,15 +187,16 @@ export function getFallbackStoreCards(limit = 12): FallbackStoreCard[] {
     name: store.name,
     location: store.location,
     logo_url: store.logo_url ?? null,
-    is_verified: Boolean(store.is_verified),
+    // Only the live backend may assert verification or subscription status.
+    is_verified: false,
     services: store.services ?? null,
-    subscription_status: store.subscription_status ?? "active",
+    subscription_status: null,
   }));
   return [...primary, ...EXTRA_STORE_CARDS].slice(0, limit);
 }
 
 // An owner listing requires a real seller and an actual listed price.
- // Never fabricate marketplace sellers, availability, location or discounts.
+// Never fabricate marketplace sellers, availability, location or discounts.
 export function getFallbackMarketplaceListings(_limit = 48): SellListingRow[] {
   return [];
 }

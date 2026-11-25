@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getFallbackMarketplaceListings, getFallbackProducts } from "./publicFallbackData";
+import { getFallbackMarketplaceListings, getFallbackProducts, getFallbackStoreCards } from "./publicFallbackData";
 import { getProductAvailability } from "@/lib/productPresentation";
 
 describe("public offline/reference data", () => {
@@ -16,5 +16,12 @@ describe("public offline/reference data", () => {
 
   it("does not invent owner listings, seller locations or negotiated used prices", () => {
     expect(getFallbackMarketplaceListings(100)).toEqual([]);
+  });
+
+  it("does not represent offline store directory suggestions as verified paid merchants", () => {
+    for (const store of getFallbackStoreCards(100)) {
+      expect(store.is_verified).toBe(false);
+      expect(store.subscription_status).toBeNull();
+    }
   });
 });
