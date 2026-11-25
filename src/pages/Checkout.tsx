@@ -16,6 +16,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { SEO } from "@/components/common/SEO";
 import { getErrorMessage, parseProductPrice } from "@/lib/utils";
+import { getProductAvailability } from "@/lib/productPresentation";
 import { isValidEmail, isValidNepalPhone, normalizeEmail, normalizePhone, sanitizeText } from "@/lib/security";
 
 type CreateOrderSecureResponse = {
@@ -93,6 +94,12 @@ export default function Checkout() {
     try {
       if (!selectedMethod) throw new Error("Please select a payment method.");
       if (!user) throw new Error("Please sign in before checkout.");
+      if (cart.some((item) => !getProductAvailability(item.product).purchasable)) {
+        throw new Error("One or more products have unverified stock or pricing. Remove them and try again.");
+      }
+      if (cart.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 10)) {
+        throw new Error("Choose 1–10 units of each product before checkout.");
+      }
       const checkoutPhone = normalizePhone(formData.phone);
       const checkoutEmail = normalizeEmail(formData.email || user.email || "");
       if (!isValidNepalPhone(checkoutPhone)) throw new Error("Enter a valid Nepal mobile number.");

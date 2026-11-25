@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

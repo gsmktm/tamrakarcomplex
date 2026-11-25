@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { getRoleFromEmail, normalizeRole } from "@/lib/roles";
+import { highestGrantedRole } from "@/lib/roleResolution";
 import type { AppRole } from "@/types/app";
 import { normalizeEmail, sanitizeOptionalText } from "@/lib/security";
 
@@ -41,21 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchingRoleForRef.current = authUser.id;
     const rolePromise = (async () => {
       setRoleError(null);
-      const rawMetadataRole =
-        typeof authUser.app_metadata?.role === "string"
-          ? authUser.app_metadata.role
-          : typeof authUser.user_metadata?.role === "string"
-            ? authUser.user_metadata.role
-            : null;
-      const metadataRole = rawMetadataRole ? normalizeRole(rawMetadataRole) : null;
-      const emailRole = getRoleFromEmail(authUser.email);
-
-      // Dev mode: if email role is present, use it without DB query
-      if (import.meta.env.DEV && emailRole) {
-        setRole(emailRole);
-        return;
-      }
-
       try {
         // Read the role assignment. A transient network/RLS failure must not
         // silently demote an admin to "user" — retry once before giving up.
@@ -72,30 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (attempt === 0) await new Promise((r) => setTimeout(r, 600));
         }
 
-        if (!tableError && tableData && tableData.length > 0) {
-          const roles = tableData.map((row) => normalizeRole(row.role));
-          if (roles.includes("suadmin")) setRole("suadmin");
-          else if (roles.includes("staffadmin")) setRole("staffadmin");
-          else if (roles.includes("storeadmin")) setRole("storeadmin");
-          else if (roles.includes("storestaff")) setRole("storestaff");
-          else setRole("user");
-          return;
-        }
-
-        // 3. Last resort: metadata heuristics only - no email-based bypass
-        const finalRole = emailRole ?? metadataRole ?? "user";
-
-        setRole(finalRole);
-        if (!emailRole && !metadataRole && finalRole === "user") {
-          const reason = tableError
-            ? "Role lookup failed after retry. Please sign out and sign back in."
-            : "No role assigned. Using guest access.";
-          setRoleError(reason);
-          console.error("Auth: user_roles lookup failed:", tableError);
-        }
+        // Database role assignments are authoritative. Never elevate from
+        // user_metadata, email substrings or cached role hints during an outage.
+        if (tableError) throw tableError;
+        setRole(highestGrantedRole(tableData));
       } catch (error) {
         console.error("Auth: Role resolution failed:", error);
-        setRole(emailRole ?? metadataRole ?? "user");
+        setRole("user");
+        setRoleError("Role verification unavailable. Administrative access is disabled until the role lookup succeeds.");
       } finally {
         fetchingRoleForRef.current = null;
         fetchingRolePromiseRef.current = null;
@@ -218,6 +187,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInAsDev = async (devRole: AppRole) => {
+    if (!import.meta.env.DEV) {
+      throw new Error("Developer sign-in is available only in development mode.");
+    }
     const mockUser = {
       id: `dev-${devRole}-id-123`,
       email: `dev-${devRole}@tamrakarcomplex.com`,

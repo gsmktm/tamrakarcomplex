@@ -102,7 +102,7 @@ const AppContent = () => {
   }, []);
 
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter>
       <SkipToContent />
       <VisitorTracker />
       <SiteSettingsHydrator />

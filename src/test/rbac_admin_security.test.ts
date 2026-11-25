@@ -88,7 +88,7 @@ describe("Phase 6 — RBAC classification: privileged mutations by role", () => 
     // "must_use_service"     = Must go through Edge Function (auth.uid check too weak)
 
     const RPC_CLASSIFICATION: Record<string, {
-      requires: "suadmin" | "staffadmin" | "storeadmin" | "suadmin|staffadmin";
+      requires: "suadmin" | "staffadmin" | "storeadmin" | "suadmin|staffadmin" | "suadmin|staffadmin|storeadmin";
       uses_rls: boolean;
       has_audit: boolean;
     }> = {

@@ -69,14 +69,14 @@ export function getFallbackProducts(): Product[] {
       price_value: item.retail_npr ?? null,
       image: item.image,
       images: [item.image],
-      rating: 4.5,
+      rating: null,
       reviews_count: 0,
       category: CATEGORY_BY_BRAND[item.brand] || "Smartphones",
       specs: null,
-      highlights: ["Nepal market price", "Tamrakar fallback catalog"],
+      highlights: ["Unverified reference price", "Availability not confirmed"],
       description: `${name} Nepal market reference listing.`,
-      in_stock: true,
-      featured: item.id % 7 === 0,
+      in_stock: false,
+      featured: false,
       source_site: "local-fallback",
       created_at: new Date(Date.now() - item.id % 30 * 86_400_000).toISOString(),
       updated_at: new Date().toISOString(),
@@ -175,9 +175,10 @@ const EXTRA_STORE_CARDS: FallbackStoreCard[] = [
   name,
   location,
   logo_url: null,
-  is_verified: true,
-  services: ["Mobile Sales", "Accessories", "Exchange", "Repair"],
-  subscription_status: "active",
+  // Static directory candidates cannot be presented as verified merchants.
+  is_verified: false,
+  services: null,
+  subscription_status: null,
 }));
 
 export function getFallbackStoreCards(limit = 12): FallbackStoreCard[] {
@@ -186,38 +187,16 @@ export function getFallbackStoreCards(limit = 12): FallbackStoreCard[] {
     name: store.name,
     location: store.location,
     logo_url: store.logo_url ?? null,
-    is_verified: Boolean(store.is_verified),
+    // Only the live backend may assert verification or subscription status.
+    is_verified: false,
     services: store.services ?? null,
-    subscription_status: store.subscription_status ?? "active",
+    subscription_status: null,
   }));
   return [...primary, ...EXTRA_STORE_CARDS].slice(0, limit);
 }
 
-export function getFallbackMarketplaceListings(limit = 48): SellListingRow[] {
-  const stores = STORES.length ? STORES : [];
-  return PRODUCTS.slice(0, limit).map((product, index) => {
-    const store = stores[index % Math.max(stores.length, 1)] as StoreDirectoryItem | undefined;
-    const usedFactor = index % 5 === 0 ? 0.72 : index % 3 === 0 ? 0.82 : 0.92;
-    const price = Math.max(5000, Math.round((product.retail_npr || 30_000) * usedFactor));
-    const brand = product.brand;
-    const model = product.model.replace(/\s*\([^)]*\)\s*$/, "");
-    const condition = index % 5 === 0 ? "used" : index % 3 === 0 ? "like_new" : "new";
-    return {
-      id: `fallback-listing-${product.id}`,
-      user_id: null,
-      store_id: store?.id ?? null,
-      title: `${product.brand} ${product.model}`,
-      description: `Available through Tamrakar Complex marketplace fallback catalog.`,
-      brand,
-      model,
-      category: "mobile",
-      condition,
-      price,
-      images: [product.image],
-      location: store?.location || "Tamrakar Complex, Kathmandu",
-      status: "active",
-      created_at: new Date(Date.now() - index * 3_600_000).toISOString(),
-      updated_at: new Date().toISOString(),
-    } as SellListingRow;
-  });
+// An owner listing requires a real seller and an actual listed price.
+// Never fabricate marketplace sellers, availability, location or discounts.
+export function getFallbackMarketplaceListings(_limit = 48): SellListingRow[] {
+  return [];
 }

@@ -119,6 +119,10 @@ export default function StoreTeamManager() {
     enabled: !!selectedStore,
   });
 
+  // UI quota guidance; server-side limits must still be enforced by RLS/RPC.
+  const currentStaffCount = team?.length ?? 0;
+  const isLimitReached = staffLimit >= 0 && currentStaffCount >= staffLimit;
+
   const addMemberMutation = useMutation({
     mutationFn: async () => {
       if (!selectedStore || !newMemberEmail) return;

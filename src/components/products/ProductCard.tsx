@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useCompareStore } from "@/hooks/useCompareStore";
 import { cn } from "@/lib/utils";
-import { resolveProductDetailImage } from "@/lib/productPresentation";
+import { getProductAvailability, resolveProductDetailImage } from "@/lib/productPresentation";
 
 interface ProductCardProps {
   product: Product;
@@ -50,7 +50,8 @@ export function ProductCard({ product }: ProductCardProps) {
   const navigate = useNavigate();
 
   const isComparing = items.some((item) => item.id === product.id);
-  const outOfStock = product.in_stock === false;
+  const availability = getProductAvailability(product);
+  const outOfStock = !availability.purchasable;
   const thumbnail = resolveProductDetailImage(product);
   const previousPrice = extractPreviousPrice(product);
   const specsBadges = extractSpecsBadges(product);
@@ -91,7 +92,7 @@ export function ProductCard({ product }: ProductCardProps) {
     <Link
       to={`/product/${product.slug}`}
       className="group relative flex flex-col bg-card border border-border hover:border-primary/40 transition-colors duration-200 h-full"
-      aria-label={`${product.name}${outOfStock ? " — out of stock" : ""}`}
+      aria-label={`${product.name}${outOfStock ? ` — ${availability.status.toLowerCase()}` : ""}`}
     >
       {/* Image */}
       <div className="relative aspect-square bg-secondary/40 overflow-hidden">
@@ -124,7 +125,7 @@ export function ProductCard({ product }: ProductCardProps) {
         {outOfStock && (
           <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border border-border px-3 py-1 bg-background">
-              Out of stock
+              {availability.status}
             </span>
           </div>
         )}

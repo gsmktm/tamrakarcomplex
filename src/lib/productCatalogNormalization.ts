@@ -21,9 +21,19 @@ export function canonicalProductKey(product: Pick<CatalogProductLike, "brand" | 
 }
 
 export function parseNprPrice(value: string) {
-  const numeric = Number(value.replace(/[^0-9.]/g, ""));
-  if (!Number.isFinite(numeric) || numeric <= 0) throw new Error("Enter a valid price greater than zero");
-  return Math.round(numeric);
+  // Keep everyday Nepal formats, including "NPR 1,39,999" and "Rs. 1,000/-",
+  // but do not turn "-500", "USD 500", "500abc" or "1e6" into valid prices.
+  const withoutCurrency = value.trim().replace(/^(?:NPR|RS\.?|रु\.?|₨)\s*/i, "");
+  const amount = withoutCurrency.replace(/\s*\/-\s*$/, "").trim();
+  if (!/^(?:\d+|\d{1,3}(?:,\d{3})+|\d{1,3}(?:,\d{2})+,\d{3})(?:\.\d{1,2})?$/.test(amount)) {
+    throw new Error("Enter a valid price greater than zero");
+  }
+  const numeric = Number(amount.replace(/,/g, ""));
+  const rounded = Math.round(numeric);
+  if (!Number.isFinite(numeric) || numeric <= 0 || !Number.isSafeInteger(rounded) || rounded <= 0) {
+    throw new Error("Enter a valid price greater than zero");
+  }
+  return rounded;
 }
 
 export function formatNprPrice(value: number) {

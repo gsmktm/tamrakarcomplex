@@ -120,9 +120,9 @@ describe("Permission checks", () => {
     expect(canAccessModule("storeadmin", "staff", null, "view", ["products", "orders"])).toBe(false);
   });
 
-  it("storeadmin grants undefined (loading) allow, empty (loaded) deny", () => {
-    // undefined = still loading -> allow so menu does not flash hidden
-    expect(canAccessModule("storeadmin", "products", null, "view", undefined)).toBe(true);
+  it("storeadmin grants undefined (loading) deny, empty (loaded) deny", () => {
+    // A loading state belongs in the route/UI; a permissions check must fail closed.
+    expect(canAccessModule("storeadmin", "products", null, "view", undefined)).toBe(false);
     // [] = loaded with no grants -> deny
     expect(canAccessModule("storeadmin", "products", null, "view", [])).toBe(false);
   });
@@ -131,8 +131,8 @@ describe("Permission checks", () => {
     const item = { href: "/storeadmin/products", requiredRole: "storeadmin" as const, requiredModule: "products", enabled: true };
     expect(canSeeMenuItem("storeadmin", item, null, ["products"])).toBe(true);
     expect(canSeeMenuItem("storeadmin", item, null, ["orders"])).toBe(false);
-    // loading (undefined) keeps the item visible
-    expect(canSeeMenuItem("storeadmin", item, null, undefined)).toBe(true);
+    // loading (undefined) keeps the protected menu item hidden.
+    expect(canSeeMenuItem("storeadmin", item, null, undefined)).toBe(false);
   });
 
   it("canSeeMenuItem shows unpermissioned storeadmin items regardless of grants", () => {

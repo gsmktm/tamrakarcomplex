@@ -26,4 +26,17 @@ describe("product catalog normalization", () => {
     expect(formatNprPrice(139999)).toBe("Rs. 1,39,999");
     expect(() => parseNprPrice("Contact us")).toThrow();
   });
+
+  it("accepts familiar Nepalese price entry formats", () => {
+    expect(parseNprPrice("Rs. 46,835")).toBe(46835);
+    expect(parseNprPrice("Rs. 1,000/-")).toBe(1000);
+    expect(parseNprPrice("रु. 500")).toBe(500);
+    expect(parseNprPrice("1200")).toBe(1200);
+  });
+
+  it("rejects negative, misleading, zero and malformed prices", () => {
+    for (const value of ["-500", "Rs. -500", "USD 500", "500abc", "1e6", "1.2.3", "0", "Rs. 0", "Infinity", "123.456", "1,,000", "1,2,3"]) {
+      expect(() => parseNprPrice(value)).toThrow("Enter a valid price greater than zero");
+    }
+  });
 });

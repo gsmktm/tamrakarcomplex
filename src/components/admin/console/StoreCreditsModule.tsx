@@ -72,7 +72,7 @@ export function StoreCreditsModule() {
           id: u.id,
           full_name: u.full_name ?? null,
           email: u.email ?? null,
-          role: (u.role ?? "public_user") as AppRole,
+          role: (u.role ?? "user") as AppRole,
         }));
       }
 
@@ -85,7 +85,7 @@ export function StoreCreditsModule() {
         id: p.user_id,
         full_name: p.display_name ?? "Unknown",
         email: null,
-        role: "public_user",
+        role: "user",
       }));
     },
     staleTime: 30_000,
@@ -118,7 +118,7 @@ export function StoreCreditsModule() {
   >({
     queryKey: ["console-store-credit-recent"],
     queryFn: async () => {
-      const { data, error } = await sb
+      const { data, error } = await supabase
         .from("store_credit_transactions")
         .select("id, user_id, store_id, amount, reason, created_at, created_by")
         .order("created_at", { ascending: false })

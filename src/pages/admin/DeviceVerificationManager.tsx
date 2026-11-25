@@ -187,7 +187,7 @@ export default function DeviceVerificationManager() {
   const bulkUpdateVerificationMutation = useMutation({
     mutationFn: ({ ids, verified }: { ids: string[]; verified: boolean }) =>
       deviceVerificationService.bulkUpdateVerification(ids, verified),
-    onSuccess: () => {
+    onSuccess: (_result, { verified }) => {
       queryClient.invalidateQueries({ queryKey: ["device-verification"] });
       queryClient.invalidateQueries({ queryKey: ["verification-stats"] });
       queryClient.invalidateQueries({ queryKey: ["verification-audit"] });

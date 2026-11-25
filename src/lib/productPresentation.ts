@@ -35,15 +35,16 @@ export function resolveProductDetailImage(product: Product) {
   return isTrustedProductImage(product, product.image) ? product.image : "/default-product.svg";
 }
 
-export function getProductAvailability(product: Pick<Product, "in_stock" | "price_value" | "price">) {
+export function getProductAvailability(product: Pick<Product, "in_stock" | "price_value" | "price" | "source_site">) {
   const priceValue = Number(product.price_value);
   const hasPrice = Number.isFinite(priceValue) && priceValue > 0;
-  const purchasable = product.in_stock === true && hasPrice;
+  const referenceOnly = product.source_site === "local-fallback";
+  const purchasable = product.in_stock === true && hasPrice && !referenceOnly;
   return {
     purchasable,
     hasPrice,
-    status: purchasable ? "In stock" : "Out of stock",
-    priceLabel: purchasable ? "Current selling price" : hasPrice ? "Last listed price" : "Price unavailable",
+    status: referenceOnly ? "Stock unverified" : purchasable ? "In stock" : "Out of stock",
+    priceLabel: referenceOnly ? "Indicative price (unverified)" : purchasable ? "Current selling price" : hasPrice ? "Last listed price" : "Price unavailable",
     displayPrice: hasPrice ? product.price : "Contact a verified seller",
   };
 }
