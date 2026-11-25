@@ -29,10 +29,20 @@ jobs:
 
       # Keep checks independent so an existing type failure cannot hide later
       # test, lint or migration results. The final gate still fails the job.
+      - name: Test TypeScript diagnostic summarizer
+        run: node --test scripts/summarize-ts-errors.test.cjs
+
       - name: Type-check
         id: typecheck
         continue-on-error: true
-        run: npx tsc -p tsconfig.app.json --noEmit
+        run: |
+          # Preserve the real tsc exit status while making diagnostics actionable.
+          set +e
+          npx tsc -p tsconfig.app.json --noEmit 2>&1 | tee "$RUNNER_TEMP/tsc.log"
+          type_status=${PIPESTATUS[0]}
+          set -e
+          node scripts/summarize-ts-errors.cjs "$RUNNER_TEMP/tsc.log" >> "$GITHUB_STEP_SUMMARY"
+          exit "$type_status"
 
       - name: Lint
         id: lint
