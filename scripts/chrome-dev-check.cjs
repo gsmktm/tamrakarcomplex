@@ -102,11 +102,15 @@ function dumpDom(url) {
 }
 
 async function main() {
+  // Don't hold unread stdout/stderr pipes open: Vite's child process can
+  // inherit them and prevent this smoke-check process from exiting.
   const preview = spawn("npm", ["run", "preview", "--", "--host", "127.0.0.1", "--port", checkPort], {
     cwd: process.cwd(),
-    stdio: "pipe",
+    stdio: "ignore",
+    detached: process.platform !== "win32",
     env: process.env,
   });
+  preview.unref();
 
   try {
     const ready = await waitForServer(baseUrl);
@@ -166,7 +170,19 @@ async function main() {
       console.log("\nChrome DOM capture was unavailable; browser validation did not pass.");
     }
   } finally {
-    preview.kill("SIGTERM");
+    try {
+      // npm can leave a Vite grandchild alive. On POSIX, a detached preview
+      // owns a new process group so one signal cleans up the whole group.
+      if (process.platform !== "win32" && preview.pid) {
+        process.kill(-preview.pid, "SIGTERM");
+      } else {
+        preview.kill("SIGTERM");
+      }
+    } catch (error) {
+      if (error.code !== "ESRCH") {
+        console.warn("Preview cleanup warning:", error.message);
+      }
+    }
   }
 }
 

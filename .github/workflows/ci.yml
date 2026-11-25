@@ -79,6 +79,9 @@ jobs:
         id: browser
         if: steps.build.outcome == 'success'
         continue-on-error: true
+        # Never allow a stuck headless-browser child to monopolize a runner.
+        # A timeout still fails the required browser gate.
+        timeout-minutes: 6
         run: npm run chrome:check
 
       - name: Enforce every quality gate
