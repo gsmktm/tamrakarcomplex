@@ -25,7 +25,7 @@ export function parseNprPrice(value: string) {
   // but do not turn "-500", "USD 500", "500abc" or "1e6" into valid prices.
   const withoutCurrency = value.trim().replace(/^(?:NPR|RS\.?|रु\.?|₨)\s*/i, "");
   const amount = withoutCurrency.replace(/\s*\/-\s*$/, "").trim();
-  if (!/^\d[\d,]*(?:\.\d{1,2})?$/.test(amount)) {
+  if (!/^(?:\d+|\d{1,3}(?:,\d{3})+|\d{1,3}(?:,\d{2})+,\d{3})(?:\.\d{1,2})?$/.test(amount)) {
     throw new Error("Enter a valid price greater than zero");
   }
   const numeric = Number(amount.replace(/,/g, ""));
