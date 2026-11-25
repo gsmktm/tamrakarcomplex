@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { assertAllowedOrigin, getCorsHeaders, requireUser } from '../_shared/cors.ts'
+import { parseOrderQuantity } from '../_shared/commerce.ts'
 
 console.log('create-order-secure function loaded')
 
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
       store_product_id: cleanText(item.store_product_id, 40) || null,
       catalog_product_id: cleanText(item.catalog_product_id, 40) || null,
       source_type: cleanText(item.source_type, 30) || 'product',
-      quantity: Math.max(1, Math.min(10, Math.floor(Number(item.quantity) || 1))),
+      quantity: parseOrderQuantity(item.quantity),
     }))
     if (safeItems.some((item) => !item.product_id && !item.store_product_id && !item.catalog_product_id)) {
       throw new Error('Each item must identify an inventory item')

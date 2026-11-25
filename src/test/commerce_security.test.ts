@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   computeLine,
   computeOrderTotal,
+  parseOrderQuantity,
   assertStoreAssigned,
   resolveInitialOrderStatus,
   assertAmountMatches,
@@ -37,10 +38,13 @@ describe("checkout — server-authoritative totals", () => {
     expect(computeOrderTotal(lines)).toBe(250);
   });
 
-  it("floors/clamps quantity to >= 1 integer", () => {
-    expect(computeLine({ product_id: "p1", quantity: 2.9 }, product()).quantity).toBe(2);
-    expect(computeLine({ product_id: "p1", quantity: 0 }, product()).quantity).toBe(1);
-    expect(computeLine({ product_id: "p1", quantity: -5 }, product()).quantity).toBe(1);
+  it("rejects invalid or tampered quantity rather than silently charging a different amount", () => {
+    for (const value of [0, -5, 2.9, 11, NaN, Infinity, "2", null]) {
+      expect(() => parseOrderQuantity(value)).toThrow(/Quantity must/);
+    }
+    expect(computeLine({ product_id: "p1", quantity: 2 }, product()).quantity).toBe(2);
+    expect(() => computeLine({ product_id: "p1", quantity: 2.9 }, product())).toThrow(/Quantity must/);
+    expect(() => computeLine({ product_id: "p1", quantity: 11 }, product())).toThrow(/Quantity must/);
   });
 });
 

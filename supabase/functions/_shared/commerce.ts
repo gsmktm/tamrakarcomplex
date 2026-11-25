@@ -28,9 +28,17 @@ export type ValidatedLine = {
   total_price: number;
 };
 
+/** Reject invalid quantities instead of silently lowering or increasing charges. */
+export function parseOrderQuantity(value: unknown, max = 10): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > max) {
+    throw new Error(`Quantity must be a whole number between 1 and ${max}`);
+  }
+  return value;
+}
+
 /** Recompute a single line from the DB-resolved product. Never uses client price. */
 export function computeLine(item: CheckoutItem, product: ResolvedProduct): ValidatedLine {
-  const quantity = Math.max(1, Math.floor(Number(item.quantity ?? 1)));
+  const quantity = parseOrderQuantity(item.quantity ?? 1);
   const unit_price = Number(product.price_npr);
   if (!Number.isFinite(unit_price) || unit_price <= 0) {
     throw new Error(`Invalid price for product ${product.name}`);
