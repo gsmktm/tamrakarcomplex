@@ -35,7 +35,7 @@ describe("product catalog normalization", () => {
   });
 
   it("rejects negative, misleading, zero and malformed prices", () => {
-    for (const value of ["-500", "Rs. -500", "USD 500", "500abc", "1e6", "1.2.3", "0", "Rs. 0", "Infinity", "123.456"]) {
+    for (const value of ["-500", "Rs. -500", "USD 500", "500abc", "1e6", "1.2.3", "0", "Rs. 0", "Infinity", "123.456", "1,,000", "1,2,3"]) {
       expect(() => parseNprPrice(value)).toThrow("Enter a valid price greater than zero");
     }
   });
