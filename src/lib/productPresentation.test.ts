@@ -29,6 +29,13 @@ describe("product presentation", () => {
     expect(getProductAvailability({ ...product, in_stock: true, price_value: 0 }).purchasable).toBe(false);
   });
 
+  it("never allows purchases of illustrative fallback stock or labels its price as verified", () => {
+    const fallback = getProductAvailability({ ...product, in_stock: true, source_site: "local-fallback" });
+    expect(fallback.purchasable).toBe(false);
+    expect(fallback.status).toBe("Stock unverified");
+    expect(fallback.priceLabel).toBe("Indicative price (unverified)");
+  });
+
   it("replaces mismatched imported artwork with verified model artwork", () => {
     expect(resolveProductDetailImage(product)).toBe("https://fdn2.gsmarena.com/vv/bigpic/oneplus-11.jpg");
   });

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Product } from "@/hooks/useProducts";
 import { parseProductPrice } from "@/lib/utils";
+import { getProductAvailability } from "@/lib/productPresentation";
 
 export interface CartItem {
   product: Product;
@@ -35,8 +36,20 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   }, [cart]);
 
   const addToCart = (product: Product, quantity = 1) => {
+    if (!getProductAvailability(product).purchasable) {
+      toast.error("This product is not confirmed available for checkout.");
+      return;
+    }
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) {
+      toast.error("Choose between 1 and 10 units.");
+      return;
+    }
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
+      if (existing && existing.quantity + quantity > 10) {
+        toast.error("Maximum 10 units of each product per order.");
+        return prev;
+      }
       if (existing) {
         toast.success("Updated quantity in cart");
         return prev.map((item) =>
@@ -56,6 +69,10 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
+    if (!Number.isInteger(quantity) || quantity > 10) {
+      toast.error("Maximum 10 units per product.");
+      return;
+    }
     if (quantity < 1) {
       removeFromCart(productId);
       return;
