@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { handleSupabaseError } from "@/lib/supabaseErrorHandler";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CONTACT_MESSAGES_COLUMNS } from "@/lib/supabaseColumnMaps";
