@@ -1,0 +1,75 @@
+name: Dependency Repair Candidate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  nonbreaking-upgrades:
+    name: Candidate - safe npm audit fixes
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'chore/engineering-skills-ci-price-20261125'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout candidate commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Resolve nonbreaking dependency fixes
+        run: |
+          npm ci
+          # This is an advisory proposal only. Do not use --force or deploy.
+          npm audit fix --package-lock-only --ignore-scripts > "$RUNNER_TEMP/audit-fix.log" 2>&1 || true
+          cat "$RUNNER_TEMP/audit-fix.log"
+          git diff --stat -- package-lock.json
+          test -s package-lock.json
+
+      - name: Verify candidate dependency installation
+        run: npm ci
+
+      - name: Verify candidate tests
+        run: npm test
+
+      - name: Verify candidate lint
+        run: npm run lint
+
+      - name: Verify candidate build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_REQUIRE_SUBSCRIPTION: "true"
+          SITE_URL: ${{ secrets.SITE_URL }}
+          NODE_ENV: production
+
+      - name: Print remaining high and critical production findings
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Save reviewed lockfile candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-lock-candidate
+          path: package-lock.json
+          retention-days: 3
+
+      # Expose only the lockfile bytes for connector-based review and selective
+      # commit. No secrets, tokens, source files, or environment values are printed.
+      - name: Print lockfile candidate for review
+        if: always()
+        run: |
+          if test -s package-lock.json; then
+            echo 'LOCK_CANDIDATE_BEGIN'
+            base64 -w0 package-lock.json | fold -w 1024 | sed 's/^/LOCK_CHUNK:/'
+            echo 'LOCK_CANDIDATE_END'
+          fi
