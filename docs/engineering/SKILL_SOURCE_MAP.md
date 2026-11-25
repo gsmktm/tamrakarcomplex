@@ -34,6 +34,10 @@ Other repositories in the supplied list (Dify, JavaGuide, CC Switch, video tools
 - `.mcp.json` previously pointed to a specific unrelated developer's local Jetro binary. It has been reset to an empty list; connect approved MCP servers through each developer's own secure configuration.
 - This PR does **not** regenerate Supabase production types, change live RLS, execute payments, deploy, or claim all TypeScript errors resolved.
 
+## Security audit caveat
+
+The 2026-11-25 audit workflow previously **looked green** despite npm audit exiting 1 due to `continue-on-error: true`. Its production report found six vulnerabilities including three high-severity items. Security workflow now uses a blocking production audit and Node 22; see [issue #102](https://github.com/gsmktm/tamrakarcomplex/issues/102). CodeQL success does not override vulnerable dependencies. Do not force Zod v3 to v4 without a migration plan and tests.
+
 ## Next code work (separate verified slices)
 
 1. Regenerate and inspect Supabase types from the correct authorized database or schema snapshot; reconcile all migrations before modifying queries.
