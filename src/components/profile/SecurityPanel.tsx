@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { safeText } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,31 +14,53 @@ import { toast } from "sonner";
 export function SecurityPanel() {
   const { user, signOut } = useAuth();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [isRevokingSessions, setIsRevokingSessions] = useState(false);
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      toast.error("Please sign in again.");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast.error("New passwords don't match");
       return;
     }
-    if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (newPassword.length < 12) {
+      toast.error("Password must have at least 12 characters.");
       return;
     }
-    // Implement password change logic
-    toast.success("Password changed successfully");
-    setChangePasswordOpen(false);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
+
+    setIsUpdatingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast.success("Password updated successfully.");
+      setChangePasswordOpen(false);
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Password update failed.");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
-  const handleSignOutOtherSessions = () => {
-    // Implement sign out other sessions
-    toast.success("Signed out from other sessions");
+  const handleSignOutOtherSessions = async () => {
+    setIsRevokingSessions(true);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: "others" });
+      if (error) throw error;
+      toast.success("Other sessions signed out. Existing access tokens may remain valid until expiry.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not sign out other sessions.");
+    } finally {
+      setIsRevokingSessions(false);
+    }
   };
 
   return (
@@ -60,7 +83,7 @@ export function SecurityPanel() {
               <Label>Email</Label>
               <div className="flex items-center gap-2">
                 <Input value={user?.email} disabled />
-                <Badge variant="secondary">Verified</Badge>
+                <Badge variant="secondary">{user?.email_confirmed_at ? "Verified" : "Not verified"}</Badge>
               </div>
             </div>
 
@@ -77,13 +100,7 @@ export function SecurityPanel() {
                 </DialogHeader>
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="current">Current Password</Label>
-                    <Input
-                      id="current"
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                    />
+                    <p className="text-sm text-muted-foreground">Your identity provider may request additional verification when updating your password.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="new">New Password</Label>
@@ -107,7 +124,7 @@ export function SecurityPanel() {
                     <Button type="button" variant="outline" onClick={() => setChangePasswordOpen(false)}>
                       Cancel
                     </Button>
-                    <Button type="submit">Update Password</Button>
+                    <Button type="submit" disabled={isUpdatingPassword}>{isUpdatingPassword ? "Updating..." : "Update Password"}</Button>
                   </div>
                 </form>
               </DialogContent>
@@ -128,8 +145,8 @@ export function SecurityPanel() {
               <div className="text-sm text-muted-foreground">
                 Currently signed in on this device
               </div>
-              <Button variant="outline" onClick={handleSignOutOtherSessions}>
-                Sign Out Other Sessions
+              <Button variant="outline" onClick={() => void handleSignOutOtherSessions()} disabled={isRevokingSessions}>
+                {isRevokingSessions ? "Signing out..." : "Sign Out Other Sessions"}
               </Button>
             </div>
 
@@ -166,7 +183,7 @@ export function SecurityPanel() {
                 <span className="text-sm">Email</span>
                 <div className="flex items-center gap-2">
                   <Input value={safeText(user?.email)} disabled />
-                  <Badge variant="secondary">Verified</Badge>
+                  <Badge variant="secondary">{user?.email_confirmed_at ? "Verified" : "Not verified"}</Badge>
                 </div>
               </div>
             </div>
@@ -208,7 +225,7 @@ export function SecurityPanel() {
                 <Smartphone className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <div className="font-medium">Current Session</div>
-                  <div className="text-sm text-muted-foreground">Chrome on macOS • Kathmandu, Nepal</div>
+                  <div className="text-sm text-muted-foreground">This browser session • device and location unverified</div>
                 </div>
               </div>
               <Badge variant="secondary">Active</Badge>
